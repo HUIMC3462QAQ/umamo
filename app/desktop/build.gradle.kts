@@ -342,9 +342,12 @@ run {
 
 // The Linux installers (D4): a .deb and an .rpm, built by jpackage over createDistributable's image rather than by
 // the plugin's packageDeb / packageRpm.  The plugin fixes jpackage's resource directory and empties it on every run,
-// and the project needs files of its own there (packaging/linux):
+// and the project needs files of its own there (packaging/linux, assembled with the desktop entry by
+// linuxInstallerResources):
 //   * umamo.desktop - jpackage's own menu entry reads "umamo" and starts the launcher without the file it was
-//     asked to open (no %f), so a double-clicked .uma would open an empty editor.
+//     asked to open (no %f), so a double-clicked .uma would open an empty editor.  The installers' entry is the
+//     tarball's own (resources/linux/umamo.desktop), rewritten where an installed launcher differs from an unpacked
+//     one, so the two cannot drift apart.
 //   * umamo.spec - JDK 21's spec removes the menu entry and the .uma registration in %preun without checking for an
 //     upgrade (JDK-8301856, fixed in 22), and an RPM upgrade runs the OLD package's %preun after the new %post.
 //     The guarded spec has to be in the first RPM ever published, since that is the one whose %preun runs.
@@ -383,6 +386,39 @@ val linuxRpmLibraryRequirements =
 		"libfontconfig.so.1()(64bit)",
 		"libasound.so.2()(64bit)",
 	)
+// jpackage's resource directory for the Linux installers: the templates, and the tarball's desktop entry with what an
+// install knows and an unpacked archive does not.  jpackage fills in the launcher's and the icon's absolute paths
+// (APPLICATION_LAUNCHER, APPLICATION_ICON, placeholders it replaces anywhere in the file, comments included), so
+// TryExec, which looks the launcher up on the PATH, and the comments, which tell a tarball user how to register the
+// entry by hand, go.  A rewrite that stops matching the tarball's entry fails the build instead of installing an entry
+// that cannot start the app.
+val linuxInstallerResourceDirectory = layout.buildDirectory.dir("compose/tmp/linux/jpackage-resources")
+val linuxInstallerResources =
+	tasks.register<Sync>("linuxInstallerResources") {
+		description = "Assembles jpackage's resource directory for the Linux installers."
+		from("packaging/linux")
+		from("resources/linux/umamo.desktop") {
+			filteringCharset = "UTF-8"
+			filter(
+				Transformer<String?, String> { line ->
+					when {
+						line.startsWith("#") || line.startsWith("TryExec=") -> null
+						line.startsWith("Exec=umamo ") -> "Exec=APPLICATION_LAUNCHER " + line.removePrefix("Exec=umamo ")
+						line == "Icon=umamo" -> "Icon=APPLICATION_ICON"
+						else -> line
+					}
+				},
+			)
+		}
+		into(linuxInstallerResourceDirectory)
+		val installedEntry = linuxInstallerResourceDirectory.get().file("umamo.desktop").asFile
+		doLast {
+			val lines = installedEntry.readLines()
+			check("Exec=APPLICATION_LAUNCHER %f" in lines && "Icon=APPLICATION_ICON" in lines) {
+				"resources/linux/umamo.desktop no longer has the Exec=umamo %f and Icon=umamo lines the installers' entry is rewritten from"
+			}
+		}
+	}
 val isLinuxHost = System.getProperty("os.name").startsWith("Linux")
 for (packageType in listOf("deb", "rpm")) {
 	val imageDirectory = layout.buildDirectory.dir("compose/binaries/main/app/$packageBaseName").get().asFile
@@ -394,10 +430,10 @@ for (packageType in listOf("deb", "rpm")) {
 	tasks.register<Exec>("packageLinux" + packageType.replaceFirstChar(Char::uppercaseChar)) {
 		group = "compose desktop"
 		description = "Builds the Linux .$packageType installer from createDistributable's app image."
-		dependsOn("createDistributable", linuxFileAssociation)
+		dependsOn("createDistributable", linuxFileAssociation, linuxInstallerResources)
 		onlyIf("the Linux installers are built on Linux") { buildsOnLinux }
 		inputs.dir(imageDirectory).withPropertyName("appImage")
-		inputs.dir("packaging/linux").withPropertyName("packagingTemplates")
+		inputs.dir(linuxInstallerResourceDirectory).withPropertyName("packagingTemplates")
 		inputs.file("icons/umamo.png").withPropertyName("icon")
 		inputs.file(associationFile).withPropertyName("fileAssociation")
 		inputs.property("installerVersion", installerVersion)
@@ -421,7 +457,7 @@ for (packageType in listOf("deb", "rpm")) {
 				"--copyright" to appCopyright,
 				"--license-file" to rootProject.file("LICENSE").absolutePath,
 				"--about-url" to appAboutUrl,
-				"--resource-dir" to project.file("packaging/linux").absolutePath,
+				"--resource-dir" to linuxInstallerResourceDirectory.get().asFile.absolutePath,
 				"--file-associations" to associationFile.absolutePath,
 				// Identities: the package name and /opt/umamo, which every later package upgrades in place.
 				"--install-dir" to "/opt",
@@ -451,7 +487,6 @@ val filesReadByTests =
 		"resources/linux/umamo-uma.xml",
 		"resources/linux/umamo.desktop",
 		"packaging/windows/main.wxs",
-		"packaging/linux/umamo.desktop",
 		"packaging/linux/umamo.spec",
 		"packaging/linux/control",
 		"packaging/linux/postinst",

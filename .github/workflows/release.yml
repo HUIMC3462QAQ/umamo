@@ -422,6 +422,11 @@ jobs:
           deb_contents="$(dpkg-deb -c "${deb}")"
           grep -q ' ./opt/umamo/bin/umamo$' <<< "${deb_contents}" || fail "the .deb does not install /opt/umamo/bin/umamo"
           grep -q ' ./opt/umamo/lib/umamo-umamo.desktop$' <<< "${deb_contents}" || fail "the .deb carries no menu entry"
+          # The menu entry is the tarball's, rewritten by linuxInstallerResources: it must start the installed launcher
+          # with the file as a path.
+          deb_entry="$(dpkg-deb --fsys-tarfile "${deb}" | tar -xO ./opt/umamo/lib/umamo-umamo.desktop)"
+          echo "${deb_entry}"
+          grep -qxF 'Exec=/opt/umamo/bin/umamo %f' <<< "${deb_entry}" || fail "the .deb's menu entry does not start /opt/umamo/bin/umamo with the file"
           rpm_file="$(ls "${binaries}"/rpm/*.rpm)"
           rpm -qip "${rpm_file}"
           rpm_requires="$(rpm -qp --requires "${rpm_file}")"
