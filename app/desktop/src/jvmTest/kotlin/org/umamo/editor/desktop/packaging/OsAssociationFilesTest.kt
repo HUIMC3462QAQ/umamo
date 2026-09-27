@@ -19,9 +19,10 @@ import kotlin.test.assertTrue
 /**
  * Holds every operating-system registration of the `.uma` type to the codec.  The type is declared in places no
  * compiler connects - the tarball's freedesktop MIME entry and desktop entry (which the Linux installers install too,
- * rewritten by the build), the desktop package's build script, and the Android manifest - and a registration that names another string, or a
- * magic rule that reads another offset, fails silently: the file manager just stops recognising the file.  The magic is not compared to a table here,
- * it is EVALUATED against the bytes the writer really produces (docs/format/UMA.md § 2).
+ * rewritten by the build), the desktop package's build script, and the Android manifest - and a registration that
+ * names another string, or a magic rule that reads another offset, fails silently: the file manager just stops
+ * recognising the file.  The magic is not compared to a table here, it is EVALUATED against the bytes the writer
+ * really produces (docs/format/UMA.md § 2).
  */
 class OsAssociationFilesTest {
 	/** Gradle runs a module's tests from the module directory, which is what these paths are relative to. */

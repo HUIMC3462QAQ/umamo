@@ -30,9 +30,9 @@ import org.umamo.ui.l10n.rememberLocaleTag
  * @param Boolean        canSave   Whether the open document can be saved (gates both Save rows).
  * @param Boolean        canExport Whether an exportable puppet document is open (gates the CMO3 and MOC3 rows).
  * @param Boolean        canExportImage Whether the open document can be rendered to an image (gates Export Image).
- * @param Boolean        canOpenLogFolder Whether the host registered Open Log Folder (shows its Help row).
  * @param MenuDispatch   dispatch  Runs a command by id; every row of the bar stands for a command, so this is
  *   all the bar needs from its host, and a rebind reaches the menu, the keyboard, and the palette alike.
+ * @param Boolean        canOpenLogFolder Whether the host registered Open Log Folder (shows its Help row).
  * @return List The top-level menus.
  */
 @Composable

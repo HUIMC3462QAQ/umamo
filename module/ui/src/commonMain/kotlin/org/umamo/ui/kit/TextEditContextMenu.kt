@@ -27,7 +27,8 @@ import org.umamo.ui.resources.text_menu_select_all
  * installed on the innermost node it wins the right-click outright - so a Properties row's Insert / Remove
  * Keyframe menu and a panel header's area menu were both unreachable over any field.  Rather than suppress
  * the built-in menu and lose the clipboard entries, this replaces it with ONE menu drawn in the kit's own
- * chrome: whatever the enclosing ContextMenuArea offers, a rule, then the four clipboard actions.
+ * chrome: whatever the enclosing ContextMenuArea offers, a rule, then the four clipboard actions (Copy and
+ * Select All alone over read-only text).
  *
  * The clipboard actions are re-implemented here rather than delegated back to the built-in menu, which is
  * why the fields that use this hold a TextFieldValue rather than a String - Cut, Copy and Select All are all

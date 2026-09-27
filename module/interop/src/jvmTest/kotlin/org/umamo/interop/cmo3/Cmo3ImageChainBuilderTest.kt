@@ -170,7 +170,7 @@ class Cmo3ImageChainBuilderTest {
 
 	@Test
 	fun cropsComeFromTheDecodedPixelsWhenThePageCarriesThem() {
-		// A page with a different value in every pixel, so any crop taken from the wrong pixels differs.
+		// A page whose value changes from each pixel to the next, so any crop taken from the wrong pixels differs.
 		val pageSize = 32
 		val pageRgba = ByteArray(pageSize * pageSize * 4) { index -> (index * 7 + index / 128).toByte() }
 		for (pixelIndex in 0 until pageSize * pageSize) {

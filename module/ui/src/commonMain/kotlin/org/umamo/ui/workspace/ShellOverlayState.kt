@@ -66,10 +66,11 @@ internal data class ConfirmRequest(
 
 /**
  * The shell's transient overlay flags in one place: which modal chrome (palette, preferences, Quick
- * Setup, Help dialogs, confirm dialog, file-open alert, export report, repack refusal report) is
- * currently up.  The command handlers toggle these, the modal key ladder routes Escape/Enter by them,
- * the focus-reclaim effect watches their aggregate, and the shell renders the matching overlay for each -
- * one holder instead of eight loose vars, so the pieces that must agree read the same state.
+ * Setup, Help dialogs, export options, confirm dialog, file-open alert, app-layer alert, export report,
+ * repack refusal report) is currently up.  The command handlers toggle these, the modal key ladder
+ * routes Escape/Enter by them, the focus-reclaim effect watches their aggregate, and the shell renders
+ * the matching overlay for each - one holder instead of a loose var per overlay, so the pieces that must
+ * agree read the same state.
  *
  * @param QuickSetupState quickSetup The Quick Setup modal's visibility, which the app holds for its whole
  *   life because this state is rebuilt with the shell on every document swap; a standalone shell has its own.
@@ -174,7 +175,7 @@ internal class ShellOverlayState(
 
 	/**
 	 * A message the app layer asks the shell to show modally - set by the document.alert command, cleared
-	 * by its OK button, the scrim, Escape, or Enter.  Null while none shows.
+	 * by its OK button, the scrim, Escape, Enter, or its alternative.  Null while none shows.
 	 */
 	var pendingAlert: AlertRequest? by mutableStateOf(null)
 

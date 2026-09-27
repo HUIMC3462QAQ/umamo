@@ -155,9 +155,9 @@ fun main(args: Array<String>) {
 		prepareSelfCheckProcess()
 		exitProcess(runSelfCheck(args.getOrNull(1)))
 	}
-	// Before anything else, a jar started with too little memory starts itself again with enough and does not
-	// return (JarRelaunch.kt): ahead of AWT, so macOS shows one Dock icon, and ahead of the session log, so the
-	// short-lived first launch does not spend one of the ten kept.
+	// Before anything else the editor does, a jar started with too little memory starts itself again with enough
+	// and does not return (JarRelaunch.kt): ahead of AWT, so macOS shows one Dock icon, and ahead of the session
+	// log, so the short-lived first launch does not spend one of the ten kept.
 	val relaunchNote = relaunchForHeapIfDue(args)
 	// Then, so the initial document load and everything after it reach the log file.  Building the storage
 	// does no IO; the log opens its own file under the data directory.

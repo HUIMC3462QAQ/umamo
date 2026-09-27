@@ -175,7 +175,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # The packaging JDK, on the legs that name one. Set up BEFORE JDK 21 so that JAVA_HOME and PATH
-      # end on 21 for Gradle; the build step hands this one's path to Gradle as
+      # end on 21 for Gradle; every packaging step hands this one's path to Gradle as
       # umamo.packagingJavaHome, which is all that reaches jlink and jpackage.
       - name: Set up the packaging JDK
         id: packaging-jdk
@@ -303,9 +303,9 @@ jobs:
 
       # jlink writes a `release` descriptor listing MODULES into every runtime image and jpackage
       # copies it into the app image verbatim, so this is a launch-free check that :desktop's
-      # modules(...) list still covers what the app actually uses. Without it a missing module is
-      # invisible until a user hits NoClassDefFoundError, because nothing in CI ever starts the
-      # packaged binary. The descriptor's depth differs per OS (macOS nests the runtime inside the
+      # modules(...) list still covers what the app actually uses. The self-check below looks for the
+      # same modules from inside the launched app; this one needs no launch and fails first, naming
+      # the list to fix. The descriptor's depth differs per OS (macOS nests the runtime inside the
       # .app bundle), so find it rather than hard-coding a path.
       - name: Assert the bundled runtime carries the modules the app needs
         if: matrix.appImage
@@ -363,8 +363,8 @@ jobs:
       # (LauncherHeapOptionTest holds the build script to it) and the two that keep a JDK 24 or later
       # runtime quiet (LauncherJvmOptionsTest) - and that the corpus-preview override, a developer path,
       # never ships. Each is checked as a whole line, never the exact set: the plugin adds its own. The
-      # cfg's depth differs per OS, and on macOS it is named after the bundle (Umamo.cfg), so find it
-      # without regard to case.
+      # cfg's depth differs per OS, and on macOS and Windows it takes the capitalized package name
+      # (Umamo.cfg), so find it without regard to case.
       - name: Assert the launcher carries its JVM options and no developer override
         if: matrix.appImage
         shell: bash
@@ -695,12 +695,14 @@ jobs:
           done
 
   # -----------------------------------------------------------------------------------------------
-  # 4. Install tests, each on a clean runner that never built anything: every installer is installed
-  #    over an older copy of itself (the upgrade a rigger's next release performs), checked for what it
-  #    registered - the menu entry, the .uma type, the file association - self-checked and started, then
-  #    removed again, settings left alone. The Linux packages also install in the distributions' own
-  #    containers: the DEB on Debian 12 and Ubuntu 22.04 (its curated dependencies), the RPM on Fedora 44
-  #    and 45 (acceptance test is `dnf install` on Fedora; 45 enforces signature checks).
+  # 4. Install tests, each on a clean runner that never built anything: each MSI, DEB, and RPM is
+  #    installed over an older copy of itself (the upgrade a rigger's next release performs), checked
+  #    for what it registered - the menu entry, the .uma type, the file association - self-checked
+  #    and, where a display is up, started, then removed again, settings left alone. The Linux
+  #    packages also install in the distributions' own containers: the DEB on Debian 12 and Ubuntu
+  #    22.04 (its curated dependencies), the RPM on Fedora 44 and 45 (acceptance test is `dnf install`
+  #    on Fedora; 45 enforces signature checks). The DMG, which has no install of its own, is mounted,
+  #    and the app copied out of it is self-checked and started.
   # -----------------------------------------------------------------------------------------------
   install-test:
     name: Install test ${{ matrix.target }}

@@ -91,7 +91,9 @@ internal class DocumentExportController(
 	 * replace-write, as a save's do, so a failed write leaves whatever was there rather than half a file.
 	 *
 	 * The model and the page set are read here, on the UI thread, and the seconds of work that turn them into
-	 * bytes run off it, so the editor stays usable while a large model exports.
+	 * bytes run off it, so the editor stays usable while a large model exports.  A CMO3-origin document's
+	 * reconcile is the exception: it edits the retained graph the document's own rasters read on this thread,
+	 * so only its thumbnail and serialization leave.
 	 *
 	 * @param OpenPuppet   exported      The document being exported, with its session and pages.
 	 * @param PlatformFile destination   The picked file.

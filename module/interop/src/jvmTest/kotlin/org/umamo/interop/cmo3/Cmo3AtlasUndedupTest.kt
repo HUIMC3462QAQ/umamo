@@ -218,13 +218,21 @@ class Cmo3AtlasUndedupTest {
 	/**
 	 * [page] as the caller that already holds it decoded hands it over: its pixels, beside PNG bytes of a
 	 * different, blank page, so a conversion that decoded the bytes instead would cut blank patches.
+	 *
+	 * @param Cmo3Conversion.AtlasPage page The page to hand over decoded.
+	 * @return Cmo3Conversion.AtlasPage The stand-in: [page]'s pixels beside a blank page's PNG bytes.
 	 */
 	private fun decodedStandIn(page: Cmo3Conversion.AtlasPage): Cmo3Conversion.AtlasPage {
 		val blank = PngCodec.write(RasterImage(page.width, page.height, ByteArray(page.width * page.height * 4)))
 		return Cmo3Conversion.AtlasPage(blank, page.width, page.height, decoded = PngCodec.read(page.pngBytes))
 	}
 
-	/** The fields of two un-dedup results that decide what the conversion writes, compared. */
+	/**
+	 * The fields of two un-dedup results that decide what the conversion writes, compared.
+	 *
+	 * @param Cmo3AtlasUndedup.Result expected The reference result.
+	 * @param Cmo3AtlasUndedup.Result actual   The result under test.
+	 */
 	private fun assertSameUndedup(expected: Cmo3AtlasUndedup.Result, actual: Cmo3AtlasUndedup.Result) {
 		assertEquals(expected.duplicatedDrawableIds, actual.duplicatedDrawableIds)
 		assertEquals(expected.sharedDrawableIds, actual.sharedDrawableIds)

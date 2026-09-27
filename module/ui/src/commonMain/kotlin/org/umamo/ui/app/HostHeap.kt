@@ -14,7 +14,8 @@ import org.umamo.ui.workspace.DialogAlternative
  * launcher sets that limit itself; a jar launch gets whatever Java picks, a quarter of the machine's memory,
  * which a large export can run out of.  A jar that starts that small relaunches itself with [JAR_HEAP_OPTION]
  * (the desktop's JarRelaunch.kt), so the shell warns only a jar that could not, and an export that runs out
- * tells only such a jar the command that raises it.  Android has no such choice and passes none.
+ * tells the command that raises it to any jar not already running with that option.  Android has no such choice
+ * and passes none.
  *
  * @property Long    maxBytes          The most the heap may grow to.
  * @property Boolean packagedLaunch    Whether the installed launcher started the editor; false for a jar or a

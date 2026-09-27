@@ -12,7 +12,7 @@ import org.lwjgl.system.Configuration
  */
 internal interface OffscreenGlContext {
 	/**
-	 * A short backend label for the startup log line (for example "GLFW" or "CGL GL4_Core"), so the log
+	 * A short backend label for the startup log line (for example "GLFW"), so the log
 	 * records which path the running OS actually took.
 	 */
 	val backendName: String

@@ -14,9 +14,10 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 
 /*
- * What the desktop host sets up and records before anything else runs: the session log every later line
- * lands in, the handler that gets an uncaught failure into it, and the memory limit this JVM started with.
- * A bug report needs all three, and only the first lines of main run early enough to catch everything.
+ * What the desktop host sets up and records right after the jar's relaunch check (JarRelaunch.kt), before
+ * anything else runs: the session log every later line lands in, the handler that gets an uncaught failure
+ * into it, and the memory limit this JVM started with.  A bug report needs all three, and only the first
+ * lines of main run early enough to catch everything.
  */
 
 /** The logs directory's name under the app's data directory. */

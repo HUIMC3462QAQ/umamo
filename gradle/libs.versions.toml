@@ -11,7 +11,7 @@ lwjgl = "3.4.2"
 androidxActivity = "1.13.0"
 # JDOM 1.x (package org.jdom) — the exact XML library the Cubism editor uses. Pinned to 1.1.x
 # so XMLOutputter + Format.getPrettyFormat() reproduce main.xml byte-for-byte; JDOM2 (org.jdom2)
-# would re-order/re-format and break the round-trip. See docs/formats/CMO3.md §3.
+# would re-order/re-format and break the round-trip. See docs/format/CMO3.md §3.
 jdom = "1.1.3"
 kotlinxSerialization = "1.11.0"
 # okio — the de-facto multiplatform filesystem (Kotlin stdlib has no common File). Backs :storage's
@@ -25,7 +25,7 @@ kotlinxCoroutines = "1.11.0"
 atomicfu = "0.28.0"
 # kotlinx-datetime — the local wall clock the CAFF zip timestamp needs. The Kotlin stdlib has a common
 # Clock but no time ZONE, and a DOS timestamp is local time, so this is the smallest thing that closes
-# the gap without reintroducing an expect/actual. See docs/formats/CMO3.md §1.
+# the gap without reintroducing an expect/actual. See docs/format/CMO3.md §1.
 kotlinxDatetime = "0.8.0"
 # FileKit — multiplatform native file pickers (desktop + Android one API). Replaces the AWT FileDialog
 # in :storage so the picker is OS-native everywhere and Android SAF comes for free. See module/storage.

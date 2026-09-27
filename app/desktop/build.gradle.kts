@@ -31,7 +31,7 @@ val umaExtension = "uma"
 val umaDescription = "Umamo Document"
 
 // Who made the app and under what terms, stamped into every installer: the plugin's (the Windows exe version resource, the
-// macOS Info.plist, the MSI) and packageLinuxDeb / packageLinuxRpm below.
+// macOS Info.plist, the DMG) and packageWindowsMsi, packageLinuxDeb, and packageLinuxRpm below.
 val appVendor = "Umamo Project"
 val appDescription = "Cross-platform 2D puppet modelling editor with Live2D Cubism .cmo3 interop."
 val appCopyright = "Copyright (C) Umamo Project contributors.  Licensed under the GPL-3.0-only."
@@ -41,8 +41,9 @@ val appAboutUrl = "https://umamo.org"
 // The name the app image, its launcher, and its cfg take (docs/plan/distribution.md D15).  A Mac app is
 // capitalized, and this is also the name the macOS menu bar shows.  Windows follows, because the MSI names its
 // Start-menu entry and its Settings > Apps entry after it.  Linux keeps the lowercase name of its package and launcher
-// conventions.  Folders a rigger's files live in stay lowercase on every OS - the Windows install folder among them.  The settings and log folders are "umamo" everywhere (desktopAppStorage),
-// and the uber jar's name is set at the bottom of this file; neither follows this.
+// conventions.  Folders a rigger's files live in stay lowercase on every OS - the Windows install folder among them.
+// The settings and log folders are "umamo" everywhere (desktopAppStorage), and the uber jar's name is set at the
+// bottom of this file; neither follows this.
 val packageBaseName =
 	if (buildTarget.startsWith("macos-") || buildTarget.startsWith("windows-")) {
 		"Umamo"
@@ -171,9 +172,10 @@ compose.desktop {
 
 			// Identity metadata. jpackage stamps vendor/description/copyright into the Windows exe
 			// version resource and the macOS Info.plist, so even an unsigned build says who made it.  No
-			// licenseFile: the plugin would hand it to the DMG as an Agree/Disagree dialog and to the MSI as
-			// an "I accept" page, and the GPL asks no one to accept it to run the program (GPLv3 section 9).
-			// The license text ships inside the app image instead (prepareAppResources below).
+			// licenseFile, and no --license-file in packageWindowsMsi: jpackage makes one the DMG's
+			// Agree/Disagree dialog and the MSI's "I accept" page, and the GPL asks no one to accept it to run
+			// the program (GPLv3 section 9).  The license text ships inside the app image instead
+			// (prepareAppResources below).
 			vendor = appVendor
 			description = appDescription
 			copyright = appCopyright
@@ -251,7 +253,7 @@ tasks.withType<Sync>().matching { syncTask -> syncTask.name == "prepareAppResour
 	}
 
 // The JDK whose jlink built the app image: the one passed as umamo.packagingJavaHome, else the plugin's default.  The
-// Linux installer tasks run ITS jpackage, because jpackage refuses an app image another jpackage version built.
+// MSI, DEB, and RPM tasks run ITS jpackage, because jpackage refuses an app image another jpackage version built.
 val imageJavaHome = compose.desktop.application.javaHome
 
 // The Windows installer (D2): a per-user MSI, built by jpackage over createDistributable's image - the very image the
@@ -477,11 +479,14 @@ for (packageType in listOf("deb", "rpm")) {
 	}
 }
 
-// Two tests read files straight from disk: OsAssociationFilesTest holds the OS registration files - this script,
-// the Android manifest, and the two freedesktop files - to the codec's Uma.MIME_TYPE, and LauncherHeapOptionTest
-// holds this script, README, RELEASING, and the release workflow to the one heap option.  None of them is on the
-// test classpath, so Gradle does not know the tests depend on them: left undeclared, an edit to any one leaves
-// jvmTest UP-TO-DATE and the check silently never runs against the change it exists to catch.
+// The packaging tests read files straight from disk: OsAssociationFilesTest holds the OS registration files - this
+// script, the Android manifest, and the two freedesktop files - to the codec's Uma.MIME_TYPE, LauncherHeapOptionTest
+// holds this script, README, RELEASING, and the release workflow to the one heap option, LauncherJvmOptionsTest and
+// ShippedLicenseTest read this script (the first against the release workflow too), and InstallerIdentityTest pins
+// the installers' identities and scriptlets across this script, the templates under packaging, and the release
+// workflow.  None of them is on the test classpath, so Gradle does not know the tests depend on them: left
+// undeclared, an edit to any one leaves jvmTest UP-TO-DATE and the check silently never runs against the change it
+// exists to catch.
 val filesReadByTests =
 	files(
 		"resources/linux/umamo-uma.xml",

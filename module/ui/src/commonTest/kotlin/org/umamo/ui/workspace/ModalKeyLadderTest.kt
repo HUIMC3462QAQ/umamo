@@ -213,7 +213,8 @@ class ModalKeyLadderTest {
 	private fun enter(state: ShellModalState): Boolean = press(Key.Enter, state)
 
 	// ---------------------------------------------------------------------------------------------
-	// Arm 1-3: the modal alerts, which swallow every key so nothing fires behind them.
+	// Arm 1-3: the modal alerts, which swallow every key so nothing fires behind them - except the
+	// copy chord, which every alert but the confirm passes on to its selectable text.
 	// ---------------------------------------------------------------------------------------------
 
 	@Test

@@ -13,10 +13,11 @@ import kotlin.system.exitProcess
  * `java -jar` gets a quarter of the machine's memory, which a large export can run out of, and a jar cannot
  * carry a heap option the way the installed launcher does.  Intel Macs run the jar for good (D12), and a
  * double-clicked jar cannot be given a flag at all, so rather than only telling the rigger what to type, the
- * jar re-executes the same Java with JAR_HEAP_OPTION and waits for that child.  The first thing main does,
- * before anything touches AWT (a second Dock icon on macOS) or opens the session log (the short-lived parent
- * would spend one of the ten).  Whatever gets in the way - a limit the rigger chose, a debugger, no path to the
- * running Java - leaves the launch as it is, where the low-memory alert still covers it.
+ * jar re-executes the same Java with JAR_HEAP_OPTION and waits for that child.  It is the first thing main does
+ * after the self-check branch (SelfCheck.kt): before anything touches AWT (a second Dock icon on macOS) or opens
+ * the session log (the short-lived parent would spend one of the ten).  Whatever gets in the way - a limit the
+ * rigger chose, a debugger, no path to the running Java - leaves the launch as it is, where the low-memory alert
+ * still covers it.
  */
 
 /** The system property a relaunched child carries: the first launch's heap limit in bytes, for its log. */

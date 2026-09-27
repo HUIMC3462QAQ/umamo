@@ -7,9 +7,9 @@ import kotlin.test.assertTrue
 
 /**
  * Holds the license to where it ships: inside the app image, so the archive and every installer made from the image
- * carry the GPL's text, and never as the plugin's licenseFile, which would put an Agree/Disagree dialog on the DMG
- * and an "I accept" page in the MSI - the GPL asks no one to accept it to run the program.  The release workflow
- * checks the built image for the file, and the macOS install test fails on a DMG that stops to ask.
+ * carry the GPL's text, and never as the plugin's licenseFile, which would put an Agree/Disagree dialog on the DMG -
+ * the GPL asks no one to accept it to run the program.  The release workflow checks the built image for the file,
+ * and the macOS install test fails on a DMG that stops to ask.
  */
 class ShippedLicenseTest {
 	/** Gradle runs a module's tests from the module directory, which is what these paths are relative to. */

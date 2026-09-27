@@ -119,8 +119,8 @@ fun QuickSetupDialog(onDismiss: () -> Unit) {
 }
 
 /**
- * The splash's banner: the splash artwork, with the app's name and icon in the bottom-left corner and the
- * version in the top-right.
+ * The splash's banner: the splash artwork, with the app's name and icon in the bottom-left corner, the
+ * version in the top-right, and the artist credit in the bottom-right.
  *
  * The art is drawable/splash_banner.png: 2:1 at 1680x840 pixels, three times the banner's largest size
  * ([QUICK_SETUP_MAX_WIDTH] wide) so it stays sharp on high-density screens.  It is cropped to fill the

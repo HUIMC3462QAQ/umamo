@@ -7,7 +7,7 @@ import org.lwjgl.system.MemoryUtil
 import org.umamo.render.gl.GlRenderDevice
 
 /**
- * The Windows / Linux offscreen GL context: a hidden GLFW window carrying a GL 3.3 core context, made
+ * The offscreen GL context on every desktop OS: a hidden GLFW window carrying a GL 3.3 core context, made
  * current on the render thread.
  */
 internal class GlfwOffscreenGlContext : OffscreenGlContext {
@@ -20,8 +20,9 @@ internal class GlfwOffscreenGlContext : OffscreenGlContext {
 
 	/**
 	 * Creates the GLFW hidden-window GL 3.3 core context on this thread and makes it current. Returns false
-	 * (degrading to a blank viewport) if GLFW init or window creation fails, or the natives will not load, and
-	 * keeps GLFW's own description of the failure for [failureReason].
+	 * (degrading to a blank viewport) if GLFW init, window creation, or creating the GL capabilities fails, or
+	 * the natives will not load, and keeps a description of the failure, GLFW's own where GLFW reports one, for
+	 * [failureReason].
 	 *
 	 * @return Boolean True on success.
 	 */

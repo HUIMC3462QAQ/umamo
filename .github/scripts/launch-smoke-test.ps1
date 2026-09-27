@@ -5,7 +5,7 @@
 # warning check here (the Windows app image bundles JDK 21, which prints none), and the runner's display
 # offers no GL 3.3 core context, so the GL line is informational.
 #
-# Usage: launch-smoke-test.ps1 -Launcher <path to umamo.exe>
+# Usage: launch-smoke-test.ps1 -Launcher <path to Umamo.exe>
 
 param(
 	[Parameter(Mandatory = $true)] [string] $Launcher
