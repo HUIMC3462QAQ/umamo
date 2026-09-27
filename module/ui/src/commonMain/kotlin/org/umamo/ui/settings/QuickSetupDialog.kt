@@ -37,6 +37,7 @@ import org.umamo.ui.kit.button.Button
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.app_icon
 import org.umamo.ui.resources.app_name
+import org.umamo.ui.resources.quick_setup_artist_credit
 import org.umamo.ui.resources.quick_setup_continue
 import org.umamo.ui.resources.quick_setup_title
 import org.umamo.ui.resources.splash_banner
@@ -168,7 +169,7 @@ private fun SplashBanner() {
 					.padding(horizontal = 6.dp, vertical = 2.dp),
 		)
 		Text(
-			text = "ARTIST CREDIT",
+			text = stringResource(Res.string.quick_setup_artist_credit),
 			style = typography.bodySmall,
 			color = colors.viewportBadgeText,
 			modifier =
