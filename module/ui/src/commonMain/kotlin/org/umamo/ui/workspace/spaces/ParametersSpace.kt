@@ -154,7 +154,7 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	// Local control state seeded from the live values (or defaults); writes publish to the renderer.
 	//
 	// Keyed on WHICH parameters exist, not on the model instance.  Every document edit publishes a new
-	// PuppetModel - moving a keyform key, recolouring a drawable - and keying this map to that threw it
+	// PuppetModel - moving a keyform key, recoloring a drawable - and keying this map to that threw it
 	// away and rebuilt it on each one.  That is churn by itself, and worse: the effects below capture the
 	// map, so a replacement silently orphaned their writes and the sliders stopped following a live scrub
 	// until something else forced them to re-run.  The set of parameters is what this map is actually

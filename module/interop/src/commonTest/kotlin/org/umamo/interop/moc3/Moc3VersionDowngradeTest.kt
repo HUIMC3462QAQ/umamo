@@ -248,7 +248,7 @@ class Moc3VersionDowngradeTest {
 					original.drawables.map { drawable ->
 						drawable.copy(
 							multiplyColor = ColorRgb(0.5f, 0.5f, 0.5f),
-							channelGrids = ChannelGrids(mapOf(FormChannel.MULTIPLY_COLOR to colourTrack())),
+							channelGrids = ChannelGrids(mapOf(FormChannel.MULTIPLY_COLOR to colorTrack())),
 						)
 					},
 			)
@@ -262,7 +262,7 @@ class Moc3VersionDowngradeTest {
 	 *
 	 * @return KeyformGrid The track.
 	 */
-	private fun colourTrack(): KeyformGrid<ChannelValue> =
+	private fun colorTrack(): KeyformGrid<ChannelValue> =
 		KeyformGrid(
 			axes = emptyList(),
 			cells = listOf(KeyformCell(intArrayOf(), ChannelValue.Color(ColorRgb(0.5f, 0.5f, 0.5f)))),

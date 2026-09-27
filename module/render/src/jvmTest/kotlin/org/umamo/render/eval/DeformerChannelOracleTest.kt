@@ -75,7 +75,7 @@ class DeformerChannelOracleTest {
 			}
 			// The canvas-space rebase is part of the app's real ingest path, and it must preserve every
 			// non-positional keyform channel (the modelA hologram tint regression: the rebase rebuilt
-			// MeshForms and silently dropped multiply/screen colours).  The channels this gate compares
+			// MeshForms and silently dropped multiply/screen colors).  The channels this gate compares
 			// are rebase-invariant, so running the rebased model keeps the gate on the rendered path.
 			val puppet = org.umamo.render.restMeshesToCanvasSpace(Moc3Import.fromMocDocument(mocDocument, null))
 			val poses = derivePoses(mocDocument, drivingParameters)

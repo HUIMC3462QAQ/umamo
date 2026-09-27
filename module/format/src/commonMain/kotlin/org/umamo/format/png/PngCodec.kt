@@ -117,7 +117,7 @@ public object PngCodec : RasterCodec {
 		val out = Buffer()
 		out.write(PNG_SIGNATURE)
 
-		// PNG spec §11.2.2 IHDR: width, height, bitDepth=8, colourType=6 (RGBA), compression=0, filter=0, interlace=0.
+		// PNG spec §11.2.2 IHDR: width, height, bitDepth=8, colorType=6 (RGBA), compression=0, filter=0, interlace=0.
 		val ihdr = Buffer()
 		ihdr.writeInt(model.width)
 		ihdr.writeInt(model.height)

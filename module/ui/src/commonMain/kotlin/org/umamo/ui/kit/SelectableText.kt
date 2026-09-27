@@ -27,7 +27,7 @@ import org.umamo.ui.theme.LocalUmamoTypography
  *
  * @param String    text     The text to show.
  * @param Modifier  modifier Layout modifier.
- * @param TextStyle style    The text style; its colour defaults to the theme's text colour, as [Text]'s does.
+ * @param TextStyle style    The text style; its color defaults to the theme's text color, as [Text]'s does.
  */
 @Composable
 fun SelectableText(

@@ -145,7 +145,7 @@ internal fun preparePose(
 			)
 		// Blend shapes: additive deltas on every channel the record carries, not just the scalars.  Each
 		// contribution's form holds its stored delta plus the grid-at-default reference (added at import),
-		// so subtracting that reference back out here recovers the delta exactly.  Opacity and the colours
+		// so subtracting that reference back out here recovers the delta exactly.  Opacity and the colors
 		// clamp to [0,1] only AFTER summing - clamping per contribution would bias a record whose
 		// neighbours pull the other way.  Draw order is left unrounded (the Umamo C++ Runtime rounds
 		// (int)(0.001+v) at sort time; Umamo sorts floats - MOC3.md §5.6).

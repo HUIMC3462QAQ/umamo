@@ -941,7 +941,7 @@ private fun ChevronSlot(visible: Boolean, expanded: Boolean, onToggle: () -> Uni
  * The type-icon slot: a fixed-width box drawing the themed vector icon for [OutlinerIcon] (from the
  * shared UmamoIcons set), distinct enough to tell the kinds apart at a glance. Each node family carries
  * a signature palette tint ([UmamoColors.outlinerObjectTint] / [UmamoColors.outlinerDeformTint], after
- * Blender's armature object / data colours) - only this function maps an [OutlinerIcon] to its art, so
+ * Blender's armature object / data colors) - only this function maps an [OutlinerIcon] to its art, so
  * the row layout never changes when an icon does.
  *
  * @param OutlinerIcon icon The icon kind.

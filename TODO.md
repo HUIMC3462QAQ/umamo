@@ -206,7 +206,7 @@ See format planning document: docs/plan/uma-format.md
 
 ## MacOS
 * Zoom with the touchpad on my 2014 Macbook Pro is glitchy.  It will jump around and even go the wrong direction.
-* Need to add back a light native menu so it does not say "MainKt" all the time.
+* Can't quit from the native menu or CMD+Q.
 
 ## Input
 
