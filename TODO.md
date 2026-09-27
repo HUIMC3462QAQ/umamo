@@ -66,6 +66,13 @@
 	* Mirror along X/Z axis, mirror with 2D cursor as the axis.  Note: This is a small divergence to Blender's style.  In Blender there is an origin for each object that can be moved to different places.  Umamo still has the centroid origin calculated, but no way to move it or even if it was moved, a way to store it.
 	* Extrude(E) - Extrude an edge creates triangle cut quad automatically.
 
+## Long Running Task Indicator
+* Atlas Repack, Import, Export, Save, Open
+* Place it right aligned of the workspace tabs.
+* Right now the status bar notice can get nuked when clicking around or potentially be cut off.
+* It's a third notice area essentially.
+* Before building, research if it would be better to have blocking notices in the status bar.
+
 ## Texture Authoring/UV Editor
 * Follow Selection Header Control - Split it into options and images.
 	* New custom image selection control.  This will also be an entry point for adding artwork.
@@ -190,6 +197,9 @@ See format planning document: docs/plan/uma-format.md
 * Key/mouse/pen input overlay for recording/streaming.
 * History playback for proof of work.  The history system is there, but that is a lot of track over a long session.  So capture a snapshot every time period or number of snapshots.
 * A proper bone skeleton system with bendy bones.
+
+## Rights Management
+* One time, permanently dismissable message dialog informing users to not edit MOC3 files without permission from the author.
 
 ## Build and Distribute
 * Eventually get installers, signing, and automatic updates setup.
