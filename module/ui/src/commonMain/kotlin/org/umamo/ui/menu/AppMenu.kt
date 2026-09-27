@@ -222,7 +222,6 @@ fun helpMenu(
 	dispatch: MenuDispatch,
 	canOpenLogFolder: Boolean = false,
 ): TopLevelMenu {
-	val quickSetupRow = commandRow(stringResource(Res.string.menu_quick_setup), "help.quickSetup", keymap, dispatch)
 	val logFolderRow = commandRow(stringResource(Res.string.menu_open_log_folder), "help.openLogFolder", keymap, dispatch)
 	return TopLevelMenu(
 		label = stringResource(Res.string.menu_help),
@@ -232,7 +231,7 @@ fun helpMenu(
 				commandRow(stringResource(Res.string.menu_web_site), "help.webSite", keymap, dispatch),
 				commandRow(stringResource(Res.string.menu_documentation), "help.documentation", keymap, dispatch),
 				MenuItem.Separator,
-				quickSetupRow,
+				commandRow(stringResource(Res.string.menu_quick_setup), "help.quickSetup", keymap, dispatch),
 				logFolderRow.takeIf { canOpenLogFolder },
 				MenuItem.Separator,
 				commandRow(stringResource(Res.string.menu_credits), "help.credits", keymap, dispatch),
