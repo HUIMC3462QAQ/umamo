@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Version=1.0
+Version=1.5
 Name=Umamo
 GenericName=2D Puppet Modelling Editor
 GenericName[ja]=2Dパペット モデリングエディター
@@ -14,3 +14,4 @@ Icon=umamo
 Terminal=false
 Categories=Graphics;2DGraphics;
 MimeType=application/vnd.umamo.uma+zip;
+StartupWMClass=org-umamo-editor-desktop-MainKt
