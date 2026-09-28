@@ -401,6 +401,57 @@ class Cmo3RetainedLayerWebTest {
 		assertSame(pageResource, (eyeMesh.texture as GTexture2D).srcImageResource, "the eye is untouched")
 	}
 
+	/**
+	 * The eye reloaded repainted in place: the same size, the same spot on the page and on the canvas, and
+	 * its drawable carried onto the replacement - so only the pixels differ from the retained graph.
+	 *
+	 * @param PuppetModel baseline The retained graph's import.
+	 * @return Pair The edited model and the eye's replacement tile.
+	 */
+	private fun eyeRepaintedInPlace(baseline: PuppetModel): Pair<PuppetModel, AtlasTile> {
+		val eyeTile = baseline.atlas.tiles.first { tile -> tile.source?.layerKey == "lyid:1576" }
+		val eyeReloaded = eyeTile.copy(id = reloadTileId(eyeTile.id, baseline.atlas.tiles.mapTo(HashSet()) { tile -> tile.id }), replaces = eyeTile.id)
+		val edited =
+			baseline.copy(
+				drawables = baseline.drawables.map { drawable -> if (drawable.id.raw == "EyeL") drawable.copy(atlasTileId = eyeReloaded.id) else drawable },
+				atlas = baseline.atlas.copy(tiles = baseline.atlas.tiles.map { tile -> if (tile.id == eyeTile.id) eyeReloaded else tile }),
+			)
+		return edited to eyeReloaded
+	}
+
+	@Test
+	fun aReloadThatKeepsItsSizeAndPlaceStillRewritesTheLayer() {
+		val (retained, baseline) = retainedGraph()
+		val (edited, eyeReloaded) = eyeRepaintedInPlace(baseline)
+		val repainted = gradient(4, 31)
+
+		val report = Cmo3Export.apply(edited, retained, recomposedPages = listOf(page), tileRasters = { tileId -> if (tileId == eyeReloaded.id) repainted else null }, nowMillis = now)
+		assertTrue(report.notices.isEmpty(), "the repaint is written, not owed: ${report.notices}")
+
+		val reread = Cmo3.read(Cmo3.write(retained))
+		val art = assertNotNull(cmo3SourceArtOf(reread.root as CModelSource, baseline.sources.single().id) { resource -> reread.extractLayerPng(resource) })
+		assertContentEquals(repainted.rgba, assertNotNull(art.layers.firstOrNull { layer -> layer.id.raw == "lyid:1576" }).raster.rgba, "the eye's layer holds the repainted pixels")
+		assertContentEquals(gradient(4, 2).rgba, assertNotNull(art.layers.firstOrNull { layer -> layer.id.raw == "lyid:5" }).raster.rgba, "the hair keeps its own")
+	}
+
+	@Test
+	fun aRepaintTheWebCannotWriteIsReportedRatherThanDropped() {
+		val (retained, baseline) = retainedGraph()
+		val (edited, _) = eyeRepaintedInPlace(baseline)
+		val entriesBefore = retained.archive.entries.map { entry -> entry.path to entry.content.copyOf() }
+
+		// No pixels for the replacement: the web declines, so the retained layer keeps the old art.
+		val report = Cmo3Export.apply(edited, retained, recomposedPages = listOf(page), tileRasters = { null }, nowMillis = now)
+
+		val reasons = report.notices.filterIsInstance<ExportNotice.UnsupportedChange>().map { notice -> notice.reason }
+		assertEquals(listOf<ExportNoticeReason>(ExportNoticeReason.AtlasTileMetadataNotReconcilable), reasons, "the unwritten repaint is owed, once: ${report.notices}")
+		for ((path, content) in entriesBefore) {
+			if (path.startsWith("imageFileBuf")) {
+				assertContentEquals(content, assertNotNull(retained.archive.byPath(path)).content, "layer '$path' is untouched")
+			}
+		}
+	}
+
 	@Test
 	fun aReloadedTileWithNoPixelsDeclinesTheWebAndLeavesTheLayersAlone() {
 		val (retained, baseline) = retainedGraph()

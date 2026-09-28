@@ -34,6 +34,7 @@ import org.umamo.runtime.model.PuppetAtlas
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.runtime.model.RuntimeTarget
 import org.umamo.runtime.model.SourceLayerRef
+import org.umamo.runtime.model.reloadTileId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -406,6 +407,38 @@ class PuppetModelDiffTest {
 		assertTrue(repaged.atlasTiles.isEmpty(), "resizing a page moves no tile")
 
 		assertTrue(diffPuppetModels(baseline, baseline).isEmpty, "an untouched atlas is no difference at all")
+	}
+
+	/**
+	 * A reload is a change to the tile's pixels, reported under the baseline's id, even when the repainted art
+	 * keeps its name, size, and place and the drawables over it follow the replacement - the case in which
+	 * nothing else in the model differs, and an export that saw no difference would write the old pixels.
+	 */
+	@Test
+	fun aReloadIsAPixelChangeEvenAtTheSameSizeAndPlace() {
+		val tileId = AtlasTileId("tile0")
+		val placed = AtlasPlacement(0, 4f, 8f, scaleX = 1f, scaleY = 1f, rotationDegrees = 0f)
+		val tile = AtlasTile(tileId, "Art", 16, 16, placed, source = SourceLayerRef(ArtSourceId("art-0"), "lyid:3", stableKey = true))
+		val baseline =
+			puppet(drawables = listOf(drawable("D1").copy(atlasTileId = tileId))).copy(
+				atlas = PuppetAtlas(listOf(AtlasPage(64, 64)), listOf(tile)),
+			)
+		val replacement = tile.copy(id = reloadTileId(tileId, setOf(tileId)), replaces = tileId)
+
+		val repainted =
+			diffPuppetModels(
+				baseline,
+				baseline.copy(
+					drawables = listOf(baseline.drawables.single().copy(atlasTileId = replacement.id)),
+					atlas = baseline.atlas.copy(tiles = listOf(replacement)),
+				),
+			)
+		assertEquals(listOf(EntityDiff.Changed(tileId, setOf(AtlasTileField.PIXELS))), repainted.atlasTiles)
+		assertTrue(repainted.drawables.isEmpty(), "a drawable carried onto its tile's replacement is not rebound")
+		assertTrue(!repainted.isEmpty, "so the export has the repaint to write")
+
+		val regrown = diffPuppetModels(baseline, baseline.copy(atlas = baseline.atlas.copy(tiles = listOf(replacement.copy(width = 24, height = 24)))))
+		assertEquals(listOf(EntityDiff.Changed(tileId, setOf(AtlasTileField.METADATA, AtlasTileField.PIXELS))), regrown.atlasTiles)
 	}
 
 	/** Rebinding a drawable to different art is a drawable-level difference the export must see. */
