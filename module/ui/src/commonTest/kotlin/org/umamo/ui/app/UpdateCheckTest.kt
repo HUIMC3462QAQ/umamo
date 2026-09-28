@@ -82,12 +82,12 @@ class UpdateCheckTest {
 	}
 
 	@Test
-	fun aNewerReleaseIsReportedWithItsPage() =
+	fun aNewerReleaseIsReportedWithDownloadPage() =
 		runTest {
 			val outcome = checkForUpdate(FakeTransport(release("v0.5.0")), currentVersion = "0.4.0")
 
 			assertEquals(
-				UpdateCheckOutcome.Newer(ReleaseVersion(0, 5, 0, null), "0.4.0", "https://github.com/umamoorg/umamo/releases/tag/v0.5.0"),
+				UpdateCheckOutcome.Newer(ReleaseVersion(0, 5, 0, null), "0.4.0", "https://www.umamo.org/#download"),
 				outcome,
 			)
 		}
