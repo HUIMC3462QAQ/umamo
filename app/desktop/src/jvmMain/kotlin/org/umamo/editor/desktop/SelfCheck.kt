@@ -23,7 +23,11 @@ import org.umamo.ui.defaultSettingsJson
 import org.umamo.ui.document.umamoWriterInfo
 import java.io.File
 import java.nio.file.Path
+import java.security.KeyStore
 import java.sql.DriverManager
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 /** The command-line flag that runs the checks below instead of the editor, optionally followed by a report file. */
 internal const val SELF_CHECK_FLAG = "--self-check"
@@ -143,6 +147,19 @@ internal fun selfChecks(): List<SelfCheck> =
 			val system = Class.forName(className).getDeclaredConstructor().newInstance()
 			val identity = if (windows) system.javaClass.getMethod("getName").invoke(system) else system.javaClass.getMethod("getUid").invoke(system)
 			"${className.substringAfterLast('.')} reports $identity"
+		},
+		SelfCheck("tls") {
+			// The update check's HTTPS, without the network: the TLS context, the certificate authorities it trusts
+			// (lib/security/cacerts), and an elliptic-curve key exchange, which a jlinked runtime offers only with its
+			// EC provider (jdk.crypto.ec on JDK 21, java.base from JDK 22).
+			val context = SSLContext.getDefault()
+			val trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+			trustFactory.init(null as KeyStore?)
+			val authorities = trustFactory.trustManagers.filterIsInstance<X509TrustManager>().sumOf { manager -> manager.acceptedIssuers.size }
+			check(authorities > 0) { "no trusted certificate authorities" }
+			val suites = context.defaultSSLParameters.cipherSuites
+			check(suites.any { suite -> "ECDHE" in suite }) { "no elliptic-curve key exchange among ${suites.size} cipher suites" }
+			"${context.protocol}, $authorities trusted authorities, ${suites.size} cipher suites"
 		},
 		SelfCheck("storage") {
 			val storage = desktopAppStorage("umamo")

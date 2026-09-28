@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalUriHandler
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.compose.resources.stringResource
@@ -24,12 +25,14 @@ import org.umamo.ui.document.Moc3ExportSessionOptions
 import org.umamo.ui.document.PuppetDocument
 import org.umamo.ui.document.UmaDocument
 import org.umamo.ui.document.openDroppedFiles
+import org.umamo.ui.help.openLinkQuietly
 import org.umamo.ui.kit.FileDropTarget
 import org.umamo.ui.menu.buildAppMenu
 import org.umamo.ui.model.SessionAtlasPages
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.title_untitled_document
 import org.umamo.ui.settings.LocalQuickSetup
+import org.umamo.ui.settings.LocalUpdateChecks
 import org.umamo.ui.settings.QuickSetupState
 import org.umamo.ui.viewport.PuppetViewportServiceFactory
 import org.umamo.ui.workspace.AppAlertQueues
@@ -42,6 +45,7 @@ import org.umamo.ui.workspace.commands.fileCommands
 import org.umamo.ui.workspace.commands.fileExportCommands
 import org.umamo.ui.workspace.commands.logFolderCommands
 import org.umamo.ui.workspace.commands.registerAll
+import org.umamo.ui.workspace.commands.updateCommands
 import org.umamo.ui.workspace.sessionViewStateOf
 
 /**
@@ -105,6 +109,9 @@ fun rememberDocumentFileFor(document: Document?): DocumentFile? = remember(docum
  * @param Function? openLogFolder Hands the session-log folder to the platform's file manager, returning null once it
  *   did or the folder's path when it could not; null for a host with no file manager to hand it to, which leaves
  *   Help > Open Log Folder out.
+ * @param UpdateTransport? updateTransport The host's HTTP GET for the update check (docs/plan/distribution.md D8);
+ *   null for a host that makes no network request, which leaves Help > Check for Updates, the check at launch, and
+ *   the setting's row out.
  */
 @Composable
 fun EditorApp(
@@ -118,6 +125,7 @@ fun EditorApp(
 	openRequests: HostOpenRequests? = null,
 	hostHeap: HostHeap? = null,
 	openLogFolder: (() -> String?)? = null,
+	updateTransport: UpdateTransport? = null,
 ) {
 	val settings = LocalSettings.current
 	val scope = rememberCoroutineScope()
@@ -208,6 +216,19 @@ fun EditorApp(
 		snapshotFlow { commandRegistry.revision }.first { commandRegistry.invoke("document.alert", notice) }
 	}
 
+	// The update notice (docs/plan/distribution.md D8): Umamo says a newer release is published and never installs
+	// it.  The release page opens in the platform's browser, through the handler the Help links use.
+	val currentUriHandler by rememberUpdatedState(LocalUriHandler.current)
+	val openPage = remember { { url: String -> currentUriHandler.openLinkQuietly(url) } }
+	// The check at launch, once per launch and at most once a day.  It waits for Quick Setup on a first run, where the
+	// rigger may turn the check off, and then for the shell's confirm command, which registers from the shell's effect.
+	LaunchedEffect(Unit) {
+		val transport = updateTransport ?: return@LaunchedEffect
+		snapshotFlow { quickSetup.visible }.first { visible -> !visible }
+		val notice = updateNoticeAtLaunch(transport, settings, openPage, System::currentTimeMillis) ?: return@LaunchedEffect
+		snapshotFlow { commandRegistry.revision }.first { commandRegistry.invoke("document.confirm", notice) }
+	}
+
 	// The document's artwork watcher with its whole life (see rememberDocumentWatch): it follows the
 	// model's source list and the watch-mode setting, and lands its events on the session.
 	val documentWatch = rememberDocumentWatch(document, session, scope, settings, commandRegistry)
@@ -264,6 +285,17 @@ fun EditorApp(
 			}
 		onDispose { cleanup() }
 	}
+	// Help > Check for Updates, registered only where the host can make the request.
+	DisposableEffect(commandRegistry, updateTransport) {
+		val hostTransport = updateTransport
+		val cleanup =
+			if (hostTransport == null) {
+				{}
+			} else {
+				commandRegistry.registerAll(updateCommands { checkForUpdatesOnRequest(services, hostTransport, openPage, System::currentTimeMillis) })
+			}
+		onDispose { cleanup() }
+	}
 	// Keyed on the export controller, which is remade with the document and the session: the handlers
 	// always reach the pair the export reconciles from, consistent by construction.
 	DisposableEffect(commandRegistry, export) {
@@ -289,13 +321,19 @@ fun EditorApp(
 			canExportImage = imageExport != null,
 			dispatch = { commandId, argument -> commandRegistry.invoke(commandId, argument) },
 			canOpenLogFolder = openLogFolder != null,
+			canCheckForUpdates = updateTransport != null,
 		)
 	// A file dropped on the window takes the same way in as one chosen from a dialog: a document replaces
 	// what is open (through the unsaved-changes gate file.openPath carries), artwork is added to it.  Both
 	// go through the registry rather than straight to a controller - that is what gives the add the hovered
 	// area its operation strip shows in, and what keeps a drop under the same availability gate as the menu.
 	FileDropTarget(onDrop = { paths -> openDroppedFiles(paths, commandRegistry) }) {
-		CompositionLocalProvider(LocalAreaViewStates provides areaViewStates, LocalQuickSetup provides quickSetup, LocalAppAlerts provides appAlerts) {
+		CompositionLocalProvider(
+			LocalAreaViewStates provides areaViewStates,
+			LocalQuickSetup provides quickSetup,
+			LocalAppAlerts provides appAlerts,
+			LocalUpdateChecks provides (updateTransport != null),
+		) {
 			DocumentViewport(
 				document = document,
 				session = session,

@@ -248,6 +248,17 @@ class CommandTableOrderTest {
 		assertEquals(1, opened)
 	}
 
+	@Test
+	fun theUpdateTableRunsTheCheck() {
+		var checks = 0
+		val commands = updateCommands { checks++ }
+
+		assertEquals(listOf("help.checkForUpdates"), commands.map { command -> command.id })
+		commands.single().handler.run(null)
+
+		assertEquals(1, checks)
+	}
+
 	/** The viewport chrome toggles the settings-backed shell registers; they write settings, so they build over an in-memory tree. */
 	@Test
 	fun viewportChromeTableIsComplete() {
