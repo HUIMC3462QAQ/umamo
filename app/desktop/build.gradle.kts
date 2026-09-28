@@ -232,10 +232,13 @@ compose.desktop {
 				minimumSystemVersion = "11.0"
 				// Signing is never switched on here.  The release workflow switches it on from the command line
 				// (compose.desktop.mac.sign and the Developer ID it names, gradle-package.sh), so a build anywhere
-				// else stays ad-hoc signed and needs no certificate.  The plugin's default entitlements stay: the
+				// else stays ad-hoc signed and needs no certificate.  The entitlements are the plugin's own defaults,
+				// kept as a file of the project's so the bundle's re-signing below uses exactly the same set: the
 				// hardened runtime notarization requires would otherwise stop the JVM's JIT (allow-jit,
 				// allow-unsigned-executable-memory) and the natives LWJGL, sqlite-jdbc, and JNA extract from their
 				// jars at run time (disable-library-validation).
+				entitlementsFile.set(project.file("packaging/macos/entitlements.plist"))
+				runtimeEntitlementsFile.set(project.file("packaging/macos/entitlements.plist"))
 			}
 			linux {
 				iconFile.set(project.file("icons/umamo.png"))
@@ -256,6 +259,46 @@ val projectLicense = rootProject.file("LICENSE")
 tasks.withType<Sync>().matching { syncTask -> syncTask.name == "prepareAppResources" }
 	.configureEach {
 		from(projectLicense)
+	}
+
+// The plugin copies each file-association icon into the app bundle AFTER it has signed the bundle
+// (modifyRuntimeOnMacOsIfNeeded, Compose 1.11.1), so a real signature's seal no longer covers the bundle's resources:
+// codesign --verify reports "a sealed resource is missing or invalid", and notarization would refuse the app.  With
+// signing switched on, the outer bundle is signed once more when the plugin is done - not --deep: the runtime and the
+// natives keep the signatures the plugin gave them, and the new seal takes in the icons - with the same entitlements,
+// the hardened runtime, and a secure timestamp, as notarization requires, then verified strictly.  jpackage copies a
+// signed app image into the DMG as it is, so the DMG needs nothing of this.  Matched lazily, like
+// prepareAppResources: the plugin registers the task after this script has run.
+val macSigningSwitchedOn = providers.gradleProperty("compose.desktop.mac.sign").orNull == "true"
+val macSigningIdentity = providers.gradleProperty("compose.desktop.mac.signing.identity").orNull
+val macSigningKeychain = providers.gradleProperty("compose.desktop.mac.signing.keychain").orNull
+tasks.matching { task -> task.name == "createDistributable" }
+	.configureEach {
+		// Local copies: a task action that read the script's own properties would capture the script object, which the
+		// configuration cache cannot store.
+		val resealsBundle = macSigningSwitchedOn && System.getProperty("os.name").startsWith("Mac")
+		val bundle = layout.buildDirectory.dir("compose/binaries/main/app/$packageBaseName.app").get().asFile
+		val entitlements = project.file("packaging/macos/entitlements.plist")
+		val identity = macSigningIdentity
+		val keychainArguments = macSigningKeychain?.let { keychain -> listOf("--keychain", keychain) }.orEmpty()
+		doLast {
+			if (!resealsBundle) {
+				return@doLast
+			}
+			checkNotNull(identity) { "compose.desktop.mac.sign is on, but compose.desktop.mac.signing.identity names no identity" }
+			val commands =
+				listOf(
+					listOf("/usr/bin/codesign", "--force", "--timestamp", "--options", "runtime", "--entitlements", entitlements.absolutePath, "--sign", identity) +
+						keychainArguments + bundle.absolutePath,
+					listOf("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", bundle.absolutePath),
+				)
+			for (command in commands) {
+				val process = ProcessBuilder(command).redirectErrorStream(true).start()
+				val output = process.inputStream.bufferedReader().readText()
+				check(process.waitFor() == 0) { "${command.joinToString(" ")} failed:\n$output" }
+				logger.lifecycle(output.trim())
+			}
+		}
 	}
 
 // The JDK whose jlink built the app image: the one passed as umamo.packagingJavaHome, else the plugin's default.  The
@@ -500,6 +543,7 @@ val filesReadByTests =
 		"resources/linux/umamo.desktop",
 		"packaging/windows/main.wxs",
 		"packaging/umamo-signing-key.asc",
+		"packaging/macos/entitlements.plist",
 		"packaging/linux/umamo.spec",
 		"packaging/linux/control",
 		"packaging/linux/postinst",
