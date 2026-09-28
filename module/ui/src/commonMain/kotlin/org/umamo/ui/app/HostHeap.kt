@@ -14,16 +14,17 @@ import org.umamo.ui.workspace.DialogAlternative
  * launcher sets that limit itself; a jar launch gets whatever Java picks, a quarter of the machine's memory,
  * which a large export can run out of.  A jar that starts that small relaunches itself with [JAR_HEAP_OPTION]
  * (the desktop's JarRelaunch.kt), so the shell warns only a jar that could not, and an export that runs out
- * tells the command that raises it to any jar not already running with that option.  Android has no such choice
- * and passes none.
+ * tells the command that raises it to any jar whose limit that option does not already set.  Android has no
+ * such choice and passes none.
  *
  * @property Long    maxBytes          The most the heap may grow to.
  * @property Boolean packagedLaunch    Whether the installed launcher started the editor; false for a jar or a
  *   development run.
  * @property String? jarFileName       The jar's file name when the editor was started from one, which the
  *   command the alerts print names; null otherwise.
- * @property Boolean heapOptionApplied Whether a jar already relaunched itself with [JAR_HEAP_OPTION]: its limit
- *   is then what the installed launcher would give it, and printing the option again would offer nothing.
+ * @property Boolean heapOptionApplied Whether [JAR_HEAP_OPTION] already sets a jar's limit - it relaunched itself
+ *   with the option, or the rigger started it with that option: its limit is then what the installed launcher
+ *   would give it, and printing the option again would offer nothing.
  */
 class HostHeap(
 	val maxBytes: Long,
@@ -40,8 +41,10 @@ class HostHeap(
 const val JAR_HEAP_OPTION = "-XX:MaxRAMPercentage=50"
 
 /**
- * The limit below which a jar launch relaunches itself with [JAR_HEAP_OPTION], or is warned when it cannot:
- * under it, a 3 × 8192² model's export can run out.
+ * The limit below which a jar launch relaunches itself with [JAR_HEAP_OPTION], or is warned when it cannot.  It is
+ * headroom rather than a measured floor: the largest typical export needs about 1.3 GB on its own (modelG, three
+ * 8192² pages, after distribution Phase 1c), and the open document, the viewport's pages, and the editing around
+ * them need room on top of that.
  */
 const val LOW_HEAP_NOTICE_BELOW_BYTES = 3L * 1024 * 1024 * 1024
 

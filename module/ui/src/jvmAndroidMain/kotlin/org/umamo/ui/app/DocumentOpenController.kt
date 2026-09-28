@@ -31,45 +31,55 @@ internal class DocumentOpenController(
 ) {
 	/**
 	 * Lands the result of a load: success records the recent file and swaps the document in, and a failure
-	 * raises the shell's modal alert (document.openFailed) so the rigger sees why nothing opened.
+	 * raises the shell's modal alert (document.openFailed) so the rigger sees why nothing opened.  The swap waits
+	 * for a model export started while the prompt was up or the file was read: the export reads the document
+	 * being replaced.
 	 *
 	 * @param DocumentLoad load The load's result.
 	 */
 	fun applyDocumentLoad(load: DocumentLoad) {
 		when (load) {
-			is DocumentLoad.Loaded -> {
-				val opened = load.document
-				// Only a document that came from a file is recordable; a loaded one always did, but the read
-				// is null-safe because the type it arrives as covers the new, unsaved document too.
-				opened.path?.let { path -> services.settings.addRecentFile(path) }
-				// What the document says about its artwork files, before anything probes them: the recorded
-				// path is what a reload, the watcher, and the Sources space will all go by.
-				for (source in (opened as? PuppetDocument)?.puppet?.sources.orEmpty()) {
-					val recorded = source.path
-					if (recorded == null) {
-						UmamoLog.info("source artwork: '${source.name}' (${source.format}, ${source.layers.size} layer(s)) has no recorded path")
-					} else {
-						UmamoLog.info("source artwork: '${source.name}' (${source.format}, ${source.layers.size} layer(s)) recorded at $recorded")
-					}
-				}
-				services.onOpen(opened)
-				// A file that opened read-only says so once, up front: Save is greyed for the document's life, and a
-				// rigger who edits it for an hour before finding that out has been misled.
-				if (opened is UmaDocument && opened.isReadOnly) {
-					val entries = opened.readOnlyReasons.joinToString { reason -> "${reason.path} (${reason.kind})" }
-					services.commandRegistry.invoke("document.alert", AlertRequest(Res.string.alert_document_read_only, listOf(opened.displayName, entries)))
-				}
-			}
+			is DocumentLoad.Loaded -> services.afterRunningExport { swapIn(load) }
 			is DocumentLoad.Failed -> services.commandRegistry.invoke("document.openFailed", load.failure)
 		}
 	}
 
 	/**
+	 * Swaps a loaded document in: records it as a recent file, logs its artwork sources, and says once, up front,
+	 * when it opened read-only.
+	 *
+	 * @param DocumentLoad.Loaded load The successful load.
+	 */
+	private fun swapIn(load: DocumentLoad.Loaded) {
+		val opened = load.document
+		// Only a document that came from a file is recordable; a loaded one always did, but the read
+		// is null-safe because the type it arrives as covers the new, unsaved document too.
+		opened.path?.let { path -> services.settings.addRecentFile(path) }
+		// What the document says about its artwork files, before anything probes them: the recorded
+		// path is what a reload, the watcher, and the Sources space will all go by.
+		for (source in (opened as? PuppetDocument)?.puppet?.sources.orEmpty()) {
+			val recorded = source.path
+			if (recorded == null) {
+				UmamoLog.info("source artwork: '${source.name}' (${source.format}, ${source.layers.size} layer(s)) has no recorded path")
+			} else {
+				UmamoLog.info("source artwork: '${source.name}' (${source.format}, ${source.layers.size} layer(s)) recorded at $recorded")
+			}
+		}
+		services.onOpen(opened)
+		// A file that opened read-only says so once, up front: Save is greyed for the document's life, and a
+		// rigger who edits it for an hour before finding that out has been misled.
+		if (opened is UmaDocument && opened.isReadOnly) {
+			val entries = opened.readOnlyReasons.joinToString { reason -> "${reason.path} (${reason.kind})" }
+			services.commandRegistry.invoke("document.alert", AlertRequest(Res.string.alert_document_read_only, listOf(opened.displayName, entries)))
+		}
+	}
+
+	/**
 	 * File > New: an empty document, which replaces the open one like any other document swap - so a dirty
-	 * document asks first.
+	 * document asks first, and the swap waits for a model export started while it asked.
 	 */
 	fun newDocument() {
-		save.confirmIfDirty { services.onOpen(newBlankDocument()) }
+		save.confirmIfDirty { services.afterRunningExport { services.onOpen(newBlankDocument()) } }
 	}
 
 	/**

@@ -28,7 +28,8 @@ import org.umamo.ui.theme.LocalUmamoShapes
 import org.umamo.ui.theme.LocalUmamoTypography
 
 /**
- * A dialog's third choice beside Cancel and Confirm - "Don't Save" beside "Save".
+ * An extra button beside a dialog's own - "Don't Save" beside a confirmation's Save and Cancel, "Don't Show
+ * Again" beside an alert's OK.
  *
  * @property String   label    The already-localized button label.
  * @property Function onSelect Called when the user picks it.

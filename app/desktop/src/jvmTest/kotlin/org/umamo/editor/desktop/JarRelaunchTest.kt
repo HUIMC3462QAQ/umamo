@@ -5,8 +5,10 @@ import org.umamo.ui.app.LOW_HEAP_NOTICE_BELOW_BYTES
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Pins when a jar relaunches itself with more memory, and the command it relaunches with: only a small, plain
@@ -112,6 +114,33 @@ class JarRelaunchTest {
 		assertEquals(File("umamo-linux-x64-0.4.0.jar").absolutePath, launchedJarPath("umamo-linux-x64-0.4.0.jar", ":"))
 		assertEquals("/home/rigger/umamo-linux-x64-0.4.0.jar", launchedJarPath("/home/rigger/umamo-linux-x64-0.4.0.jar", ":"))
 		assertNull(launchedJarPath("/opt/umamo/lib/app/ui-jvm.jar:/opt/umamo/lib/app/format-jvm.jar", ":"))
+	}
+
+	@Test
+	fun theOptionGovernsOnlyWhenItIsTheLimitThatApplies() {
+		assertTrue(jarHeapOptionGoverns(listOf(JAR_HEAP_OPTION)))
+		assertTrue(jarHeapOptionGoverns(listOf("-XX:MaxRAMPercentage=25", JAR_HEAP_OPTION)), "the last percentage is the one the JVM keeps")
+		assertFalse(jarHeapOptionGoverns(listOf("-XX:MaxRAMPercentage=25")))
+		assertFalse(jarHeapOptionGoverns(listOf(JAR_HEAP_OPTION, "-XX:MaxRAMPercentage=75")))
+		// An absolute limit outranks any percentage, wherever it stands.
+		assertFalse(jarHeapOptionGoverns(listOf(JAR_HEAP_OPTION, "-Xmx1g")))
+		assertFalse(jarHeapOptionGoverns(listOf("-XX:MaxHeapSize=1073741824", JAR_HEAP_OPTION)))
+		assertFalse(jarHeapOptionGoverns(listOf(JAR_HEAP_OPTION, "-XX:MaxRAMFraction=4")))
+		assertFalse(jarHeapOptionGoverns(emptyList()))
+	}
+
+	@Test
+	fun aJarStartedWithTheOptionIsNotToldToUseIt() {
+		// The rigger followed the README: on a machine under about 6 GB the limit still sits under the threshold,
+		// which keeps the launch in process, and the alerts must not print the command it was started with.
+		val startedWithTheOption = smallJarLaunch(inputArguments = listOf(JAR_HEAP_OPTION))
+		assertEquals(RunInProcessReason.ExplicitHeapLimit, reasonOf(decideJarRelaunch(startedWithTheOption, emptyList())))
+
+		assertTrue(detectHostHeap(startedWithTheOption).heapOptionApplied)
+		assertTrue(detectHostHeap(smallJarLaunch(inputArguments = listOf(JAR_HEAP_OPTION, "-D$RELAUNCHED_PROPERTY=$twoGibibytes"), relaunchedFrom = "$twoGibibytes")).heapOptionApplied)
+		assertFalse(detectHostHeap(smallJarLaunch()).heapOptionApplied)
+		assertFalse(detectHostHeap(smallJarLaunch(inputArguments = listOf("-Xmx1g"))).heapOptionApplied)
+		assertFalse(detectHostHeap(null).heapOptionApplied, "the installed launcher and a development run gather no jar facts")
 	}
 
 	@Test

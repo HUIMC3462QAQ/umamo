@@ -73,6 +73,7 @@ Umamo is early alpha.
 * Viewport: Meshes that reach past the edge of their texture no longer smear the edge pixels across the overhang in the atlas display and clicking that overhang no longer selects the drawable.
 * Export: A CMO3 or MOC3 export that runs out of memory or fails now shows an alert instead of a Java error that crashes the application.
 * Export: Exporting a CMO3 from a MOC3 model now uses up to 30% less memory by reusing textures from memory instead of decoding the textures again from the source.
+* Export: Exporting a CMO3 from a CMO3 model no longer changes the open document.
 * Packaging: JAR releases no longer print native access warnings on Java 24 and newer, and runs the Java 25 code paths of its libraries on Java 25 and newer.
 * Packaging: The Linux tarball's desktop entry now names Umamo's window class, so the desktop matches the running window to its menu entry and icon.
 

@@ -2,6 +2,7 @@ package org.umamo.ui.app
 
 import kotlinx.coroutines.CoroutineScope
 import org.umamo.edit.EditorSession
+import org.umamo.edit.NoticePlacement
 import org.umamo.edit.seed.ParameterTemplate
 import org.umamo.interop.art.ArtworkAnchor
 import org.umamo.interop.art.SourceArtImportOptions
@@ -114,6 +115,22 @@ internal class EditorAppServices(
 ) {
 	/** The model export running now, which a second export, a quit, and a document replace all defer to. */
 	val modelExports: ModelExportGate = ModelExportGate()
+
+	/**
+	 * Runs [action] once no model export is running, telling the rigger on the status bar when it has to wait.
+	 * Every point that ends the process or swaps the document in calls this at the moment it acts: an export can
+	 * start at any time before that - during the unsaved-changes prompt, a save, or a document's load - since
+	 * nothing disables the export commands meanwhile.
+	 *
+	 * @param Function action What to do once no export is running.
+	 */
+	fun afterRunningExport(action: () -> Unit) {
+		modelExports.afterPendingExport(
+			scope,
+			onWaiting = { current().session?.emitNotice("notice.document.waitingForExport", NoticePlacement.StatusBar) },
+			action = action,
+		)
+	}
 
 	/**
 	 * What an artwork import seeds with and where it places a later file, read at the moment the import

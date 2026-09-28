@@ -22,7 +22,8 @@ internal class GlfwOffscreenGlContext : OffscreenGlContext {
 	 * Creates the GLFW hidden-window GL 3.3 core context on this thread and makes it current. Returns false
 	 * (degrading to a blank viewport) if GLFW init, window creation, or creating the GL capabilities fails, or
 	 * the natives will not load, and keeps a description of the failure, GLFW's own where GLFW reports one, for
-	 * [failureReason].
+	 * [failureReason].  A false return holds nothing: a window created before the failure is destroyed again,
+	 * so no hidden window or current context outlives an attempt that did not succeed.
 	 *
 	 * @return Boolean True on success.
 	 */
@@ -50,9 +51,11 @@ internal class GlfwOffscreenGlContext : OffscreenGlContext {
 			// A native library that will not load (a missing or rejected dylib, dll, or so) costs the viewport, not
 			// the editor.
 			failure = "the GLFW or OpenGL natives did not load: $loadFailure"
+			destroy()
 			return false
 		} catch (glFailure: IllegalStateException) {
 			failure = "OpenGL capabilities could not be created: ${glFailure.message}"
+			destroy()
 			return false
 		}
 	}
@@ -79,7 +82,8 @@ internal class GlfwOffscreenGlContext : OffscreenGlContext {
 
 	/**
 	 * Releases the GLFW window and unbinds the context. Runs on the render thread, where the context is
-	 * current, after the engine's glFinish barrier.
+	 * current, after the engine's glFinish barrier - or from a failed [createAndMakeCurrent], to release the
+	 * window it made.  Does nothing once no window is held, so a second call is harmless.
 	 */
 	override fun destroy() {
 		if (window != MemoryUtil.NULL) {

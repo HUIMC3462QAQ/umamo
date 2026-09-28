@@ -16,9 +16,14 @@ import org.umamo.ui.viewport.LiveParams
 import org.umamo.ui.viewport.initialLiveParams
 
 /**
- * A loaded `.cmo3`: the format model (the retained graph Export CMO3 reconciles the session's edits
- * onto - Cmo3Export.apply), the runtime puppet + atlas textures + source artwork (for render), live
- * params.
+ * A loaded `.cmo3`: the format model (the retained graph whose archive Export CMO3 reads a working copy
+ * from, to reconcile the session's edits onto - Cmo3Export.apply), the runtime puppet + atlas textures +
+ * source artwork (for render), live params.
+ *
+ * The retained graph and its archive stay exactly as the file was opened for the document's life: no
+ * export writes into them, so everything that reads them - the raster store, [tilePng], a source read's
+ * decomposed layers, a UMA save, and each export's working copy - sees the imported art, and none of
+ * those reads, on whichever thread, races a write.
  */
 class Cmo3Document(
 	override val path: String,
@@ -29,13 +34,15 @@ class Cmo3Document(
 	override val liveParams: LiveParams,
 	/**
 	 * The atlas pages as the CMO3 embedded them, kept from the open so a save can store those exact bytes
-	 * while the atlas sits at its imported baseline, whatever a later export rewrote in the graph.  A document
-	 * assembled by hand (a test probe) has none, and a save of it derives its pages instead.
+	 * while the atlas sits at its imported baseline.  A document assembled by hand (a test probe) has none,
+	 * and a save of it derives its pages instead.
 	 */
 	val pageSet: AtlasPageSet = AtlasPageSet.EMPTY,
 	/**
-	 * A tile's layer PNG as the CMO3 embedded it, or null for a tile the graph has no image for - the same
-	 * lookup the raster store decodes through, exposed so a save can copy the bytes without a decode.
+	 * A tile's layer PNG as the CMO3 embedded it when opened, or null for a tile the graph has no image for -
+	 * the same lookup the raster store decodes through, exposed so a save can copy the bytes without a
+	 * decode.  An imported tile's bytes never change: a reload supersedes the tile with a new id rather than
+	 * rewriting this one, and an export rewrites the layer only in its own working copy.
 	 */
 	val tilePng: (AtlasTileId) -> ByteArray? = { null },
 ) : PuppetDocument

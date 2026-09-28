@@ -6,7 +6,10 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -60,5 +63,43 @@ class Cmo3FacadeTest {
 		val updated = reread.imageResources().first()
 		assertContentEquals(donorPng, reread.extractLayerPng(updated), "replaced PNG persisted")
 		assertEquals(donorPng.size, updated.imageFileBuf_size, "size attribute updated")
+	}
+
+	/**
+	 * Reading a model's archive again yields a private graph as the file was read: it re-emits the original
+	 * main.xml byte for byte, an edit of it never reaches the first model, and an edit of the first model
+	 * never reaches it - a model's main_xml entry stays as read, because a write re-emits into a copy.
+	 */
+	@Test
+	fun readingAnArchiveAgainGivesAPrivateGraphAsRead() {
+		val file =
+			sample ?: run {
+				println("cmo3.sample not present; skipping the archive reread test")
+				return
+			}
+		val model = Cmo3.read(file)
+		val originalMainXml = CaffCodec.read(file.readBytes()).firstByTag(CaffArchive.TAG_MAIN_XML)!!.content
+		val mainXmlOf = { cmo3: Cmo3Model -> CaffCodec.read(Cmo3.write(cmo3)).firstByTag(CaffArchive.TAG_MAIN_XML)!!.content }
+
+		val workingCopy = Cmo3.read(model.archive)
+		assertSame(model.archive, workingCopy.archive, "the reread shares the archive value")
+		assertNotSame(model.root, workingCopy.root, "the reread parses a graph of its own")
+		assertContentEquals(originalMainXml, mainXmlOf(workingCopy), "the reread re-emits the original main.xml")
+
+		// Edits of the working copy - a graph field and a layer's pixels - stay in the working copy.
+		val firstResource = model.imageResources().first()
+		val originalPng = model.extractLayerPng(firstResource)!!
+		val workingResources = workingCopy.imageResources()
+		workingCopy.setTargetVersionNo((model.targetVersionNo ?: 0) + 1)
+		workingCopy.replaceLayerPng(workingResources.first(), workingCopy.extractLayerPng(workingResources[1])!!)
+		assertFalse(originalMainXml.contentEquals(mainXmlOf(workingCopy)), "the working copy's edit reaches its own main.xml")
+		assertNotSame(model.archive, workingCopy.archive, "a pixel edit swaps in an archive of the working copy's own")
+		assertContentEquals(originalMainXml, mainXmlOf(model), "the first model re-emits the original main.xml")
+		assertContentEquals(originalPng, model.extractLayerPng(firstResource), "the first model's layer keeps its pixels")
+
+		// An edit of the first model stays in its graph: its archive still rereads as the file was read.
+		model.setTargetVersionNo((model.targetVersionNo ?: 0) + 2)
+		assertFalse(originalMainXml.contentEquals(mainXmlOf(model)), "the first model's edit reaches its own main.xml")
+		assertContentEquals(originalMainXml, mainXmlOf(Cmo3.read(model.archive)), "a reread of the edited model's archive re-emits the original main.xml")
 	}
 }

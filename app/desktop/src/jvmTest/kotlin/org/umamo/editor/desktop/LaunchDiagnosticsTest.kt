@@ -2,8 +2,10 @@ package org.umamo.editor.desktop
 
 import org.umamo.storage.LogLevel
 import org.umamo.storage.UmamoLog
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -11,7 +13,8 @@ import kotlin.test.assertTrue
 /**
  * Pins the two launch facts the desktop reads off the JVM that a bug report depends on: which jar the editor
  * was started from, which the heap alerts name, and that a crash's reason reaches the log before the handler
- * that was there before sees it.
+ * that was there before sees it.  Also that the folder opener behind Open Log Folder neither hangs on its own
+ * output nor outlives its timeout.
  */
 class LaunchDiagnosticsTest {
 	@Test
@@ -28,6 +31,30 @@ class LaunchDiagnosticsTest {
 		assertNull(launchedJarFileName("/opt/umamo/lib/app/ui-jvm.jar:/opt/umamo/lib/app/format-jvm.jar", ":"))
 		assertNull(launchedJarFileName("/work/umamo/app/desktop/build/classes/kotlin/jvm/main", ":"))
 		assertNull(launchedJarFileName("", ":"))
+	}
+
+	@Test
+	fun aChattyFolderOpenerStillFinishes() {
+		if (!File("/bin/sh").exists()) {
+			println("skipping: no POSIX shell to stand in for xdg-open")
+			return
+		}
+		// A megabyte of output is far past what a pipe holds: left in a pipe nothing reads, the opener would block
+		// on its write and never exit.
+		assertTrue(runFolderOpener(listOf("/bin/sh", "-c", "head -c 1048576 /dev/zero"), timeoutSeconds = 10))
+		assertFalse(runFolderOpener(listOf("/bin/sh", "-c", "exit 3"), timeoutSeconds = 10), "a failing opener reports failure")
+	}
+
+	@Test
+	fun aFolderOpenerThatHangsIsStoppedAtTheTimeout() {
+		if (!File("/bin/sh").exists()) {
+			println("skipping: no POSIX shell to stand in for xdg-open")
+			return
+		}
+		val started = System.nanoTime()
+
+		assertFalse(runFolderOpener(listOf("/bin/sh", "-c", "sleep 30"), timeoutSeconds = 1))
+		assertTrue(System.nanoTime() - started < 10_000_000_000L, "it returns at the timeout rather than waiting the opener out")
 	}
 
 	@Test

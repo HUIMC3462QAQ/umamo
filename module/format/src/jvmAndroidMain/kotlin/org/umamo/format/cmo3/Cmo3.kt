@@ -240,8 +240,9 @@ public class Cmo3Model internal constructor(
  * Reads and writes Live2D Cubism `.cmo3` files (the CAFF container + the typed model graph).
  *
  * EN: `read` parses the container and deserializes main.xml into the typed model; `write` re-emits
- *     the model into main.xml and repacks the container. Round-trip is byte-identical for unedited
- *     files. Implements [FormatCodec] for `.cmo3`; the `File`-taking overloads are JVM-only
+ *     the model into main.xml and repacks the container. An unedited file's decompressed main.xml
+ *     round-trips byte for byte; the whole file does not, since each compressed entry carries the
+ *     write's own timestamp (CMO3.md §1). Implements [FormatCodec] for `.cmo3`; the `File`-taking overloads are JVM-only
  *     conveniences on top of the byte-array contract. JVM/Android only (uses reflection + JDOM).
  *
  * @see <a href="https://docs.umamo.org/format/CMO3.md">CMO3.md</a>
@@ -318,8 +319,28 @@ public object Cmo3 : FormatCodec<Cmo3Model> {
 	 * @param ByteArray bytes The file contents.
 	 * @return Cmo3Model The loaded model.
 	 */
-	override fun read(bytes: ByteArray): Cmo3Model {
-		val archive = CaffCodec.read(bytes)
+	override fun read(bytes: ByteArray): Cmo3Model = read(CaffCodec.read(bytes))
+
+	/**
+	 * Parses a `.cmo3` whose container is already decoded: the archive's `main_xml` entry deserialized
+	 * into the typed model graph.
+	 *
+	 * The model holds [archive] itself, not a copy.  A [CaffArchive] is never changed once built: its
+	 * entry list is read-only, nothing writes into an entry's content array, and every edit of a model's
+	 * pixels ([Cmo3Model.replacePng], [Cmo3Model.addPng], [Cmo3Model.removeLayerPng]) swaps in a new
+	 * archive through [CaffArchive.withEntries].  A model's `main_xml` entry therefore stays as it was
+	 * read, because [write] re-emits the graph into a copy of the archive, so reading a model's archive
+	 * again returns the graph as that model was read - a private graph with its own identity-keyed
+	 * serializer metadata, which an edit can mutate while the first model stays untouched.
+	 *
+	 * @param CaffArchive archive The decoded container.
+	 * @return Cmo3Model The loaded model.
+	 * @warning A model whose graph was edited after its read rereads as its pre-edit state, since an
+	 *   edit reaches `main_xml` only through a write - every Cmo3Conversion.freshCmo3 result, for
+	 *   instance, which is reconciled onto after its read.
+	 */
+	public fun read(archive: CaffArchive): Cmo3Model {
+		// CMO3.md §1 FILE TABLE: the serialized model document is the entry tagged main_xml.
 		val mainXml =
 			archive.firstByTag(CaffArchive.TAG_MAIN_XML)?.content
 				?: error("not a CMO3: no main_xml entry")

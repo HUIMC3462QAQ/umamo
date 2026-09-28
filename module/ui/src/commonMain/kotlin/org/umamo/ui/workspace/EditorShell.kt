@@ -15,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -89,6 +90,7 @@ import org.umamo.ui.properties.runtimeFeatureLabelRes
 import org.umamo.ui.resources.*
 import org.umamo.ui.settings.LocalQuickSetup
 import org.umamo.ui.settings.QuickSetupDialog
+import org.umamo.ui.settings.QuickSetupState
 import org.umamo.ui.settings.SettingsWindow
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.theme.UmamoTheme
@@ -182,10 +184,12 @@ fun EditorShell(
 	val currentExportImage by rememberUpdatedState(exportImage)
 	val workspaces =
 		remember { WorkspaceLayoutController(initialLayout) { newLayout -> currentOnLayoutChange(newLayout) } }
-	// Quick Setup's visibility is the app's, held across the document swaps that rebuild this shell; read once,
-	// since the app's holder lives as long as the app and the command tables below close over these overlays.
+	// Quick Setup's visibility and the alert-family queues are the app's, held across the document swaps that
+	// rebuild this shell; read once, since the app's holders live as long as the app and the command tables
+	// below close over these overlays.
 	val quickSetup = LocalQuickSetup.current
-	val overlays = remember { quickSetup?.let(::ShellOverlayState) ?: ShellOverlayState() }
+	val appAlerts = LocalAppAlerts.current
+	val overlays = remember { ShellOverlayState(quickSetup ?: QuickSetupState(visible = false), appAlerts ?: AppAlertQueues()) }
 	// The localized base name new and imported workspaces are named from (deduped) - the same string the "+"
 	// button passes to onCreate, so the menu's New Workspace and the tab strip agree.
 	val newWorkspaceBaseName = stringResource(Res.string.workspace_new_name)
@@ -363,16 +367,18 @@ fun EditorShell(
 	//  - structuralEditCount: area-tree edits and popup-invoked workspace CRUD;
 	//  - selfFocusedOverlayOpen / inline edit: reclaim when the palette, preferences, Help dialogs, or an
 	//    inline rename CLOSE (while one is open it owns focus, so the effect waits);
-	//  - modalAlertOpen: the confirm dialog, the file-open alert, the app layer's alerts, the export report,
+	//  - topmostModalAlert: the confirm dialog, the file-open alert, the app layer's alerts, the export report,
 	//    and the repack refusal report do NOT own focus - root focus is (re)claimed on open too, so their
-	//    Escape/Enter route through the modal ladder while open;
+	//    Escape/Enter route through the modal ladder while open.  Keyed on the topmost arrival rather than on
+	//    whether any is open, because they queue: a dismissed dialog can take its focused text along while the
+	//    next queued one shows, and nothing else would reclaim focus for it;
 	//  - menu-bar close: an open menu's popup holds focus and its teardown takes it along.
 	// The two-frame wait lets a closing popup's teardown finish stealing focus first - an immediate
 	// request would be nulled right back out (the menu bar demonstrably needs this; it is harmless for
 	// the other triggers).
 	val overlaySelfFocused = overlays.selfFocusedOverlayOpen || inlineEditController.cancel != null
 	val menuBarOpen = menuBarController.closeOpenMenu != null
-	LaunchedEffect(workspaces.structuralEditCount, overlaySelfFocused, overlays.modalAlertOpen, menuBarOpen) {
+	LaunchedEffect(workspaces.structuralEditCount, overlaySelfFocused, overlays.topmostModalAlert, menuBarOpen) {
 		if (overlaySelfFocused || menuBarOpen) {
 			return@LaunchedEffect
 		}
@@ -574,9 +580,14 @@ fun EditorShell(
 					// full-window scrims cover the menu bar and tab strip too: a click anywhere outside the
 					// overlay's card dismisses it, and the chrome behind is not interactable while it is open
 					// (so the palette cannot be left open under a menu-bar-launched window).  Painted
-					// bottom-to-top: palette, preferences, the Help dialogs, Quick Setup, the export-options
-					// dialog, the file-open alert, the export report, the repack refusal report, then the confirm
-					// dialog (the topmost modal).
+					// bottom-to-top in the reverse of the order the modal key ladder hands them keys, so the
+					// overlay taking Escape and Enter is always the one on top: the palette, the Help dialogs,
+					// preferences, Quick Setup, the export-options dialog, the repack refusal report, the export
+					// report, the app layer's alert, the file-open alert, then the confirm dialog (the topmost
+					// modal).  Each modal alert shows the head of its kind's queue, keyed on it so the next arrival
+					// gets a fresh dialog rather than inheriting a press in flight on the last, and its buttons and
+					// scrim name the arrival they were drawn for, so a click that lands after that one was
+					// answered never answers the next.
 					if (overlays.paletteVisible) {
 						// The space the palette was summoned over, read once per open.  The palette's scrim
 						// keeps every leaf from stamping while it is up, so this is also the surface the
@@ -600,19 +611,20 @@ fun EditorShell(
 							},
 						)
 					}
+					// The Help dialogs, below preferences as Escape closes them after it.
+					if (overlays.creditsVisible) {
+						CreditsDialog(onDismiss = { overlays.creditsVisible = false })
+					}
+					if (overlays.aboutVisible) {
+						AboutDialog(onDismiss = { overlays.aboutVisible = false })
+					}
 					// The preferences overlay; auto-saves every change, so closing it is the only action it needs.
 					if (overlays.settingsVisible) {
 						SettingsWindow(onDismiss = { overlays.settingsVisible = false })
 					}
-					// The Help dialogs, in the same modal family (below the confirm dialog in paint order).
-					if (overlays.aboutVisible) {
-						AboutDialog(onDismiss = { overlays.aboutVisible = false })
-					}
-					if (overlays.creditsVisible) {
-						CreditsDialog(onDismiss = { overlays.creditsVisible = false })
-					}
-					// Quick Setup, open on a first run.  Above the Help dialogs, and below the alerts, so a message a
-					// first launch raises (a read-only document from the command line) still shows over it.
+					// Quick Setup, open on a first run.  Above preferences and the Help dialogs, and below the alerts,
+					// so a message a first launch raises (a read-only document from the command line) still shows
+					// over it.
 					if (overlays.quickSetupVisible) {
 						QuickSetupDialog(onDismiss = { overlays.quickSetupVisible = false })
 					}
@@ -625,61 +637,71 @@ fun EditorShell(
 							onDismiss = { overlays.pendingExportOptions = null },
 						)
 					}
-					// The file-open failure alert, in the same modal family (below the confirm dialog in paint order).
-					overlays.openFailure?.let { failure ->
-						MessageDialog(
-							message = stringResource(openFailureMessage(failure.error), failure.displayName),
-							onDismiss = { overlays.openFailure = null },
-						)
-					}
-					// A message the app layer raised (document.alert), in the same modal family.
-					overlays.pendingAlert?.let { alert ->
-						MessageDialog(
-							message = stringResource(alert.message, *alert.arguments.toTypedArray()),
-							onDismiss = { overlays.pendingAlert = null },
-							alternative =
-								alert.alternative?.let { alternative ->
-									DialogChoice(stringResource(alternative.label)) { overlays.chooseAlertAlternative() }
-								},
-						)
+					// The repack refusal report, the lowest of the modal alerts.  Unlike the export report it
+					// describes work that did NOT happen: the repack aborted whole rather than dropping these tiles.
+					overlays.repackReport?.let { report ->
+						key(report) {
+							MessageDialog(
+								message = repackReportMessage(report),
+								onDismiss = { overlays.dismissRepackReport(report) },
+							)
+						}
 					}
 					// The export report, in the same modal family: advisory only - the export has already
 					// been written when it shows.
 					overlays.exportReport?.let { report ->
-						MessageDialog(
-							message = exportReportMessage(report),
-							onDismiss = { overlays.exportReport = null },
-						)
+						key(report) {
+							MessageDialog(
+								message = exportReportMessage(report),
+								onDismiss = { overlays.dismissExportReport(report) },
+							)
+						}
 					}
-					// The repack refusal report, same modal family.  Unlike the export report it describes
-					// work that did NOT happen: the repack aborted whole rather than dropping these tiles.
-					overlays.repackReport?.let { report ->
-						MessageDialog(
-							message = repackReportMessage(report),
-							onDismiss = { overlays.repackReport = null },
-						)
+					// A message the app layer raised (document.alert), in the same modal family.
+					overlays.pendingAlert?.let { alert ->
+						key(alert) {
+							MessageDialog(
+								message = stringResource(alert.message, *alert.arguments.toTypedArray()),
+								onDismiss = { overlays.dismissAlert(alert) },
+								alternative =
+									alert.alternative?.let { alternative ->
+										DialogChoice(stringResource(alternative.label)) { overlays.chooseAlertAlternative(alert) }
+									},
+							)
+						}
+					}
+					// The file-open failure alert, the highest of the modal alerts below the confirm dialog.
+					overlays.openFailure?.let { failure ->
+						key(failure) {
+							MessageDialog(
+								message = stringResource(openFailureMessage(failure.error), failure.displayName),
+								onDismiss = { overlays.dismissOpenFailure(failure) },
+							)
+						}
 					}
 					// A destructive command raised a confirm: a modal scrim over the whole shell, painted last
-					// so it floats above the tabs, the area tree, the palette, and the settings window.
+					// so it floats above the tabs, the area tree, the palette, the settings window, and the alerts.
 					overlays.pendingConfirm?.let { request ->
-						ConfirmDialog(
-							// Format only when the prompt takes arguments: an argument-free prompt may carry a
-							// literal % (a scale, a progress figure) that a formatter would choke on.
-							message =
-								if (request.arguments.isEmpty()) {
-									stringResource(request.message)
-								} else {
-									stringResource(request.message, *request.arguments.toTypedArray())
-								},
-							onConfirm = { overlays.confirmPending() },
-							onCancel = { overlays.cancelPending() },
-							confirmLabel = stringResource(request.confirmLabel),
-							cancelLabel = stringResource(request.cancelLabel),
-							alternative =
-								request.alternative?.let { alternative ->
-									DialogChoice(stringResource(alternative.label)) { overlays.choosePendingAlternative() }
-								},
-						)
+						key(request) {
+							ConfirmDialog(
+								// Format only when the prompt takes arguments: an argument-free prompt may carry a
+								// literal % (a scale, a progress figure) that a formatter would choke on.
+								message =
+									if (request.arguments.isEmpty()) {
+										stringResource(request.message)
+									} else {
+										stringResource(request.message, *request.arguments.toTypedArray())
+									},
+								onConfirm = { overlays.confirmPending(request) },
+								onCancel = { overlays.cancelPending(request) },
+								confirmLabel = stringResource(request.confirmLabel),
+								cancelLabel = stringResource(request.cancelLabel),
+								alternative =
+									request.alternative?.let { alternative ->
+										DialogChoice(stringResource(alternative.label)) { overlays.choosePendingAlternative(request) }
+									},
+							)
+						}
 					}
 				}
 			}

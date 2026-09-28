@@ -61,7 +61,7 @@ internal fun selfChecks(): List<SelfCheck> =
 			val javaHome = System.getProperty("java.home")
 			// Under a jpackage launcher the runtime must be the one the image carries, not a JDK on the machine that
 			// happens to satisfy every other check.
-			if (System.getProperty("jpackage.app-version") != null) {
+			if (System.getProperty(PACKAGED_VERSION_PROPERTY) != null) {
 				val launcherPath = checkNotNull(System.getProperty("jpackage.app-path")) { "the launcher did not say where it is" }
 				check(runtimeBelongsToImage(Path.of(launcherPath), Path.of(javaHome))) {
 					"the runtime at ${Path.of(javaHome).toRealPath()} is not the app's own, under ${Path.of(launcherPath).toRealPath().parent.parent}"

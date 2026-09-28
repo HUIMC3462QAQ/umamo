@@ -9,10 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.EditorSession
@@ -31,15 +28,15 @@ import org.umamo.ui.kit.FileDropTarget
 import org.umamo.ui.menu.buildAppMenu
 import org.umamo.ui.model.SessionAtlasPages
 import org.umamo.ui.resources.Res
-import org.umamo.ui.resources.alert_log_folder_failed
 import org.umamo.ui.resources.title_untitled_document
 import org.umamo.ui.settings.LocalQuickSetup
 import org.umamo.ui.settings.QuickSetupState
 import org.umamo.ui.viewport.PuppetViewportServiceFactory
-import org.umamo.ui.workspace.AlertRequest
+import org.umamo.ui.workspace.AppAlertQueues
 import org.umamo.ui.workspace.AreaViewStates
 import org.umamo.ui.workspace.EDITOR_STATE_AREAS
 import org.umamo.ui.workspace.EDITOR_STATE_SESSION
+import org.umamo.ui.workspace.LocalAppAlerts
 import org.umamo.ui.workspace.LocalAreaViewStates
 import org.umamo.ui.workspace.commands.fileCommands
 import org.umamo.ui.workspace.commands.fileExportCommands
@@ -135,6 +132,8 @@ fun EditorApp(
 	// Quick Setup opens on a first run - no user settings file when the app loaded - and is held here for the
 	// same reason: a file opened while it is up swaps the document and rebuilds the shell, which must not close it.
 	val quickSetup = remember { QuickSetupState(visible = !settings.foundUserFile) }
+	// The alerts the app raises about work that can finish across a document swap, held here for the same reason.
+	val appAlerts = remember { AppAlertQueues() }
 	// The session's effective atlas pages: a repack swaps them and undo swaps them back, driven by the
 	// model through the resolver's collector.  Created up here rather than in the viewport wiring so
 	// a save and an export read the same page set the viewport shows.
@@ -227,9 +226,10 @@ fun EditorApp(
 	val exportImage = remember(imageExport) { imageExport?.let { controller -> { viewportAreaId: String? -> controller.exportImage(viewportAreaId) } } }
 
 	// The host's exits pass through the same guard as File > Exit.  Installed once per guard: the gate reads
-	// the live document, so the closure's own age does not matter.
+	// the live document, so the closure's own age does not matter.  A running model export is work an exit
+	// waits for, so the host routes even a clean document's exit through the guard while one runs.
 	DisposableEffect(exitGuard) {
-		val cleanup = exitGuard.install { exit -> save.confirmExit(exit) }
+		val cleanup = exitGuard.install(workRunning = { services.modelExports.isBusy }) { exit -> save.confirmExit(exit) }
 		onDispose { cleanup() }
 	}
 
@@ -253,24 +253,14 @@ fun EditorApp(
 			)
 		onDispose { cleanup() }
 	}
-	// Help > Open Log Folder, where the host can show a folder.  The host's call can wait on the desktop's file manager,
-	// so it runs off the UI thread; when it fails, the alert names the folder, whose path the rigger can copy.
+	// Help > Open Log Folder, registered only where the host can show a folder.
 	DisposableEffect(commandRegistry, openLogFolder) {
 		val hostOpensLogFolder = openLogFolder
 		val cleanup =
 			if (hostOpensLogFolder == null) {
 				{}
 			} else {
-				commandRegistry.registerAll(
-					logFolderCommands {
-						scope.launch {
-							val unopenedFolder = withContext(Dispatchers.IO) { hostOpensLogFolder() }
-							if (unopenedFolder != null) {
-								commandRegistry.invoke("document.alert", AlertRequest(Res.string.alert_log_folder_failed, listOf(unopenedFolder)))
-							}
-						}
-					},
-				)
+				commandRegistry.registerAll(logFolderCommands { openLogFolderOrAlert(services, hostOpensLogFolder) })
 			}
 		onDispose { cleanup() }
 	}
@@ -305,7 +295,7 @@ fun EditorApp(
 	// go through the registry rather than straight to a controller - that is what gives the add the hovered
 	// area its operation strip shows in, and what keeps a drop under the same availability gate as the menu.
 	FileDropTarget(onDrop = { paths -> openDroppedFiles(paths, commandRegistry) }) {
-		CompositionLocalProvider(LocalAreaViewStates provides areaViewStates, LocalQuickSetup provides quickSetup) {
+		CompositionLocalProvider(LocalAreaViewStates provides areaViewStates, LocalQuickSetup provides quickSetup, LocalAppAlerts provides appAlerts) {
 			DocumentViewport(
 				document = document,
 				session = session,

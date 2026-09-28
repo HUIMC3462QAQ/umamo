@@ -10,25 +10,20 @@ import okio.IOException
 import org.jetbrains.compose.resources.getString
 import org.umamo.edit.NoticePlacement
 import org.umamo.format.FileKind
-import org.umamo.format.cmo3.Cmo3
 import org.umamo.interop.ExportReport
 import org.umamo.interop.describeExportNotice
 import org.umamo.interop.moc3.Moc3ExportOptions
 import org.umamo.interop.moc3.Moc3Sidecars
 import org.umamo.storage.UmamoLog
 import org.umamo.storage.writeReplacing
-import org.umamo.ui.document.Cmo3Document
 import org.umamo.ui.document.DocumentFile
 import org.umamo.ui.document.Moc3Document
 import org.umamo.ui.document.Moc3ExportSessionOptions
-import org.umamo.ui.document.RenderedCmo3Export
 import org.umamo.ui.document.existingBundleFiles
 import org.umamo.ui.document.exportedModelFor
-import org.umamo.ui.document.prepareCmo3Export
 import org.umamo.ui.document.prepareMoc3Export
 import org.umamo.ui.document.renderCmo3Export
 import org.umamo.ui.document.writeMoc3Bundle
-import org.umamo.ui.model.DrawableThumbnailer
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.alert_export_failed
 import org.umamo.ui.resources.confirm_export_overwrite
@@ -43,8 +38,9 @@ import kotlin.time.Clock
 
 /**
  * The CMO3 and MOC3 exports of ONE open document.  Both puppet document kinds export to either format:
- * Export CMO3 reconciles onto a CMO3-origin document's retained graph and synthesizes a fresh one
- * otherwise, while Export MOC3 bakes fresh from the model whatever the origin.
+ * Export CMO3 reconciles onto a fresh read of a CMO3-origin document's retained graph and synthesizes a
+ * fresh one otherwise, while Export MOC3 bakes fresh from the model whatever the origin.  Neither writes
+ * into the open document.
  *
  * Made per document and holding its [OpenPuppet], so the document, the session, and the page set an export
  * reconciles from are the same three for the controller's whole life - a mismatched set would write one
@@ -91,9 +87,9 @@ internal class DocumentExportController(
 	 * replace-write, as a save's do, so a failed write leaves whatever was there rather than half a file.
 	 *
 	 * The model and the page set are read here, on the UI thread, and the seconds of work that turn them into
-	 * bytes run off it, so the editor stays usable while a large model exports.  A CMO3-origin document's
-	 * reconcile is the exception: it edits the retained graph the document's own rasters read on this thread,
-	 * so only its thumbnail and serialization leave.
+	 * bytes run off it, so the editor stays usable and the exporting notice paints while a large model exports.
+	 * That holds for a CMO3-origin document too: its reconcile lowers onto a working copy read from the
+	 * document's archive, never onto the graph the open document reads.
 	 *
 	 * @param OpenPuppet   exported      The document being exported, with its session and pages.
 	 * @param PlatformFile destination   The picked file.
@@ -115,16 +111,7 @@ internal class DocumentExportController(
 		exported.session.emitNotice("notice.document.exportingModel", NoticePlacement.StatusBar)
 		val nowMillis = Clock.System.now().toEpochMilliseconds()
 		val obfuscateKey = Random.nextInt()
-		val rendered =
-			if (puppetDocument is Cmo3Document) {
-				// The reconcile edits the retained graph that the document's own rasters read on this thread, so it
-				// stays here; the thumbnail and the serialization only read, and leave.
-				val modelThumbnail = withContext(Dispatchers.Default) { DrawableThumbnailer(edited, effectiveTextures).modelRasterFor() }
-				val prepared = prepareCmo3Export(puppetDocument, edited, effectiveTextures, suggestedName, nowMillis, obfuscateKey, modelThumbnail)
-				RenderedCmo3Export(withContext(Dispatchers.Default) { Cmo3.write(prepared.model) }, prepared.report)
-			} else {
-				withContext(Dispatchers.Default) { renderCmo3Export(puppetDocument, edited, effectiveTextures, suggestedName, nowMillis, obfuscateKey) }
-			}
+		val rendered = withContext(Dispatchers.Default) { renderCmo3Export(puppetDocument, edited, effectiveTextures, suggestedName, nowMillis, obfuscateKey) }
 		// Once the bytes exist they land: a torn-down composition must not leave half a file.
 		withContext(NonCancellable) { destination.writeReplacing(rendered.bytes) }
 		reportExport(rendered.report)
@@ -229,7 +216,9 @@ internal class DocumentExportController(
 	 */
 	private suspend fun writeMoc3(exported: OpenPuppet, destination: PlatformFile, bundle: Moc3Sidecars.Bundle) {
 		services.alertingExportFailures(destination.name) {
-			val written = withContext(Dispatchers.IO) { writeMoc3Bundle(destination, bundle) }
+			// Once the family starts to land it lands whole: a torn-down composition must not leave a moc beside
+			// the textures and sidecars of an older export.
+			val written = withContext(NonCancellable + Dispatchers.IO) { writeMoc3Bundle(destination, bundle) }
 			reportExport(bundle.report)
 			UmamoLog.info("exported $written file(s) as ${destination.absolutePath()}")
 			exported.session.emitNotice("notice.document.exportedModel", NoticePlacement.StatusBar, listOf(destination.name))

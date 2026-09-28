@@ -18,7 +18,8 @@ import kotlin.time.Instant
  * file stays open for the whole session - a crash handler never has to open a file.
  *
  * Each session writes its own file and [open] prunes the oldest, so two editor processes (a second launch
- * opens a second window) never share one.  A size cap bounds a runaway session: past the soft cap only
+ * opens a second window) never share one; a session that marks its file ([SessionLogLocks]) keeps it out of
+ * another session's pruning for as long as it runs.  A size cap bounds a runaway session: past the soft cap only
  * errors are still written, and past the hard cap nothing is, each announced by one marker line.  The caps
  * leave room for errors because the failure after a flood of warnings is the line a report needs.
  *
@@ -33,6 +34,7 @@ class SessionLogFile private constructor(
 	private val softCapBytes: Long,
 	private val hardCapBytes: Long,
 	private var writtenBytes: Long,
+	private var releaseHold: (() -> Unit)?,
 ) : LogSink {
 	private val lock = SynchronizedObject()
 
@@ -77,17 +79,24 @@ class SessionLogFile private constructor(
 	}
 
 	/**
-	 * Closes the file.  Lines logged afterwards are dropped.
+	 * Closes the file, then releases this session's mark on it, so a later session may prune it.  Lines logged
+	 * afterwards are dropped.
 	 */
 	fun close() {
 		synchronized(lock) {
-			val openSink = sink ?: return
+			val openSink = sink
 			sink = null
-			try {
-				openSink.close()
-			} catch (_: IOException) {
-				// Every line was already flushed; a failed close loses nothing.
+			if (openSink != null) {
+				try {
+					openSink.close()
+				} catch (_: IOException) {
+					// Every line was already flushed; a failed close loses nothing.
+				}
 			}
+			// Released here even when a failed write already closed the file: the lines it holds are still this
+			// session's until the session ends.
+			releaseHold?.invoke()
+			releaseHold = null
 		}
 	}
 
@@ -117,16 +126,20 @@ class SessionLogFile private constructor(
 	companion object {
 		/**
 		 * Starts a new session log in [directory], after pruning the oldest ones so that, with this one,
-		 * [keptSessions] remain.  Only files named like a session log are ever pruned; a file another process
-		 * still holds open (which Windows refuses to delete) is left for a later session to prune.
+		 * [keptSessions] remain, and marks it through [locks] for as long as it stays open.  Only files named like
+		 * a session log are ever pruned.  One another running session holds - by its mark, or because the file
+		 * system refuses to delete a file another process has open, as Windows does - is left for a later session
+		 * to prune.
 		 *
-		 * @param FileSystem fileSystem   The file system holding [directory].
-		 * @param Path       directory    The logs directory, created if missing.
-		 * @param Instant    startedAt    When the session started; it names the file.
-		 * @param Int        keptSessions How many session logs to keep, this one included.
-		 * @param Long       softCapBytes The size past which only errors are written.
-		 * @param Long       hardCapBytes The size past which nothing is written.
-		 * @param Random     random       The source of the name's suffix.
+		 * @param FileSystem      fileSystem   The file system holding [directory].
+		 * @param Path            directory    The logs directory, created if missing.
+		 * @param Instant         startedAt    When the session started; it names the file.
+		 * @param Int             keptSessions How many session logs to keep, this one included.
+		 * @param Long            softCapBytes The size past which only errors are written.
+		 * @param Long            hardCapBytes The size past which nothing is written.
+		 * @param Random          random       The source of the name's suffix.
+		 * @param SessionLogLocks locks        How a running session marks its log; [SessionLogLocks.None] marks
+		 *   nothing.
 		 * @return SessionLogFile The open session log.
 		 * @throws IOException When the directory or the file cannot be created.
 		 */
@@ -138,9 +151,11 @@ class SessionLogFile private constructor(
 			softCapBytes: Long = SESSION_LOG_SOFT_CAP_BYTES,
 			hardCapBytes: Long = SESSION_LOG_HARD_CAP_BYTES,
 			random: Random = Random.Default,
+			locks: SessionLogLocks = SessionLogLocks.None,
 		): SessionLogFile {
 			fileSystem.createDirectories(directory)
-			pruneSessionLogs(fileSystem, directory, keptSessions - 1)
+			// Before this session's own file exists, so the probe never touches the file this session holds.
+			pruneSessionLogs(fileSystem, directory, keptSessions - 1, locks)
 			var attempt = 0
 			while (true) {
 				val path = directory / sessionLogFileName(startedAt, random.nextInt(SUFFIX_RANGE).toString(16).padStart(SUFFIX_DIGITS, '0'))
@@ -155,15 +170,17 @@ class SessionLogFile private constructor(
 						}
 						continue
 					}
+				val releaseHold = locks.holdForSession(path)
 				val header = "# Umamo session log, started ${formatLogTimestamp(startedAt)} (UTC timestamps)\n"
 				try {
 					sink.writeUtf8(header)
 					sink.flush()
 				} catch (failure: IOException) {
 					sink.close()
+					releaseHold?.invoke()
 					throw failure
 				}
-				return SessionLogFile(path, sink, softCapBytes, hardCapBytes, header.utf8Size())
+				return SessionLogFile(path, sink, softCapBytes, hardCapBytes, header.utf8Size(), releaseHold)
 			}
 		}
 	}
@@ -219,19 +236,24 @@ internal fun formatLogTimestamp(instant: Instant): String {
 }
 
 /**
- * Deletes the oldest session logs in [directory] until at most [keepNewest] remain.  A file that will not
- * delete is left alone: it is most likely another running session's.
+ * Deletes the oldest session logs in [directory] until at most [keepNewest] remain, skipping any another
+ * running session holds.  A file that will not delete is left alone too: it is most likely another running
+ * session's, on a file system that refuses to delete an open file.
  *
- * @param FileSystem fileSystem The file system holding [directory].
- * @param Path       directory  The logs directory.
- * @param Int        keepNewest How many of the newest session logs to keep.
+ * @param FileSystem      fileSystem The file system holding [directory].
+ * @param Path            directory  The logs directory.
+ * @param Int             keepNewest How many of the newest session logs to keep.
+ * @param SessionLogLocks locks      Which logs a running session holds.
  */
-private fun pruneSessionLogs(fileSystem: FileSystem, directory: Path, keepNewest: Int) {
+private fun pruneSessionLogs(fileSystem: FileSystem, directory: Path, keepNewest: Int, locks: SessionLogLocks) {
 	val sessionLogs =
 		fileSystem.listOrNull(directory).orEmpty()
 			.filter { candidate -> candidate.name.startsWith(SESSION_LOG_PREFIX) && candidate.name.endsWith(SESSION_LOG_EXTENSION) }
 			.sortedByDescending { sessionLog -> sessionLog.name }
 	for (expired in sessionLogs.drop(keepNewest.coerceAtLeast(0))) {
+		if (locks.isHeldElsewhere(expired)) {
+			continue
+		}
 		try {
 			fileSystem.delete(expired, mustExist = false)
 		} catch (_: IOException) {
