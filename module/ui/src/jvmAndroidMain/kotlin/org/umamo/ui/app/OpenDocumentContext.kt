@@ -18,7 +18,7 @@ import org.umamo.ui.settings.IMPORT_ALIGNMENT_KEY
 import org.umamo.ui.settings.IMPORT_PARAMETER_TEMPLATE_KEY
 import org.umamo.ui.viewport.AtlasPageBinding
 import org.umamo.ui.viewport.PuppetViewportService
-import org.umamo.ui.workspace.AreaViewStates
+import org.umamo.ui.workspace.editorstate.AreaViewStates
 
 /**
  * An open puppet document with the session that edits it and the page set that session resolves to: the

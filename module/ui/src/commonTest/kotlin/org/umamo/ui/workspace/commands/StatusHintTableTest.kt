@@ -10,10 +10,10 @@ import org.umamo.ui.resources.status_bind_rotate
 import org.umamo.ui.resources.status_bind_scale
 import org.umamo.ui.resources.status_bind_visibility
 import org.umamo.ui.resources.status_select_mode
-import org.umamo.ui.workspace.STATUS_HINT_LIMIT
 import org.umamo.ui.workspace.SpaceKind
-import org.umamo.ui.workspace.everyStatusHintFor
-import org.umamo.ui.workspace.statusHintsFor
+import org.umamo.ui.workspace.statusbar.STATUS_HINT_LIMIT
+import org.umamo.ui.workspace.statusbar.everyStatusHintFor
+import org.umamo.ui.workspace.statusbar.statusHintsFor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

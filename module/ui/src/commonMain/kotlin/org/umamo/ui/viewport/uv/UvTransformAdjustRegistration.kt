@@ -1,0 +1,86 @@
+package org.umamo.ui.viewport.uv
+
+import org.umamo.edit.AdjustableOperation
+import org.umamo.edit.EditorSession
+import org.umamo.edit.ModalTransformCapture
+import org.umamo.edit.ProportionalEditState
+import org.umamo.edit.ProportionalRows
+import org.umamo.edit.TransformGestureParameters
+import org.umamo.edit.TransformRowSpace
+import org.umamo.edit.rederiveProportionalHalos
+import org.umamo.edit.transformGestureParametersOf
+import org.umamo.edit.transformParameters
+import org.umamo.edit.withMeshUvs
+import org.umamo.runtime.model.DrawableId
+import org.umamo.runtime.model.PuppetModel
+import org.umamo.ui.viewport.gizmo.applyOperator
+
+/**
+ * Registers the UV editor's texture-coordinate transform that just committed as the session's
+ * adjustable operation.  The rows read in display texels; the rerun applies the edited numbers over
+ * the frozen display coordinates and writes only the moved vertices back through [frame] onto the
+ * BASE model's stored coordinates (the untouched ones stay bit-identical, as the commit keeps them).
+ * The proportional radius is in texels too, so [onProportional] receives it separately from the
+ * state for the caller to place where the editor keeps its radius.
+ *
+ * @param EditorSession              session      The session the gesture committed into.
+ * @param String                     areaId       The UV editor the gesture ran in.
+ * @param ModalTransformCapture      transform    The frozen capture (display-space positions).
+ * @param UvEditFrame                frame        The space the gesture was authored in.
+ * @param TransformGestureParameters parameters   The numbers the gesture landed with, in texels.
+ * @param ProportionalRows?          proportional The proportional rows (radius in texels), or null.
+ * @param Function                   onProportional Receives the adjusted proportional state (null for
+ *   off) and the row's texel radius after each landed adjustment; unused when [proportional] is null.
+ * @return AdjustableOperation? The record, or null when the session refused the registration or the
+ *   operator has no rows.
+ */
+internal fun registerUvTransformAdjustment(
+	session: EditorSession,
+	areaId: String,
+	transform: ModalTransformCapture,
+	frame: UvEditFrame,
+	parameters: TransformGestureParameters,
+	proportional: ProportionalRows?,
+	onProportional: (ProportionalEditState?, Float) -> Unit,
+): AdjustableOperation? {
+	val kind = transform.operatorKind
+	val rows = transformParameters(kind, parameters, TransformRowSpace.UvDisplay, proportional)
+	if (rows.isEmpty()) {
+		return null
+	}
+	return session.registerAdjustableOperation(session.model.value, areaId, rows) { record ->
+		val adjusted = transformGestureParametersOf(kind, TransformRowSpace.UvDisplay, record.parameters)
+		val proportionalRows = rederiveProportionalHalos(transform, record.parameters)
+		val landed =
+			transform.entries.fold(record.baseSnapshot.model) { model, entry ->
+				val display = applyOperator(kind, entry.positions, entry.groups, adjusted, entry.influence)
+				model.withMeshUvs(entry.drawableId, storedUvsForRerun(model, entry.drawableId, entry.movedIndices, display, frame))
+			}
+		if (session.amendLastCommit(record, landed) && proportionalRows != null) {
+			onProportional(proportionalRows.asState(), proportionalRows.radius)
+		}
+	}
+}
+
+/**
+ * The stored coordinates a rerun commits for one mesh: the base model's current values with only the
+ * moved vertices overwritten - the commit's own discipline (see [storedUvsWithMoved]) - or, for a
+ * drawable the base holds no coordinates for, the whole transformed array converted.
+ *
+ * @param PuppetModel model        The base model the rerun lands over.
+ * @param DrawableId  drawableId   The mesh.
+ * @param Set         movedIndices The vertices the rerun moved.
+ * @param FloatArray  display      The transformed display coordinates.
+ * @param UvEditFrame frame        The space the coordinates are in.
+ * @return FloatArray The coordinates to commit.
+ */
+private fun storedUvsForRerun(
+	model: PuppetModel,
+	drawableId: DrawableId,
+	movedIndices: Set<Int>,
+	display: FloatArray,
+	frame: UvEditFrame,
+): FloatArray {
+	val storedUvs = model.drawables.firstOrNull { drawable -> drawable.id == drawableId }?.mesh?.uvs
+	return if (storedUvs == null) frame.storedUvs(display) else storedUvsWithMoved(storedUvs, movedIndices, display, frame)
+}

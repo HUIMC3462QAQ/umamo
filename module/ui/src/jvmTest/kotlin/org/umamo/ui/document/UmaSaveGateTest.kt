@@ -38,12 +38,12 @@ import org.umamo.ui.model.runAtlasRepack
 import org.umamo.ui.viewport.AreaCameraKey
 import org.umamo.ui.viewport.AtlasPageBinding
 import org.umamo.ui.viewport.CameraSurface
-import org.umamo.ui.workspace.AreaViewStates
-import org.umamo.ui.workspace.EDITOR_STATE_AREAS
-import org.umamo.ui.workspace.EDITOR_STATE_SESSION
 import org.umamo.ui.workspace.PersistentSpaceState
-import org.umamo.ui.workspace.sessionStateJson
-import org.umamo.ui.workspace.sessionViewStateOf
+import org.umamo.ui.workspace.editorstate.AreaViewStates
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_AREAS
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_SESSION
+import org.umamo.ui.workspace.editorstate.sessionStateJson
+import org.umamo.ui.workspace.editorstate.sessionViewStateOf
 import java.io.File
 import java.util.zip.ZipFile
 import kotlin.io.path.createTempDirectory

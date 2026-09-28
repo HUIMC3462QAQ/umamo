@@ -33,6 +33,9 @@ interface PersistentSpaceState {
 	fun restore(tree: JsonObject)
 }
 
+/** An area block's members in the order a writer lays them down (UMA §7.3, §7.5). */
+internal val AREA_BLOCK_MEMBER_ORDER: List<String> = listOf("cameras", "outliner", "sources", "parameters", "keyformSheet", "properties", "uv")
+
 /**
  * The per-area context handed to a space's content factory and its header slot. Carries the hosting
  * area's stable id (which the 2D viewport needs to key its GL surface) and the per-space state bag -

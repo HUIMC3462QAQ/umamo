@@ -1,11 +1,15 @@
 package org.umamo.ui.workspace
 
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.unit.dp
 
 /* The 2D viewport's floating chrome state: whether the left tool toolbar and the right sidebar drawer
  * are shown.  The state itself lives in settings (interface.viewport.showToolbar / showSidebar) and is
  * provided by the settings-backed shell wrapper; the plain EditorShell stays Settings-free (its
- * documented contract), so the default here is what a standalone shell renders. */
+ * documented contract), so the default here is what a standalone shell renders.
+ *
+ * The operation strip's inset sits here too.  The strip host provides it and the viewport's zoom badge
+ * reads it, so it is a seam between the two packages and belongs to neither. */
 
 /** The settings key backing the left tool toolbar's visibility. */
 const val SHOW_TOOLBAR_SETTINGS_KEY = "interface.viewport.showToolbar"
@@ -31,3 +35,10 @@ data class ViewportChromeState(
  * change, and readers (the viewport body) must recompose with it.
  */
 val LocalViewportChrome = compositionLocalOf { ViewportChromeState() }
+
+/**
+ * How far an area's own bottom-left chrome must lift to clear the strip: the strip's height plus its
+ * margin while one shows in that area, else zero.  Provided by the strip host around the space
+ * body; the viewport's zoom badge reads it, so the two never overlap.
+ */
+val LocalOperationStripInset = compositionLocalOf { 0.dp }

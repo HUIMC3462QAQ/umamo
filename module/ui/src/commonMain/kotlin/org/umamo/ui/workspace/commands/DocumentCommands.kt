@@ -8,8 +8,8 @@ import org.umamo.ui.resources.*
 import org.umamo.ui.workspace.AlertRequest
 import org.umamo.ui.workspace.ConfirmRequest
 import org.umamo.ui.workspace.DialogAlternative
-import org.umamo.ui.workspace.ExportOptionsRequest
 import org.umamo.ui.workspace.ShellOverlayState
+import org.umamo.ui.workspace.export.ExportOptionsRequest
 
 /**
  * What a dirty document's replace and quit prompts can do: discard the unsaved edits and go on, or save

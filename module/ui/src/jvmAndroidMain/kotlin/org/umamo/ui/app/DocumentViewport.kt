@@ -39,10 +39,10 @@ import org.umamo.ui.settings.HistorySettings
 import org.umamo.ui.viewport.AtlasPageBinding
 import org.umamo.ui.viewport.LiveParamsAdapter
 import org.umamo.ui.viewport.PuppetViewportServiceFactory
-import org.umamo.ui.viewport.rememberPuppetViewportHost
-import org.umamo.ui.workspace.LocalAreaViewStates
-import org.umamo.ui.workspace.PersistentEditorShell
+import org.umamo.ui.viewport.viewport2d.rememberPuppetViewportHost
 import org.umamo.ui.workspace.commands.ArtworkOperations
+import org.umamo.ui.workspace.editorstate.LocalAreaViewStates
+import org.umamo.ui.workspace.shell.PersistentEditorShell
 
 /**
  * Renders the open document inside the editor shell. For a puppet document, a per-area viewport host

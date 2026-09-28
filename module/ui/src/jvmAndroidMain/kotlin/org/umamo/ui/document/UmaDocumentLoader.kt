@@ -20,8 +20,8 @@ import org.umamo.storage.UmamoLog
 import org.umamo.ui.help.ProjectInfo
 import org.umamo.ui.viewport.LiveParams
 import org.umamo.ui.viewport.initialLiveParams
-import org.umamo.ui.workspace.EDITOR_STATE_SESSION
-import org.umamo.ui.workspace.savedPoseOf
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_SESSION
+import org.umamo.ui.workspace.editorstate.savedPoseOf
 
 /**
  * A rig opened from Umamo's own `.uma` file - the one format the editor opens and saves rather than

@@ -25,10 +25,10 @@ import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.alert_save_failed
 import org.umamo.ui.viewport.fitSquare
 import org.umamo.ui.workspace.AlertRequest
-import org.umamo.ui.workspace.EDITOR_STATE_AREAS
-import org.umamo.ui.workspace.EDITOR_STATE_SESSION
 import org.umamo.ui.workspace.commands.DirtyDocumentPrompt
-import org.umamo.ui.workspace.sessionStateJson
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_AREAS
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_SESSION
+import org.umamo.ui.workspace.editorstate.sessionStateJson
 
 /**
  * How long a save waits for the renderer to draw its thumbnail before compositing one itself.  A capture

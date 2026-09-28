@@ -77,7 +77,7 @@ import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.LocalUmamoTypography
 import org.umamo.ui.viewport.ViewportColorSettings
 import org.umamo.ui.viewport.ViewportSettings
-import org.umamo.ui.workspace.artworkAnchorLabel
+import org.umamo.ui.workspace.operationstrip.artworkAnchorLabel
 
 /** The settings key + values for the UI theme mode, kept in lockstep with org.umamo.ui.theme.Theme. */
 private const val THEME_KEY = "interface.theme"

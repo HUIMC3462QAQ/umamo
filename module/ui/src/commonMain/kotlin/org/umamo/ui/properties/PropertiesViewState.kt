@@ -12,10 +12,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.umamo.ui.workspace.PersistentSpaceState
-import org.umamo.ui.workspace.finiteFloatOf
-import org.umamo.ui.workspace.stringArrayOrNull
-import org.umamo.ui.workspace.stringListOf
-import org.umamo.ui.workspace.stringOf
+import org.umamo.ui.workspace.editorstate.finiteFloatOf
+import org.umamo.ui.workspace.editorstate.stringArrayOrNull
+import org.umamo.ui.workspace.editorstate.stringListOf
+import org.umamo.ui.workspace.editorstate.stringOf
 
 /** The AreaScope.spaceState key the Properties panel parks its view state under, and its member in an area block (UMA §7.3). */
 internal const val PROPERTIES_VIEW_STATE_KEY = "properties"

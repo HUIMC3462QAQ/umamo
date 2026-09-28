@@ -37,11 +37,11 @@ import org.umamo.ui.resources.cmd_mesh_grab
 import org.umamo.ui.resources.cmd_preferences
 import org.umamo.ui.theme.UmamoTheme
 import org.umamo.ui.workspace.ConfirmRequest
-import org.umamo.ui.workspace.ShellModalState
 import org.umamo.ui.workspace.ShellOverlayState
 import org.umamo.ui.workspace.commands.registerAll
-import org.umamo.ui.workspace.handleModalKeyLadder
-import org.umamo.ui.workspace.toShellKeyStroke
+import org.umamo.ui.workspace.shell.ShellModalState
+import org.umamo.ui.workspace.shell.handleModalKeyLadder
+import org.umamo.ui.workspace.shell.toShellKeyStroke
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

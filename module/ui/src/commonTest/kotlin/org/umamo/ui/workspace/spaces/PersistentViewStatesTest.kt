@@ -15,6 +15,14 @@ import org.umamo.ui.tracks.TRACK_LABEL_COLUMN_DEFAULT_WIDTH
 import org.umamo.ui.tracks.TRACK_LABEL_COLUMN_MAX_WIDTH
 import org.umamo.ui.tracks.TrackWindow
 import org.umamo.ui.workspace.PersistentSpaceState
+import org.umamo.ui.workspace.spaces.keyformsheet.KeyformSheetViewState
+import org.umamo.ui.workspace.spaces.outliner.OUTLINER_ROOT_ID
+import org.umamo.ui.workspace.spaces.outliner.OutlinerViewState
+import org.umamo.ui.workspace.spaces.parameters.ParametersViewState
+import org.umamo.ui.workspace.spaces.sources.SourcesFilter
+import org.umamo.ui.workspace.spaces.sources.SourcesViewState
+import org.umamo.ui.workspace.spaces.uv.UvEditorViewState
+import org.umamo.ui.workspace.spaces.uv.UvTextureSelection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
