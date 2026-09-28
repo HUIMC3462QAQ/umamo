@@ -163,6 +163,10 @@ val LocalDrawableThumbnails = staticCompositionLocalOf<DrawableThumbnailProvider
  * records one undo step at the gesture boundary (drag release, a typed value, a reset). So a whole slider
  * drag is a single undo step. The desktop implementation writes its volatile LiveParams hand-off on
  * preview and routes commit through the EditorSession; Android will wrap its own.
+ *
+ * Both writes are refused while Edit mode pins the pose, so a control that scrubs needs no lock of its
+ * own to be safe.  A control that also SHOWS the value it writes still has to know, or it would show a
+ * value the write never took.
  */
 interface LiveParamsHandle {
 	/** The current parameter values (parameter id → value). */

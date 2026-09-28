@@ -3,6 +3,7 @@ package org.umamo.ui.workspace.spaces.parameters
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -102,6 +103,7 @@ import org.umamo.ui.workspace.shell.handleModalKeyLadder
 import org.umamo.ui.workspace.shell.observeTextEntryPresses
 import org.umamo.ui.workspace.shell.shouldReleaseTextEntry
 import org.umamo.ui.workspace.shell.toShellKeyStroke
+import org.umamo.ui.workspace.spaces.keyformsheet.KeyformSheetSpace
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -289,6 +291,7 @@ internal fun panelFixtureModel(runtimeTarget: RuntimeTarget = RuntimeTarget.NoTa
  * @property String rangeDefault The range editor's default caption.
  * @property String rangeMaximum The range editor's maximum caption.
  * @property String more The overflow chip a narrow header collapses into.
+ * @property String trackGeometry The keyform sheet's label for a geometry track.
  */
 internal class PanelText(
 	val reset: String,
@@ -312,6 +315,7 @@ internal class PanelText(
 	val rangeDefault: String,
 	val rangeMaximum: String,
 	val more: String,
+	val trackGeometry: String,
 )
 
 /**
@@ -321,6 +325,8 @@ internal class PanelText(
  * @property Boolean provideSession Whether the composition gets an editing session at all.
  * @property Boolean showHeader Whether the panel's header strip is mounted above the body.
  * @property Boolean provideDocument Whether the composition gets an open document at all.
+ * @property Boolean showKeyformSheet Whether a keyform sheet is mounted beside the panel, over the same
+ *   session and the same pose hand-off.
  */
 internal class ParametersPanelHarness(
 	runtimeTarget: RuntimeTarget = RuntimeTarget.NoTarget,
@@ -328,11 +334,13 @@ internal class ParametersPanelHarness(
 	val provideSession: Boolean = true,
 	val showHeader: Boolean = false,
 	val provideDocument: Boolean = true,
+	val showKeyformSheet: Boolean = false,
 ) {
 	val session = EditorSession(panelFixtureModel(runtimeTarget), PANEL_FIXTURE_POSE)
 	val liveParams: LiveParams = initialLiveParams(session.model.value, PANEL_FIXTURE_POSE)
 	val liveParamsHandle = LiveParamsAdapter(liveParams, session)
 	val scope = AreaScope(PANEL_AREA_ID)
+	val sheetScope = AreaScope(PANEL_SHEET_AREA_ID)
 	val inlineEditController = InlineEditController()
 	val rowDragCancel = RowDragCancelController()
 	val overlays = ShellOverlayState()
@@ -437,6 +445,7 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				rangeDefault = stringResource(Res.string.parameter_range_default),
 				rangeMaximum = stringResource(Res.string.parameter_range_max),
 				more = stringResource(Res.string.header_more),
+				trackGeometry = stringResource(Res.string.track_geometry),
 			)
 		// Collected, not read once: an edit publishes a new model, and the panel has to be handed it.
 		val puppet by harness.session.model.collectAsState()
@@ -511,18 +520,25 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 								)
 							},
 				) {
-					Column {
-						if (harness.showHeader) {
-							Box(modifier = Modifier.width(harness.headerWidth).height(PANEL_HEADER_HEIGHT).testTag(PANEL_HEADER_TAG)) {
-								OverflowRow(modifier = Modifier.fillMaxWidth()) {
-									parametersHeaderControls(harness.scope)
+					Row {
+						Column {
+							if (harness.showHeader) {
+								Box(modifier = Modifier.width(harness.headerWidth).height(PANEL_HEADER_HEIGHT).testTag(PANEL_HEADER_TAG)) {
+									OverflowRow(modifier = Modifier.fillMaxWidth()) {
+										parametersHeaderControls(harness.scope)
+									}
 								}
 							}
+							Box(modifier = Modifier.size(harness.panelSize).testTag(PANEL_BODY_TAG)) {
+								ParametersSpace(harness.scope, Modifier.fillMaxSize())
+							}
+							Box(modifier = Modifier.testTag(PANEL_ELSEWHERE_TAG).size(PANEL_ELSEWHERE_SIZE))
 						}
-						Box(modifier = Modifier.size(harness.panelSize).testTag(PANEL_BODY_TAG)) {
-							ParametersSpace(harness.scope, Modifier.fillMaxSize())
+						if (harness.showKeyformSheet) {
+							Box(modifier = Modifier.size(PANEL_SHEET_WIDTH, PANEL_SHEET_HEIGHT).testTag(PANEL_SHEET_TAG)) {
+								KeyformSheetSpace(harness.sheetScope)
+							}
 						}
-						Box(modifier = Modifier.testTag(PANEL_ELSEWHERE_TAG).size(PANEL_ELSEWHERE_SIZE))
 					}
 				}
 			}
@@ -997,6 +1013,18 @@ internal fun parameterOf(harness: ParametersPanelHarness, id: ParameterId): Para
 
 /** The area the fixture mounts the panel in. */
 internal const val PANEL_AREA_ID = "area-1"
+
+/** The id of the area the keyform sheet beside the panel is mounted in. */
+internal const val PANEL_SHEET_AREA_ID = "area-2"
+
+/** The tag of the box the keyform sheet beside the panel is mounted in. */
+internal const val PANEL_SHEET_TAG = "sheet"
+
+/** The width the keyform sheet beside the panel is laid out at. */
+internal val PANEL_SHEET_WIDTH: Dp = 580.dp
+
+/** The height the keyform sheet beside the panel is laid out at. */
+internal val PANEL_SHEET_HEIGHT: Dp = 320.dp
 
 /** The command the bound chord runs. */
 internal const val PANEL_SHORTCUT_COMMAND = "test.shortcut"

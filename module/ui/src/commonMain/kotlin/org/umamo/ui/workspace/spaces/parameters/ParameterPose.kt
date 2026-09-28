@@ -10,9 +10,11 @@ import org.umamo.ui.model.LiveParamsHandle
  *
  * Parameters are LOCKED while in Edit mode: Edit mode edits the neutral state of the base mesh and is
  * pinned to the neutral pose (the viewport shows rest via a display-only override), so no scrub may move
- * the session pose out from under it.  The lock gates every write here; the sliders keep displaying the
- * untouched Object-mode pose, which returns to the viewport on exit.  Range, link, rename, create, and
- * delete are document edits rather than pose writes, so none of them comes through this class.
+ * the session pose out from under it.  The pose seam refuses such a write from anyone; the lock here is
+ * the panel's own, and what it adds is that a refused write never reaches the values the panel shows.
+ * The sliders keep displaying the untouched Object-mode pose, which returns to the viewport on exit.
+ * Range, link, rename, create, and delete are document edits rather than pose writes, so none of them
+ * comes through this class.
  *
  * The lock is a constructor value, not a read at write time.  A writer stands for one state of the lock
  * and is replaced when the mode changes, so a callback holding a writer can never act on a lock that has
