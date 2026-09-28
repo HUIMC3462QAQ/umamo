@@ -97,6 +97,12 @@ enum class AtlasTileField {
 
 	/** Its name, pixel size, or source binding: what the art itself is, not where it was packed. */
 	METADATA,
+
+	/**
+	 * Its pixels: a reload superseded the tile with a new one over repainted art.  Reported on its own, since
+	 * a repaint can keep the name, the size, and the place, and nothing else in the model then differs.
+	 */
+	PIXELS,
 }
 
 /** The changed document-level aspects of a [PuppetModel]. */
@@ -402,9 +408,11 @@ private fun deformerFields(baseline: Deformer, edited: Deformer): Set<DeformerFi
  * its puppet, which never had layered art, does not know about.  Reporting those as deletions would
  * describe an edit nobody made, on a path with nothing to reconcile.
  *
- * That is safe precisely because no edit can add or remove art today.  When re-import can (it is the
- * whole point of that phase), this grows the created/deleted arms together with the lowering that
- * serves them, rather than reporting a difference nothing acts on.
+ * Art added since the import needs no entry here either: the drawables over it arrive as Created
+ * entries, and the atlas-web reconcile mints a layer web for every edited tile the graph has no image
+ * for.  A reload changes a shared tile's art: it supersedes the tile with a new one, compared here
+ * under its lineage root, which reads as [AtlasTileField.PIXELS] even where the name, the size, and
+ * the place are unchanged.
  *
  * @param List baseline The graph-derived tiles.
  * @param List edited   The session's tiles.
@@ -433,6 +441,11 @@ private fun atlasTileFields(baseline: AtlasTile, edited: AtlasTile): Set<AtlasTi
 	buildSet {
 		if (baseline.placement != edited.placement) {
 			add(AtlasTileField.PLACEMENT)
+		}
+		// A tile's pixels never change under its id, and a reload mints a new id only for a layer whose art
+		// changed - so an edited tile standing in for the baseline's under another id is new pixels.
+		if (baseline.id != edited.id) {
+			add(AtlasTileField.PIXELS)
 		}
 		if (
 			baseline.name != edited.name ||

@@ -170,6 +170,8 @@ See format planning document: docs/plan/uma-format.md
 
 ## Refactor
 * module/render/src/commonMain/kotlin/org/umamo/render/puppet/PuppetRenderer.kt
+* module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/EditorShell.kt
+	* Also reorganize the workspace folder.
 
 ## DRY/Standardization
 * Fields like PropertyFieldRow need to take a key use use that to get the correct resource key automatically instead of passing it.

@@ -33,6 +33,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * A CMO3 export of a CMO3-origin document lowers onto a working copy read from the document's archive,
@@ -52,11 +53,14 @@ class Cmo3ExportIsolationTest {
 	/** A guid's uuid attribute in main.xml; CMO3: every *Guid element carries its value as attribute uuid. */
 	private val uuidAttribute = Regex("uuid=\"([0-9a-fA-F-]{36})\"")
 
-	/**
-	 * Layer A repainted and grown under the same key.  The size change is what the export's model diff
-	 * sees, so the reconcile rewrites the retained layer rather than finding nothing to lower.
-	 */
+	/** Layer A repainted and grown under the same key: a reload that changes its size along with its pixels. */
 	private val layerARepainted = InMemoryLayer("lyid:1", "A", 0, LayerBounds(10, 10, 12, 12), solidRaster(12, 12, 9))
+
+	/**
+	 * Layer A repainted in place: the same key, bounds, and size, so only its pixels change - the reload that
+	 * leaves nothing else in the model different.
+	 */
+	private val layerARepaintedInPlace = InMemoryLayer("lyid:1", "A", 0, LayerBounds(10, 10, 8, 8), solidRaster(8, 8, 9))
 
 	/**
 	 * What a CMO3-origin document retains, captured as it opened to compare against after exports.
@@ -92,10 +96,11 @@ class Cmo3ExportIsolationTest {
 	 * Builds the in-memory art document, exports it to a CMO3, reopens that as a CMO3-origin document, and
 	 * reloads layer A repainted, waiting for the session's pages to follow the reload.
 	 *
-	 * @param CoroutineScope scope The test's scope, which the repack host and the page resolver run in.
+	 * @param CoroutineScope scope     The test's scope, which the repack host and the page resolver run in.
+	 * @param InMemoryLayer  repainted Layer A as the reload reads it.
 	 * @return ReloadedCmo3 The reloaded document, ready to export.
 	 */
-	private suspend fun reloadedCmo3(scope: CoroutineScope): ReloadedCmo3 {
+	private suspend fun reloadedCmo3(scope: CoroutineScope, repainted: InMemoryLayer = layerARepainted): ReloadedCmo3 {
 		val artLoad = buildArtDocument(InMemoryArt(listOf(layerA, layerB)), FileKind.Psd, "a.psd", "/art/a.psd", options)
 		val artDocument = assertIs<ArtDocument>(assertIs<DocumentLoad.Loaded>(artLoad).document)
 		val cmo3Bytes = renderCmo3Export(artDocument, artDocument.puppet, artDocument.textures, "isolation", nowMillis = 0L, obfuscateKey = 0).bytes
@@ -118,7 +123,7 @@ class Cmo3ExportIsolationTest {
 				report = { report -> error("the reload must not refuse: ${report.refusals.joinToString { refusal -> "${refusal.tileName}: ${refusal.reason}" }}") },
 				rememberOptions = { _, _ -> },
 			)
-		val request = ReloadArtworkRequest(listOf(ReloadEntry(sourceId, InMemoryArt(listOf(layerARepainted, layerB)), contentHash = "v2")), options)
+		val request = ReloadArtworkRequest(listOf(ReloadEntry(sourceId, InMemoryArt(listOf(repainted, layerB)), contentHash = "v2")), options)
 		assertEquals(ReloadArtworkResult.Applied, runReloadArtwork(host, request, areaId = null), "the reload lands")
 		val reloaded = session.model.value
 		val replacement = reloaded.atlas.tiles.first { tile -> tile.replaces == originalTile.id }
@@ -251,5 +256,28 @@ class Cmo3ExportIsolationTest {
 			val rereadArt = assertNotNull(cmo3SourceArtOf(reread.root as CModelSource, fixture.sourceId) { resource -> reread.extractLayerPng(resource) }, "the written file's layers read back")
 			val rereadLayerA = assertNotNull(rereadArt.layers.firstOrNull { layer -> layer.id.raw == layerA.id.raw }, "layer A is listed under its key")
 			assertContentEquals(layerARepainted.raster.rgba, rereadLayerA.raster.rgba, "the export after the failure writes the repainted pixels")
+		}
+
+	/**
+	 * A reload that repaints layer A without changing its size or place leaves nothing in the model different
+	 * but the tile's pixels, and the export still writes them.
+	 */
+	@Test
+	fun aRepaintThatKeepsItsSizeAndPlaceReachesTheExport() =
+		runBlocking {
+			val fixture = reloadedCmo3(this, repainted = layerARepaintedInPlace)
+			val original = fixture.document.puppet.atlas.tiles.first { tile -> tile.id == fixture.originalTileId }
+			val replacement = fixture.edited.atlas.tiles.first { tile -> tile.id == fixture.replacementTileId }
+			assertEquals(original.width to original.height, replacement.width to replacement.height, "the repaint kept its size")
+			assertEquals(original.placement, replacement.placement, "and its place on the page")
+
+			val prepared = prepareCmo3Export(fixture.document, fixture.edited, fixture.effectiveTextures, "isolation", nowMillis = 0L, obfuscateKey = 0)
+			assertTrue(prepared.report.notices.isEmpty(), "the repaint is written, not owed: ${prepared.report.notices}")
+			assertRetainedAsOpened(fixture, "after the export")
+
+			val reread = Cmo3.read(Cmo3.write(prepared.model))
+			val rereadArt = assertNotNull(cmo3SourceArtOf(reread.root as CModelSource, fixture.sourceId) { resource -> reread.extractLayerPng(resource) }, "the written file's layers read back")
+			val rereadLayerA = assertNotNull(rereadArt.layers.firstOrNull { layer -> layer.id.raw == layerA.id.raw }, "layer A is listed under its key")
+			assertContentEquals(layerARepaintedInPlace.raster.rgba, rereadLayerA.raster.rgba, "the export writes the repainted pixels")
 		}
 }
