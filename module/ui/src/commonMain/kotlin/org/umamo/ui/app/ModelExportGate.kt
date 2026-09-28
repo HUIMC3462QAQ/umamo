@@ -1,6 +1,10 @@
 package org.umamo.ui.app
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -14,14 +18,16 @@ import kotlinx.coroutines.launch
  * export while the next one loads beside it, and a quit would kill the write half done.
  *
  * App-lifetime rather than per document: the export controllers are rebuilt with every document, and the export
- * that must be waited for belongs to the document being replaced.  Every call comes from the UI thread.
+ * that must be waited for belongs to the document being replaced.  Every call comes from the UI thread.  The
+ * running export is snapshot state, so a composition that reads [isBusy] - Android's back handler - follows it.
  */
 internal class ModelExportGate {
-	private var running: Job? = null
+	/** The running export's job, cleared the moment it completes. */
+	private var running: Job? by mutableStateOf(null)
 
 	/** Whether a model export is running now. */
 	val isBusy: Boolean
-		get() = running?.isActive == true
+		get() = running != null
 
 	/**
 	 * Starts [work] in [scope] as the running export, unless one already runs.
@@ -34,14 +40,23 @@ internal class ModelExportGate {
 		if (isBusy) {
 			return false
 		}
-		running = scope.launch { work() }
+		// Started lazily so the gate holds the job before any of it can run, and so before it can complete.
+		val export = scope.launch(start = CoroutineStart.LAZY) { work() }
+		running = export
+		export.invokeOnCompletion {
+			if (running === export) {
+				running = null
+			}
+		}
+		export.start()
 		return true
 	}
 
 	/**
 	 * Runs [action] once no model export is running: at once when none is, else when the running one ends,
 	 * whether or not it wrote its file - a failed export has already said so in its alert, and nothing about it
-	 * is a reason to keep the rigger from quitting or opening another document.
+	 * is a reason to keep the rigger from quitting or opening another document.  An export started while this
+	 * waits - the gate is free between one export's end and the moment the wait resumes - is waited for too.
 	 *
 	 * @param CoroutineScope scope     The scope the wait runs in.
 	 * @param Function       onWaiting Called when there is an export to wait for, before the wait.
@@ -55,7 +70,11 @@ internal class ModelExportGate {
 		}
 		onWaiting()
 		scope.launch {
-			pending.join()
+			var waitingOn: Job? = pending
+			while (waitingOn != null) {
+				waitingOn.join()
+				waitingOn = running?.takeUnless { job -> job.isCompleted }
+			}
 			action()
 		}
 	}

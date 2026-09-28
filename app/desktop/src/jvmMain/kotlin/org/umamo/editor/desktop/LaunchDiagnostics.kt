@@ -29,9 +29,13 @@ private const val XDG_OPEN_TIMEOUT_SECONDS = 10L
 /** The system property the installed launcher sets (its umamo.cfg); a jar or development launch has none. */
 internal const val PACKAGED_VERSION_PROPERTY = "jpackage.app-version"
 
+/** Bytes in a mebibyte, for the memory limits the launch logs. */
+internal const val BYTES_PER_MEBIBYTE = 1024L * 1024
+
 /**
  * Starts this session's log file under the data directory and routes every logged line into it for the rest
- * of the process.
+ * of the process.  The file is locked for the session ([FileChannelSessionLogLocks]), so another session's
+ * pruning leaves it alone on every OS.
  *
  * @param AppStorage storage The app's directories.
  * @return SessionLogFile? The open session log, or null when it could not be created; the editor runs on
@@ -39,7 +43,7 @@ internal const val PACKAGED_VERSION_PROPERTY = "jpackage.app-version"
  */
 internal fun attachSessionLog(storage: AppStorage): SessionLogFile? =
 	try {
-		SessionLogFile.open(FileSystem.SYSTEM, logDirectoryOf(storage), Clock.System.now()).also { sessionLog -> UmamoLog.addSink(sessionLog) }
+		SessionLogFile.open(FileSystem.SYSTEM, logDirectoryOf(storage), Clock.System.now(), locks = FileChannelSessionLogLocks).also { sessionLog -> UmamoLog.addSink(sessionLog) }
 	} catch (failure: IOException) {
 		UmamoLog.warn("no session log this time: ${failure.message}")
 		null
@@ -70,14 +74,38 @@ internal fun openLogFolder(storage: AppStorage): String? {
 			Desktop.getDesktop().open(folder)
 		} else {
 			check(System.getProperty("os.name").orEmpty().startsWith("Linux")) { "this desktop cannot open a folder" }
-			val opener = ProcessBuilder("xdg-open", folder.absolutePath).redirectErrorStream(true).start()
-			check(opener.waitFor(XDG_OPEN_TIMEOUT_SECONDS, TimeUnit.SECONDS) && opener.exitValue() == 0) { "xdg-open did not open it" }
+			check(runFolderOpener(listOf("xdg-open", folder.absolutePath), XDG_OPEN_TIMEOUT_SECONDS)) { "xdg-open did not open it" }
 		}
 		null
 	} catch (failure: Exception) {
 		UmamoLog.warn("could not open the log folder ${folder.absolutePath}: ${failure.message}")
 		folder.absolutePath
 	}
+}
+
+/**
+ * Runs a command that hands a folder to the file manager, and says whether it finished in time and succeeded.
+ *
+ * Its output is discarded rather than left in a pipe nothing reads: an opener that writes more than the pipe
+ * holds would otherwise block on the write and never exit.  One that runs past [timeoutSeconds] is destroyed, so
+ * it is not left running for the rest of the session.
+ *
+ * @param List command        The opener and its arguments.
+ * @param Long timeoutSeconds How long it may run.
+ * @return Boolean True when it exited in time with status 0.
+ */
+internal fun runFolderOpener(command: List<String>, timeoutSeconds: Long): Boolean {
+	val opener =
+		ProcessBuilder(command)
+			.redirectErrorStream(true)
+			.redirectOutput(ProcessBuilder.Redirect.DISCARD)
+			.start()
+	opener.outputStream.close()
+	if (!opener.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+		opener.destroy()
+		return false
+	}
+	return opener.exitValue() == 0
 }
 
 /**
@@ -109,14 +137,16 @@ internal fun installUncaughtExceptionLogging(): Thread.UncaughtExceptionHandler?
 /**
  * The memory limit this JVM started with, and how it was started.
  *
+ * @param JarLaunchFacts? jarLaunch What a jar launch knows about itself ([gatherJarLaunchFacts]), or null for the
+ *   installed launcher or a development class path.
  * @return HostHeap The launch's heap.
  */
-internal fun detectHostHeap(): HostHeap =
+internal fun detectHostHeap(jarLaunch: JarLaunchFacts?): HostHeap =
 	HostHeap(
 		maxBytes = Runtime.getRuntime().maxMemory(),
 		packagedLaunch = System.getProperty(PACKAGED_VERSION_PROPERTY) != null,
 		jarFileName = launchedJarFileName(System.getProperty("java.class.path").orEmpty()),
-		heapOptionApplied = System.getProperty(RELAUNCHED_PROPERTY) != null,
+		heapOptionApplied = jarLaunch != null && (jarLaunch.relaunchedFrom != null || jarHeapOptionGoverns(jarLaunch.inputArguments)),
 	)
 
 /**
@@ -148,8 +178,7 @@ internal fun logLaunchFacts(hostHeap: HostHeap, sessionLog: SessionLogFile?) {
 			else -> "a development class path"
 		}
 
-	val bytesPerMebibyte = 1024L * 1024
-	UmamoLog.info("started from $launch; the heap may grow to ${hostHeap.maxBytes / bytesPerMebibyte} MiB")
+	UmamoLog.info("started from $launch; the heap may grow to ${hostHeap.maxBytes / BYTES_PER_MEBIBYTE} MiB")
 	relaunchLogLine(System.getProperty(RELAUNCHED_PROPERTY))?.let { relaunchLine -> UmamoLog.info(relaunchLine) }
 	sessionLog?.let { openLog -> UmamoLog.info("session log: ${openLog.path}") }
 }

@@ -146,6 +146,40 @@ class SessionLogFileTest {
 	}
 
 	@Test
+	fun aRunningSessionsLogIsDeletedWhereTheFileSystemAllowsItAndNothingMarksIt() {
+		// Linux and macOS unlink a file another process has open; with no mark, pruning cannot tell it is in use.
+		val fileSystem = FakeFileSystem().apply { allowDeletingOpenFiles = true }
+		val running = SessionLogFile.open(fileSystem, directory, Instant.parse("2026-09-24T01:00:00Z"))
+
+		val sessionLog = SessionLogFile.open(fileSystem, directory, startedAt, keptSessions = 1)
+		sessionLog.close()
+		running.close()
+
+		assertEquals(setOf(sessionLog.path), fileSystem.list(directory).toSet())
+	}
+
+	@Test
+	fun aMarkedSessionLogSurvivesPruningUntilItsSessionEnds() {
+		val fileSystem = FakeFileSystem().apply { allowDeletingOpenFiles = true }
+		val locks = RecordingSessionLogLocks()
+		val running = SessionLogFile.open(fileSystem, directory, Instant.parse("2026-09-24T01:00:00Z"), locks = locks)
+		assertEquals(setOf(running.path), locks.held, "a session marks its own log as it opens it")
+
+		val sessionLog = SessionLogFile.open(fileSystem, directory, startedAt, keptSessions = 1, locks = locks)
+		assertEquals(setOf(running.path, sessionLog.path), fileSystem.list(directory).toSet(), "the running session's log is left")
+
+		running.close()
+		assertEquals(setOf(sessionLog.path), locks.held, "closing releases the mark")
+		sessionLog.close()
+		val nextSession = SessionLogFile.open(fileSystem, directory, Instant.parse("2026-09-24T05:00:00Z"), keptSessions = 1, locks = locks)
+		nextSession.close()
+
+		assertEquals(setOf(nextSession.path), fileSystem.list(directory).toSet(), "a finished session's log is pruned again")
+		assertTrue(locks.held.isEmpty())
+		fileSystem.checkNoOpenFiles()
+	}
+
+	@Test
 	fun twoSessionsStartedAtOneInstantWriteTwoFiles() {
 		val fileSystem = FakeFileSystem()
 		// Identical seeds draw the same first suffix, the collision two processes could meet by chance.
@@ -236,4 +270,33 @@ class SessionLogFileTest {
 			assertEquals(8 * 200, lines.toSet().size, "every line landed exactly once")
 			fileSystem.checkNoOpenFiles()
 		}
+}
+
+/**
+ * A [SessionLogLocks] that keeps its marks in a set, standing in for the operating-system locks of the desktop
+ * host.  One set serves every session in a test: a session never probes its own log, which does not exist yet
+ * when it prunes.
+ */
+private class RecordingSessionLogLocks : SessionLogLocks {
+	/** The logs a session currently marks. */
+	val held = mutableSetOf<Path>()
+
+	/**
+	 * Marks [path] until the returned release runs.
+	 *
+	 * @param Path path The session's log.
+	 * @return Function The release.
+	 */
+	override fun holdForSession(path: Path): (() -> Unit)? {
+		held += path
+		return { held -= path }
+	}
+
+	/**
+	 * Whether a session marks [path].
+	 *
+	 * @param Path path A session log.
+	 * @return Boolean True when it is marked.
+	 */
+	override fun isHeldElsewhere(path: Path): Boolean = path in held
 }

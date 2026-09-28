@@ -2,7 +2,9 @@ package org.umamo.ui.app
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * Pins the host-side half of the quit guard: who decides, and what happens when nobody does.
@@ -66,5 +68,22 @@ class ExitGuardTest {
 
 		assertEquals(1, replacementCount)
 		assertEquals(0, exitCount)
+	}
+
+	@Test
+	fun theHostSeesTheWorkAnExitWaitsFor() {
+		// Android keeps the platform's own back for a clean document; while an export is written it must route
+		// back through the guard, which waits for the file to land.
+		val guard = ExitGuard()
+		var exportRunning = false
+		assertFalse(guard.workRunning, "with no guard installed there is nothing to wait for")
+
+		val cleanup = guard.install(workRunning = { exportRunning }) {}
+		assertFalse(guard.workRunning)
+		exportRunning = true
+		assertTrue(guard.workRunning, "the host reads the probe as it is now")
+
+		cleanup()
+		assertFalse(guard.workRunning, "an uninstalled guard reports nothing")
 	}
 }

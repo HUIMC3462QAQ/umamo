@@ -157,14 +157,16 @@ fun main(args: Array<String>) {
 	}
 	// Before anything else the editor does, a jar started with too little memory starts itself again with enough
 	// and does not return (JarRelaunch.kt): ahead of AWT, so macOS shows one Dock icon, and ahead of the session
-	// log, so the short-lived first launch does not spend one of the ten kept.
-	val relaunchNote = relaunchForHeapIfDue(args)
+	// log, so the short-lived first launch does not spend one of the ten kept.  The launch's facts are gathered
+	// once, here, and the heap detection below reads the same ones.
+	val jarLaunch = gatherJarLaunchFacts()
+	val relaunchNote = relaunchForHeapIfDue(jarLaunch, args)
 	// Then, so the initial document load and everything after it reach the log file.  Building the storage
 	// does no IO; the log opens its own file under the data directory.
 	val storage = desktopAppStorage("umamo")
 	val sessionLog = attachSessionLog(storage)
 	installUncaughtExceptionLogging()
-	val hostHeap = detectHostHeap()
+	val hostHeap = detectHostHeap(jarLaunch)
 	logLaunchFacts(hostHeap, sessionLog)
 	relaunchNote?.let { note -> UmamoLog.warn(note) }
 	// FileKit's native dialogs need a one-time init; `appId` names the per-OS data/cache dirs it uses.

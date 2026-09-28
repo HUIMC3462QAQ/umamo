@@ -95,6 +95,26 @@ internal fun hasExplicitHeapLimit(inputArguments: List<String>): Boolean =
 	}
 
 /**
+ * Whether [JAR_HEAP_OPTION] is what sets this launch's heap limit: the last `-XX:MaxRAMPercentage` is exactly that
+ * option, and no `-Xmx`, `-XX:MaxHeapSize`, or `-XX:MaxRAMFraction` overrides it.  A launch it governs already
+ * runs with the limit the low-memory advice would give it, so that advice would change nothing.
+ *
+ * @param List inputArguments The JVM options.
+ * @return Boolean Whether the option governs the heap limit.
+ */
+internal fun jarHeapOptionGoverns(inputArguments: List<String>): Boolean {
+	val lastPercentage = inputArguments.lastOrNull { argument -> argument.startsWith("-XX:MaxRAMPercentage=") }
+	if (lastPercentage != JAR_HEAP_OPTION) {
+		return false
+	}
+	return inputArguments.none { argument ->
+		argument.startsWith("-Xmx") ||
+			argument.startsWith("-XX:MaxHeapSize=") ||
+			argument.startsWith("-XX:MaxRAMFraction=")
+	}
+}
+
+/**
  * Whether a JDWP debugger agent is attached, which a relaunched child would start a second time.
  *
  * @param List inputArguments The JVM options.
@@ -156,11 +176,13 @@ internal fun gatherJarLaunchFacts(): JarLaunchFacts? {
  * the option variables, because their options already reach it through the input arguments and would
  * otherwise apply twice.  A shutdown hook takes the child down with this process.
  *
- * @param Array<String> programArguments The arguments `main` received.
+ * @param JarLaunchFacts? jarLaunch        What the launch knows about itself ([gatherJarLaunchFacts]), or null
+ *   when it is not a jar launch, which never relaunches.
+ * @param Array<String>   programArguments The arguments `main` received.
  * @return String? A note for the log when a relaunch was due but could not start, else null.
  */
-internal fun relaunchForHeapIfDue(programArguments: Array<String>): String? {
-	val facts = gatherJarLaunchFacts() ?: return null
+internal fun relaunchForHeapIfDue(jarLaunch: JarLaunchFacts?, programArguments: Array<String>): String? {
+	val facts = jarLaunch ?: return null
 	val decision = decideJarRelaunch(facts, programArguments.toList())
 	if (decision !is JarRelaunchDecision.Relaunch) {
 		return null
@@ -210,5 +232,3 @@ internal fun launchedJarPath(classPath: String, pathSeparator: String = File.pat
 	}
 	return File(onlyEntry).absolutePath
 }
-
-private const val BYTES_PER_MEBIBYTE = 1024L * 1024

@@ -187,18 +187,19 @@ internal class DocumentSaveController(
 	 * unsaved-changes prompt from appearing over a running save, where its Save button could only answer that
 	 * one is in progress.
 	 *
+	 * This is the early wait, before the prompt.  An export started after it - while the prompt is up, a save is
+	 * written, or a document loads - is waited for again where the exit or the swap actually happens
+	 * ([EditorAppServices.afterRunningExport]).
+	 *
 	 * @param Function action What to do once nothing is being written.
 	 */
 	private fun afterPendingWrites(action: () -> Unit) {
-		services.modelExports.afterPendingExport(
-			services.scope,
-			onWaiting = { services.current().session?.emitNotice("notice.document.waitingForExport", NoticePlacement.StatusBar) },
-		) {
+		services.afterRunningExport {
 			val context = services.current()
 			val file = context.file
 			if (file == null) {
 				action()
-				return@afterPendingExport
+				return@afterRunningExport
 			}
 			file.afterPendingSave(
 				services.scope,
@@ -242,16 +243,19 @@ internal class DocumentSaveController(
 	/**
 	 * Runs [exit], asking first when the document is dirty (document.confirmExit): quitting discards the
 	 * session the same way a replace does.  File > Exit calls this directly; the host's window close, OS
-	 * quit, and back gesture reach it through the exit guard.
+	 * quit, and back gesture reach it through the exit guard.  Whichever way the exit comes - at once, after
+	 * Don't Save, or after a save lands - it waits for a model export started meanwhile, so the process never
+	 * ends with an export half written.
 	 *
 	 * @param Function exit Closes the application.
 	 */
 	fun confirmExit(exit: () -> Unit) {
+		val exitWhenIdle = { services.afterRunningExport(exit) }
 		afterPendingWrites {
 			if (services.current().session?.dirty?.value == true) {
-				services.commandRegistry.invoke("document.confirmExit", dirtyDocumentPrompt(exit))
+				services.commandRegistry.invoke("document.confirmExit", dirtyDocumentPrompt(exitWhenIdle))
 			} else {
-				exit()
+				exitWhenIdle()
 			}
 		}
 	}

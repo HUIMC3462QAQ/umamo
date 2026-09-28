@@ -30,7 +30,7 @@ Every leg builds on its own OS and architecture.  Unlike the uber jar, an applic
 
 The bundled runtime is JDK 21 everywhere except `macos-arm64`, which packages with JDK 27 (`-Pumamo.packagingJavaHome`, set by the leg's `packagingJdk`): only JDK 27's jpackage accepts a macOS version starting with `0`, and the fix was never backported.  That leg therefore follows the JDK feature releases (28 in March 2027) until the JDK 29 LTS; Linux and Windows stay on 21 until Temurin 27 ships for Windows or 29 arrives.  Intel Macs get the jar only: Temurin will never publish 27 for macOS x64.  Re-check a new JDK before moving to it - Compose's default jlink module set includes `jdk.crypto.ec`, deprecated and empty since JDK 22, and jlink fails the release it is removed in.
 
-Out of scope until alpha: code signing, notarization, auto-update, and any Android artifact.  See `TODO.md` § Build and Distribute.
+Not yet: code signing, notarization, an update notice, and any Android artifact.  Umamo never updates itself: a new version is announced, and the rigger installs it when they choose.  See `TODO.md` § Build and Distribute.
 
 ## File associations
 

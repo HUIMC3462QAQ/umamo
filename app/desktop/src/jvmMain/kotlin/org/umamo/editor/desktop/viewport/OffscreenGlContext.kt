@@ -1,6 +1,7 @@
 package org.umamo.editor.desktop.viewport
 
 import org.lwjgl.system.Configuration
+import org.umamo.editor.desktop.PACKAGED_VERSION_PROPERTY
 
 /**
  * An off-screen GL 3.3+ core context owned by a single render thread. The offscreen viewport renderer
@@ -20,7 +21,8 @@ internal interface OffscreenGlContext {
 	/**
 	 * Creates the context and makes it current on the calling (render) thread. On failure returns false so
 	 * the caller degrades to a blank viewport rather than crashing - the same graceful fallback the engine
-	 * already applies when GL is unavailable.
+	 * already applies when GL is unavailable - and holds nothing: whatever the attempt made before it failed is
+	 * released again.
 	 *
 	 * @return Boolean True on success (a context is now current), false to degrade to a blank viewport.
 	 */
@@ -44,7 +46,8 @@ internal interface OffscreenGlContext {
 
 	/**
 	 * Releases the context on the render thread. Must NOT call glFinish - the engine issues one glFinish
-	 * barrier before disposing its GL resources, and this runs last, after that barrier.
+	 * barrier before disposing its GL resources, and this runs last, after that barrier.  Harmless when
+	 * nothing is held, which is how the engine can call it after a failed [createAndMakeCurrent] too.
 	 */
 	fun destroy()
 }
@@ -72,7 +75,7 @@ internal fun configureLwjglNatives() {
 		// once signing lands), so their bytes never match the reference hashes LWJGL ships, and its check would
 		// only print a false "incompatible Java and native library versions" error.  A jar or a development run
 		// loads them unmodified and keeps the check.
-		if (System.getProperty("jpackage.app-version") != null) {
+		if (System.getProperty(PACKAGED_VERSION_PROPERTY) != null) {
 			Configuration.DISABLE_HASH_CHECKS.set(true)
 		}
 	}

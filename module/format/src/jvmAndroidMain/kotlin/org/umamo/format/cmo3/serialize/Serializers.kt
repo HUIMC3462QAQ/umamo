@@ -6,6 +6,7 @@ import org.umamo.format.cmo3.serialize.annotations.DontSerializeIfDefault
 import org.umamo.format.cmo3.serialize.annotations.SerialAttribute
 import org.umamo.format.cmo3.serialize.annotations.SerialName
 import org.umamo.format.cmo3.serialize.annotations.SuppressSerializeSuperClass
+import java.lang.reflect.InvocationTargetException
 import kotlin.reflect.KClass
 import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.full.declaredMemberProperties
@@ -153,8 +154,9 @@ internal class ReflectiveClassSerializer(
 			.map { it.name }.toSet()
 
 	// A class that will not instantiate has no default to compare against, so its fields are all written.  An
-	// Error is not that case: caught here, an OutOfMemoryError would be remembered as "no default" for the rest
-	// of the write, and a file that finished writing would carry every default-valued field it should skip.
+	// Error is not that case: [newInstance] rethrows one unwrapped, so an OutOfMemoryError fails the write rather
+	// than being remembered as "no default" and leaving a finished file carrying every default-valued field it
+	// should skip.
 	private val defaultInstance: Any? by lazy {
 		if (skipIfDefault.isEmpty()) {
 			null
@@ -175,10 +177,24 @@ internal class ReflectiveClassSerializer(
 		)
 	}
 
+	/**
+	 * A fresh instance of [kClass] from its no-argument constructor.
+	 *
+	 * Reflection hands back whatever the constructor threw wrapped in an InvocationTargetException - since
+	 * JDK 18 (JEP 416) that includes an Error such as OutOfMemoryError, which is an Exception on the outside.
+	 * An Error is unwrapped and rethrown as itself, so no caller that recovers from an Exception can mistake
+	 * running out of memory for a class that will not instantiate.
+	 *
+	 * @return Any The new instance.
+	 */
 	private fun newInstance(): Any {
 		val constructor = kClass.java.getDeclaredConstructor()
 		constructor.isAccessible = true
-		return constructor.newInstance()
+		try {
+			return constructor.newInstance()
+		} catch (wrapped: InvocationTargetException) {
+			throw (wrapped.cause as? Error) ?: wrapped
+		}
 	}
 
 	@Suppress("UNCHECKED_CAST")

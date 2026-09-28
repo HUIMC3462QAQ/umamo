@@ -59,6 +59,22 @@ class DocumentConfirmTest {
 	}
 
 	@Test
+	fun aSecondRequestToQuitJoinsThePromptAlreadyUp() {
+		// Two clicks on the window's close button: one prompt, so Cancel leaves the app running rather than
+		// showing a queued twin.
+		val overlays = ShellOverlayState()
+		val commands = registry(overlays)
+		var exitCount = 0
+		commands.invoke("document.confirmExit", DirtyDocumentPrompt(discard = { exitCount++ }, save = null))
+		commands.invoke("document.confirmExit", DirtyDocumentPrompt(discard = { exitCount++ }, save = null))
+
+		overlays.cancelPending()
+
+		assertNull(overlays.pendingConfirm, "one Cancel answers every request to quit")
+		assertEquals(0, exitCount)
+	}
+
+	@Test
 	fun cancellingTheExitPromptLeavesTheAppRunning() {
 		val overlays = ShellOverlayState()
 		var exitCount = 0
@@ -120,8 +136,27 @@ class DocumentConfirmTest {
 		assertSame(alert, overlays.pendingAlert)
 	}
 
+	/**
+	 * A second document.alert, landing while the first is still unread - a background export failing while a save
+	 * failure shows - waits behind it instead of replacing it.
+	 */
 	@Test
-	fun aReadyBuiltConfirmRoutesIntoTheOneSlotUnchanged() {
+	fun aSecondAlertWaitsBehindTheFirst() {
+		val overlays = ShellOverlayState()
+		val commands = registry(overlays)
+		val first = AlertRequest(Res.string.confirm_quit_unsaved, listOf("first"))
+		val second = AlertRequest(Res.string.confirm_quit_unsaved, listOf("second"))
+
+		commands.invoke("document.alert", first)
+		commands.invoke("document.alert", second)
+
+		assertSame(first, overlays.pendingAlert, "the first stays up")
+		overlays.dismissAlert()
+		assertSame(second, overlays.pendingAlert, "and the second shows once it is acknowledged")
+	}
+
+	@Test
+	fun aReadyBuiltConfirmRoutesIntoTheQueueUnchanged() {
 		val overlays = ShellOverlayState()
 		val request = ConfirmRequest(Res.string.confirm_quit_unsaved) {}
 
@@ -178,7 +213,8 @@ class DocumentConfirmTest {
 
 		overlays.pendingAlert = AlertRequest(Res.string.confirm_quit_unsaved)
 
-		// The focus-reclaim effect keys on this, so a clicked-away alert hands focus back to the shell.
+		// The focus-reclaim effect keys on the topmost arrival, so a clicked-away alert hands focus back to the shell.
 		assertTrue(overlays.modalAlertOpen)
+		assertNotNull(overlays.topmostModalAlert)
 	}
 }

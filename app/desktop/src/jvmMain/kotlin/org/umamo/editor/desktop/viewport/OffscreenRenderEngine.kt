@@ -526,6 +526,9 @@ internal class OffscreenRenderEngine(
 	private fun renderLoop() {
 		if (!context.createAndMakeCurrent()) {
 			UmamoLog.warn("[GL] offscreen context unavailable (${context.backendName}): ${context.failureReason() ?: "no reason given"}; viewport will stay blank")
+			// The context releases what a failed attempt made; this is the engine's own guarantee that the thread
+			// ends holding nothing, whatever backend it ran.
+			context.destroy()
 			acceptingSnapshots = false
 			failPendingSnapshots()
 			return

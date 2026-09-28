@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -95,5 +96,39 @@ class ModelExportGateTest {
 
 			assertFalse(gate.isBusy)
 			assertTrue(ran, "the waiting action runs once the export has ended, however it ended")
+		}
+
+	@Test
+	fun anExportStartedBeforeTheWaitResumesIsWaitedForToo() =
+		runTest {
+			val gate = ModelExportGate()
+			val firstRelease = CompletableDeferred<Unit>()
+			val secondRelease = CompletableDeferred<Unit>()
+			val order = ArrayList<String>()
+			gate.tryStart(this) {
+				firstRelease.await()
+				order += "first"
+			}
+			// Resumes right behind the first export, so it starts the next one in the moment the gate is free and
+			// the wait below has not resumed yet.
+			launch {
+				firstRelease.await()
+				assertTrue(
+					gate.tryStart(this@runTest) {
+						secondRelease.await()
+						order += "second"
+					},
+				)
+			}
+			gate.afterPendingExport(this) { order += "action" }
+			advanceUntilIdle()
+
+			firstRelease.complete(Unit)
+			advanceUntilIdle()
+			assertEquals(listOf("first"), order, "the action waits for the export that started while it waited")
+
+			secondRelease.complete(Unit)
+			advanceUntilIdle()
+			assertEquals(listOf("first", "second", "action"), order)
 		}
 }

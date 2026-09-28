@@ -66,10 +66,10 @@ class MainActivity : ComponentActivity() {
 						val exitGuard = rememberExitGuard()
 						// Back leaves the app (on Android 8 to 11 it destroys the root activity, edits and all), so
 						// while the document is dirty it asks through the same guard as File > Exit - and while a
-						// save is being written it goes through the guard too, which waits for the file to land.
-						// A clean, idle document keeps the platform's own back behavior.
+						// save or a model export is being written it goes through the guard too, which waits for
+						// the file to land.  A clean, idle document keeps the platform's own back behavior.
 						val dirty = session?.dirty?.collectAsState()?.value == true
-						BackHandler(enabled = dirty || documentFile?.saving == true) {
+						BackHandler(enabled = dirty || documentFile?.saving == true || exitGuard.workRunning) {
 							exitGuard.request { finish() }
 						}
 						EditorApp(

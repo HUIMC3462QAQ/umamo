@@ -1,8 +1,10 @@
 package org.umamo.ui.workspace
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import org.jetbrains.compose.resources.StringResource
 import org.umamo.interop.ExportReport
 import org.umamo.ui.document.DocumentOpenFailure
@@ -42,9 +44,9 @@ internal data class AlertRequest(
 
 /**
  * A pending confirmation: the localized prompt to show, the buttons it names, and the action to run if the
- * user confirms.  The shell holds at most one of these (like its palette-visible flag) and renders a
- * ConfirmDialog for it, so a destructive command (reset, import-overwrite, export-overwrite) sets one instead
- * of acting immediately.
+ * user confirms.  The shell queues these and renders a ConfirmDialog for the first, so a destructive command
+ * (reset, import-overwrite, export-overwrite) raises one instead of acting immediately; one raised while
+ * another is up waits behind it rather than replacing it.
  *
  * @property StringResource      message      The localized prompt shown in the dialog.
  * @property List                arguments    The prompt's format arguments, in placeholder order; empty for
@@ -65,18 +67,104 @@ internal data class ConfirmRequest(
 )
 
 /**
- * The shell's transient overlay flags in one place: which modal chrome (palette, preferences, Quick
+ * One arrival of a modal: the payload it shows, wrapped so the same payload raised twice still counts as two
+ * arrivals.  Its identity is what tells one arrival from the next when the topmost modal changes hands.
+ *
+ * @property Any payload The request, report, or failure the modal shows.
+ */
+internal class ModalArrival<T : Any>(
+	val payload: T,
+)
+
+/**
+ * One modal kind's arrivals in the order they came: the head shows and the rest wait behind it.  A snapshot
+ * list, so a composition reading the head recomposes when it changes hands.
+ */
+internal class ModalQueue<T : Any> {
+	private val arrivals = mutableStateListOf<ModalArrival<T>>()
+
+	/** The showing arrival, or null while none of this kind is queued. */
+	val head: ModalArrival<T>?
+		get() = arrivals.firstOrNull()
+
+	/**
+	 * Queues an arrival behind every one already waiting; it shows at once only when none was.
+	 *
+	 * @param Any payload The arrival's payload.
+	 */
+	fun enqueue(payload: T) {
+		arrivals.add(ModalArrival(payload))
+	}
+
+	/**
+	 * Whether any arrival, showing or waiting, matches [predicate].
+	 *
+	 * @param Function predicate The test each payload is put to.
+	 * @return Boolean True when one matches.
+	 */
+	fun anyQueued(predicate: (T) -> Boolean): Boolean = arrivals.any { arrival -> predicate(arrival.payload) }
+
+	/**
+	 * Removes the showing arrival, provided it is still the one the caller acted on.
+	 *
+	 * @param Any? showing The payload the caller acted on, or null for whatever shows now.
+	 * @return Any? The removed payload, or null when none shows or [showing] is no longer the head.
+	 */
+	fun removeHead(showing: T?): T? {
+		val current = arrivals.firstOrNull() ?: return null
+		if (showing != null && showing !== current.payload) {
+			return null
+		}
+		arrivals.removeAt(0)
+		return current.payload
+	}
+}
+
+/**
+ * The modal alerts that outlive a document swap: the app-layer alert, the file-open failure, and the export
+ * report.  The app raises these about work that can finish across a swap - a document that opened read-only
+ * says so right after it is swapped in, and an export's report or failure lands just as a replace that waited
+ * for the export goes ahead - while the shell, and its overlay state with it, is rebuilt for every document.
+ * Raised through the outgoing shell's commands, they would be discarded with that shell unread.  So the app
+ * holds these queues for its whole life, like [QuickSetupState], and provides them through [LocalAppAlerts].
+ * Confirmations and the repack report stay with the shell: what they act on or describe is the document's.
+ */
+internal class AppAlertQueues {
+	/** The app-layer alerts (document.alert). */
+	val alerts = ModalQueue<AlertRequest>()
+
+	/** The file-open failures (document.openFailed). */
+	val openFailures = ModalQueue<DocumentOpenFailure>()
+
+	/** The export reports (document.exportReport). */
+	val exportReports = ModalQueue<ExportReport>()
+}
+
+/** The app's [AppAlertQueues], or null where no app provides them (the standalone shell, tests). */
+internal val LocalAppAlerts = staticCompositionLocalOf<AppAlertQueues?> { null }
+
+/**
+ * The shell's transient overlay state in one place: which modal chrome (palette, preferences, Quick
  * Setup, Help dialogs, export options, confirm dialog, file-open alert, app-layer alert, export report,
- * repack refusal report) is currently up.  The command handlers toggle these, the modal key ladder
- * routes Escape/Enter by them, the focus-reclaim effect watches their aggregate, and the shell renders
+ * repack refusal report) is currently up.  The command handlers raise these, the modal key ladder
+ * routes Escape/Enter by them, the focus-reclaim effect watches which is topmost, and the shell renders
  * the matching overlay for each - one holder instead of a loose var per overlay, so the pieces that must
  * agree read the same state.
  *
+ * The five modal alerts (confirm, file-open failure, app-layer alert, export report, repack refusal report)
+ * are queues, not slots: one of each kind shows at a time, and a later arrival of that kind waits behind it
+ * in arrival order.  Exports and saves finish in the background, so a request can land while one of its kind
+ * is still unread; replacing it would lose a prompt the rigger never saw, and a reflexive Enter would answer
+ * the wrong one.
+ *
  * @param QuickSetupState quickSetup The Quick Setup modal's visibility, which the app holds for its whole
  *   life because this state is rebuilt with the shell on every document swap; a standalone shell has its own.
+ * @param AppAlertQueues  appAlerts  The alert, file-open failure, and export report queues, which the app holds
+ *   for its whole life for the same reason; a standalone shell has its own.
  */
 internal class ShellOverlayState(
 	private val quickSetup: QuickSetupState = QuickSetupState(visible = false),
+	appAlerts: AppAlertQueues = AppAlertQueues(),
 ) {
 	/** The command palette's visible flag - toggled by palette.toggle. */
 	var paletteVisible: Boolean by mutableStateOf(false)
@@ -97,120 +185,217 @@ internal class ShellOverlayState(
 	/** The Credits dialog's visible flag - toggled by the help.credits command. */
 	var creditsVisible: Boolean by mutableStateOf(false)
 
-	private val pendingConfirmState = mutableStateOf<ConfirmRequest?>(null)
+	private val confirmQueue = ModalQueue<ConfirmRequest>()
+
+	private val openFailureQueue = appAlerts.openFailures
+
+	private val alertQueue = appAlerts.alerts
+
+	private val exportReportQueue = appAlerts.exportReports
+
+	private val repackReportQueue = ModalQueue<AtlasRepackReport>()
 
 	/**
-	 * A destructive command (reset, import-overwrite) sets this instead of acting; the rendered
-	 * ConfirmDialog runs the action on confirm.  At most one is pending at a time.
-	 *
-	 * Raising a request also decides whether Enter may confirm it yet - see [confirmArmedForEnter].
+	 * The confirmation showing now, or null while none is queued.  A destructive command (reset,
+	 * import-overwrite) sets this instead of acting; the rendered ConfirmDialog runs the action on confirm.
+	 * Setting a request queues it behind any already waiting; setting null dismisses the showing one.
 	 */
 	var pendingConfirm: ConfirmRequest?
-		get() = pendingConfirmState.value
+		get() = confirmQueue.head?.payload
 		set(value) {
-			if (value != null) {
-				confirmArmedForEnter = !enterHeld
-			}
-			pendingConfirmState.value = value
+			raiseOrDismiss(confirmQueue, value)
 		}
 
 	/**
+	 * Whether any confirmation, showing or waiting, matches [predicate] - for a caller that raises one prompt
+	 * however often it is asked, such as the quit prompt behind a second click on the window's close button.
+	 *
+	 * @param Function predicate The test each confirmation is put to.
+	 * @return Boolean True when one matches.
+	 */
+	fun confirmQueued(predicate: (ConfirmRequest) -> Boolean): Boolean = confirmQueue.anyQueued(predicate)
+
+	/**
 	 * Whether Enter is physically down, as the key ladder last saw it.  Compose's key-down carries no
-	 * repeat flag, so this is the one honest signal for "the Enter that raised a dialog is still held".
+	 * repeat flag, so this is the one honest signal for "the Enter that came before this dialog is still held".
 	 */
 	private var enterHeld: Boolean = false
 
 	/**
-	 * Whether Enter may confirm the pending request.
+	 * Whether Enter may act on the topmost modal alert - confirm the confirmation, acknowledge the others.
 	 *
-	 * False while the Enter that raised the request is still held: the palette runs its command on Enter's
-	 * key-down, so the request lands under a held key whose OS auto-repeat would otherwise reach the confirm
-	 * arm and run a destructive action before the dialog is even seen.  The release arms it.  A request
-	 * raised with Enter up - a menu row, a button - is armed at once, and the first Enter confirms it.
+	 * False while an Enter that was already down when the topmost modal took over is still held, since its OS
+	 * auto-repeat would otherwise answer a dialog nobody has seen.  Two things hand a modal the top under a
+	 * held Enter: the palette runs its command on Enter's key-down, so a request it raises lands under that
+	 * key; and the Enter that answers one modal is still down when the next queued one takes its place.  The
+	 * release arms it.  A modal that takes the top with Enter up - raised by a menu row, a button, or a
+	 * finished export - is armed at once, and the first Enter acts on it.
 	 */
-	var confirmArmedForEnter: Boolean = true
+	var enterArmed: Boolean = true
 		private set
 
 	/**
-	 * Records an Enter stroke the ladder saw, so a request raised under a held Enter waits for its release.
+	 * Records an Enter stroke the ladder saw, so a modal that takes the top under a held Enter waits for its
+	 * release.
 	 *
 	 * @param Boolean isDown True for the key-down, false for the release.
 	 */
 	fun noteEnterStroke(isDown: Boolean) {
 		enterHeld = isDown
-		if (!isDown && pendingConfirm != null) {
-			confirmArmedForEnter = true
+		if (!isDown) {
+			enterArmed = true
 		}
 	}
 
 	/**
-	 * Runs the pending confirmation's action - what its confirm button and Enter both do.
+	 * Runs the showing confirmation's action - what its confirm button and Enter both do.
 	 *
-	 * The slot clears before the action runs, so an action that raises a confirmation of its own leaves that one
-	 * pending instead of having it cleared out from under it.  The key ladder and the rendered dialog both come
-	 * through here, so the two cannot disagree about what confirming means.
+	 * The confirmation leaves the queue before the action runs, so a confirmation or an alert the action raises
+	 * queues behind those already waiting instead of being dismissed along with it.  The key ladder and the
+	 * rendered dialog both come through here, so the two cannot disagree about what confirming means.
+	 *
+	 * @param ConfirmRequest? showing The confirmation the rendered dialog was showing when its button was
+	 *   clicked, so a click that lands after that one has gone never confirms the next; null (the key ladder)
+	 *   acts on whichever shows now.
 	 */
-	fun confirmPending() {
-		val request = pendingConfirm ?: return
-		pendingConfirm = null
+	fun confirmPending(showing: ConfirmRequest? = null) {
+		val request = takeShowing(confirmQueue, showing) ?: return
 		request.onConfirm()
 	}
 
 	/**
-	 * Dismisses the pending confirmation without acting - what its cancel button, the scrim, and Escape do.
+	 * Dismisses the showing confirmation without acting - what its cancel button, the scrim, and Escape do.
+	 *
+	 * @param ConfirmRequest? showing The confirmation the rendered dialog was showing, or null for whichever
+	 *   shows now; see [confirmPending].
 	 */
-	fun cancelPending() {
-		pendingConfirm = null
+	fun cancelPending(showing: ConfirmRequest? = null) {
+		takeShowing(confirmQueue, showing)
 	}
 
 	/**
-	 * Runs the pending confirmation's third choice, when it has one, clearing the slot first as [confirmPending]
-	 * does.
+	 * Runs the showing confirmation's third choice, when it has one, dequeuing it first as [confirmPending] does.
+	 *
+	 * @param ConfirmRequest? showing The confirmation the rendered dialog was showing, or null for whichever
+	 *   shows now; see [confirmPending].
 	 */
-	fun choosePendingAlternative() {
-		val alternative = pendingConfirm?.alternative ?: return
-		pendingConfirm = null
+	fun choosePendingAlternative(showing: ConfirmRequest? = null) {
+		val request = showingPayload(confirmQueue, showing) ?: return
+		val alternative = request.alternative ?: return
+		takeShowing(confirmQueue, request)
 		alternative.onSelect()
 	}
 
 	/**
-	 * A message the app layer asks the shell to show modally - set by the document.alert command, cleared
-	 * by its OK button, the scrim, Escape, Enter, or its alternative.  Null while none shows.
+	 * The app-layer message showing now, or null while none is queued - raised by the document.alert command,
+	 * acknowledged by its OK button, the scrim, Escape, Enter, or its alternative.  Setting a request queues it
+	 * behind any already waiting; setting null dismisses the showing one.
 	 */
-	var pendingAlert: AlertRequest? by mutableStateOf(null)
+	var pendingAlert: AlertRequest?
+		get() = alertQueue.head?.payload
+		set(value) {
+			raiseOrDismiss(alertQueue, value)
+		}
 
 	/**
-	 * Runs the pending alert's alternative, when it has one, clearing the slot first as [choosePendingAlternative]
-	 * does for a confirmation.
+	 * Dismisses the showing app-layer alert - what its OK button, the scrim, Escape, and Enter do.
+	 *
+	 * @param AlertRequest? showing The alert the rendered dialog was showing, or null for whichever shows now;
+	 *   see [confirmPending].
 	 */
-	fun chooseAlertAlternative() {
-		val alternative = pendingAlert?.alternative ?: return
-		pendingAlert = null
+	fun dismissAlert(showing: AlertRequest? = null) {
+		takeShowing(alertQueue, showing)
+	}
+
+	/**
+	 * Runs the showing alert's alternative, when it has one, dequeuing the alert first as
+	 * [choosePendingAlternative] does for a confirmation.
+	 *
+	 * @param AlertRequest? showing The alert the rendered dialog was showing, or null for whichever shows now;
+	 *   see [confirmPending].
+	 */
+	fun chooseAlertAlternative(showing: AlertRequest? = null) {
+		val request = showingPayload(alertQueue, showing) ?: return
+		val alternative = request.alternative ?: return
+		takeShowing(alertQueue, request)
 		alternative.onSelect()
 	}
 
 	/**
-	 * The file-open failure alert's payload - set by the document.openFailed command (dispatched by
-	 * the app's document layer), cleared by its OK button, the scrim, Escape, or Enter.  Null while
-	 * none shows.
+	 * The file-open failure alert showing now, or null while none is queued - raised by the document.openFailed
+	 * command (dispatched by the app's document layer), acknowledged by its OK button, the scrim, Escape, or
+	 * Enter.  Setting a failure queues it behind any already waiting; setting null dismisses the showing one.
 	 */
-	var openFailure: DocumentOpenFailure? by mutableStateOf(null)
+	var openFailure: DocumentOpenFailure?
+		get() = openFailureQueue.head?.payload
+		set(value) {
+			raiseOrDismiss(openFailureQueue, value)
+		}
 
 	/**
-	 * The export report alert's payload - set by the document.exportReport command when a CMO3 or MOC3
-	 * export finished with advisory notices (edits the target format could not carry, features stripped
-	 * for an older runtime target, weld divergence), cleared like the open-failure alert.  Null while
-	 * none shows.  Non-blocking: the export has already been written when this shows.
+	 * Dismisses the showing file-open failure alert.
+	 *
+	 * @param DocumentOpenFailure? showing The failure the rendered dialog was showing, or null for whichever
+	 *   shows now; see [confirmPending].
 	 */
-	var exportReport: ExportReport? by mutableStateOf(null)
+	fun dismissOpenFailure(showing: DocumentOpenFailure? = null) {
+		takeShowing(openFailureQueue, showing)
+	}
 
 	/**
-	 * The repack refusal report's payload - set by the document.repackReport command when a repack
-	 * aborted over tiles it could not carry, cleared like the open-failure alert.  Null while none
-	 * shows.  Unlike the export report this one is about work that did NOT happen: nothing was
-	 * applied when it shows.
+	 * The export report showing now, or null while none is queued - raised by the document.exportReport command
+	 * when a CMO3 or MOC3 export finished with advisory notices (edits the target format could not carry,
+	 * features stripped for an older runtime target, weld divergence), acknowledged like the open-failure
+	 * alert.  Non-blocking: the export has already been written when this shows.  Setting a report queues it
+	 * behind any already waiting; setting null dismisses the showing one.
 	 */
-	var repackReport: AtlasRepackReport? by mutableStateOf(null)
+	var exportReport: ExportReport?
+		get() = exportReportQueue.head?.payload
+		set(value) {
+			raiseOrDismiss(exportReportQueue, value)
+		}
+
+	/**
+	 * Dismisses the showing export report.
+	 *
+	 * @param ExportReport? showing The report the rendered dialog was showing, or null for whichever shows now;
+	 *   see [confirmPending].
+	 */
+	fun dismissExportReport(showing: ExportReport? = null) {
+		takeShowing(exportReportQueue, showing)
+	}
+
+	/**
+	 * The repack refusal report showing now, or null while none is queued - raised by the document.repackReport
+	 * command when a repack aborted over tiles it could not carry, acknowledged like the open-failure alert.
+	 * Unlike the export report this one is about work that did NOT happen: nothing was applied when it shows.
+	 * Setting a report queues it behind any already waiting; setting null dismisses the showing one.
+	 */
+	var repackReport: AtlasRepackReport?
+		get() = repackReportQueue.head?.payload
+		set(value) {
+			raiseOrDismiss(repackReportQueue, value)
+		}
+
+	/**
+	 * Dismisses the showing repack refusal report.
+	 *
+	 * @param AtlasRepackReport? showing The report the rendered dialog was showing, or null for whichever shows
+	 *   now; see [confirmPending].
+	 */
+	fun dismissRepackReport(showing: AtlasRepackReport? = null) {
+		takeShowing(repackReportQueue, showing)
+	}
+
+	/**
+	 * The arrival the key ladder routes Escape and Enter to, as an identity token: the head of the first
+	 * non-empty queue in the ladder's order (confirm, file-open failure, app-layer alert, export report, repack
+	 * refusal report), or null while no modal alert is up.  It changes whenever a different arrival takes the
+	 * top - one opening, one closing, or a queued one showing after its predecessor - so the focus reclaim keys
+	 * on it: a dismissed dialog can take a focused node (its selectable text) along while the next one shows.
+	 */
+	val topmostModalAlert: Any?
+		get() = topmostArrival()
 
 	/**
 	 * The export-options dialog's payload - set by the document.exportOptions command when an
@@ -247,9 +432,77 @@ internal class ShellOverlayState(
 
 	/**
 	 * True while a modal alert (confirm dialog, file-open failure, an app-layer alert, export report, repack
-	 * refusal report) is up.  These do NOT hold their own focus - the shell keeps root focus so their
+	 * refusal report) is up or queued.  These do NOT hold their own focus - the shell keeps root focus so their
 	 * Escape/Enter route through the modal key ladder.
 	 */
 	val modalAlertOpen: Boolean
-		get() = pendingConfirm != null || openFailure != null || pendingAlert != null || exportReport != null || repackReport != null
+		get() = topmostArrival() != null
+
+	/**
+	 * What every modal alert property's setter does: a payload queues behind its kind's, and null dismisses the
+	 * showing one.
+	 *
+	 * @param ModalQueue queue The kind's queue.
+	 * @param Any?       value The payload to queue, or null to dismiss.
+	 */
+	private fun <T : Any> raiseOrDismiss(queue: ModalQueue<T>, value: T?) {
+		if (value != null) {
+			changingTopmost { queue.enqueue(value) }
+		} else {
+			takeShowing(queue, showing = null)
+		}
+	}
+
+	/**
+	 * Dequeues the showing payload of one kind, provided it is still the one the caller acted on.
+	 *
+	 * @param ModalQueue queue   The kind's queue.
+	 * @param Any?       showing The payload the caller acted on, or null for whichever shows now.
+	 * @return Any? The dequeued payload, or null when nothing was dequeued.
+	 */
+	private fun <T : Any> takeShowing(queue: ModalQueue<T>, showing: T?): T? = changingTopmost { queue.removeHead(showing) }
+
+	/**
+	 * The payload of one kind that shows now, provided it is the one the caller acted on.
+	 *
+	 * @param ModalQueue queue   The kind's queue.
+	 * @param Any?       showing The payload the caller acted on, or null for whichever shows now.
+	 * @return Any? The showing payload, or null when none shows or [showing] is no longer it.
+	 */
+	private fun <T : Any> showingPayload(queue: ModalQueue<T>, showing: T?): T? {
+		val current = queue.head?.payload ?: return null
+		return if (showing == null || showing === current) current else null
+	}
+
+	/**
+	 * The arrival the key ladder routes to first: the head of the first non-empty queue, in the ladder's arm
+	 * order.  The order here and the arms in handleModalKeyLadder must agree, and EditorShell paints in the
+	 * reverse, so the dialog taking the keys is the one drawn on top.
+	 *
+	 * @return ModalArrival? The topmost arrival, or null while no modal alert is up.
+	 */
+	private fun topmostArrival(): ModalArrival<*>? =
+		confirmQueue.head
+			?: openFailureQueue.head
+			?: alertQueue.head
+			?: exportReportQueue.head
+			?: repackReportQueue.head
+
+	/**
+	 * Runs one queue mutation, re-deciding whether Enter is armed when it hands the top to a different arrival.
+	 *
+	 * Every queue mutation comes through here, so no path can change what the ladder routes Enter to without
+	 * this seeing it: a modal that takes the top under a held Enter stays unarmed until that Enter's release.
+	 *
+	 * @param Function mutation The mutation to run.
+	 * @return Any? What the mutation returned.
+	 */
+	private inline fun <R> changingTopmost(mutation: () -> R): R {
+		val topmostBefore = topmostArrival()
+		val result = mutation()
+		if (topmostArrival() !== topmostBefore) {
+			enterArmed = !enterHeld
+		}
+		return result
+	}
 }

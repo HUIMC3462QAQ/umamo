@@ -1,5 +1,8 @@
 package org.umamo.ui.app
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.umamo.edit.setCanvasSize
 import org.umamo.ui.document.BlankDocument
@@ -27,6 +30,7 @@ import kotlin.test.assertTrue
  * A failure must reach the rigger as an alert and open nothing; a success is recorded and swapped in; a
  * file that opened read-only says so once, up front, since Save is greyed for the document's life.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class DocumentOpenControllerTest {
 	/**
 	 * The open controller over [fixture], with the save controller whose gate it borrows.
@@ -113,5 +117,54 @@ class DocumentOpenControllerTest {
 			assertTrue(fixture.opened.isEmpty(), "File > New never discards unsaved edits on its own")
 			assertIs<DirtyDocumentPrompt>(fixture.argumentsOf("document.confirmReplace").single()).discard()
 			assertIs<BlankDocument>(fixture.opened.single(), "choosing not to save goes on to the empty document")
+		}
+
+	@Test
+	fun aLoadedDocumentSwapsInOnlyAfterARunningExportEnds() =
+		runTest {
+			val fixture = AppControllerFixture(this)
+			val load = assertIs<DocumentLoad.Loaded>(loadDocument(emptyDocumentBytes(), "rig.uma", "/rigs/rig.uma"))
+			// An export started while the file was being read: it reads the document about to be replaced.
+			val exportRelease = CompletableDeferred<Unit>()
+			fixture.services.modelExports.tryStart(this) { exportRelease.await() }
+
+			controllerOver(fixture).applyDocumentLoad(load)
+			runCurrent()
+			assertTrue(fixture.opened.isEmpty(), "the document stays while the export reads it")
+
+			exportRelease.complete(Unit)
+			runCurrent()
+			assertSame(load.document, fixture.opened.single())
+		}
+
+	@Test
+	fun aFailedLoadReportsAtOnceEvenUnderARunningExport() =
+		runTest {
+			val fixture = AppControllerFixture(this)
+			val exportRelease = CompletableDeferred<Unit>()
+			fixture.services.modelExports.tryStart(this) { exportRelease.await() }
+			val failure = DocumentOpenFailure(DocumentOpenError.Unrecognized, "notes.bin")
+
+			controllerOver(fixture).applyDocumentLoad(DocumentLoad.Failed(failure))
+
+			assertSame(failure, fixture.argumentsOf("document.openFailed").single(), "nothing is swapped, so nothing waits")
+			exportRelease.complete(Unit)
+		}
+
+	@Test
+	fun aNewDocumentWaitsForARunningExport() =
+		runTest {
+			val fixture = AppControllerFixture(this)
+			fixture.context = AppControllerFixture.contextFor(newBlankDocument())
+			val exportRelease = CompletableDeferred<Unit>()
+			fixture.services.modelExports.tryStart(this) { exportRelease.await() }
+
+			controllerOver(fixture).newDocument()
+			runCurrent()
+			assertTrue(fixture.opened.isEmpty())
+
+			exportRelease.complete(Unit)
+			runCurrent()
+			assertIs<BlankDocument>(fixture.opened.single())
 		}
 }

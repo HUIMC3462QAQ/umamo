@@ -3,8 +3,8 @@
 # installer on a clean runner, and publishes them.
 #
 # The installers are an MSI (Windows), a DEB and an RPM (Linux), and a DMG (macOS arm64), which is built and
-# tested here but published only once it can be notarized (docs/plan/distribution.md D5). Deliberately out of
-# scope until alpha: code signing, notarization, and auto-update. See RELEASING.md.
+# tested here but published only once it can be notarized (docs/plan/distribution.md D5). Not yet: code
+# signing, notarization, and an update notice. Umamo never updates itself (D8). See RELEASING.md.
 name: Release
 
 on:
@@ -319,8 +319,10 @@ jobs:
             exit 1
           fi
           echo "runtime descriptor: ${release_file}"
-          # The runtime must come from the JDK this leg meant to package with (D14): a leg that quietly
-          # fell back to the daemon's 21 would build a macOS image that rejects its own 0.x version.
+          # The runtime must come from the JDK this leg meant to package with (D14): this catches a packaging
+          # step or umamo.packagingJavaHome that handed jlink another JDK. A 0.x macOS build under 21 already
+          # fails createDistributable before this point, so today the check guards Linux and Windows, and
+          # macOS once the version leaves 0.x.
           expected_jdk="${UMAMO_PACKAGING_JDK:-21}"
           java_version_line="$(grep '^JAVA_VERSION=' "${release_file}")"
           echo "${java_version_line}"

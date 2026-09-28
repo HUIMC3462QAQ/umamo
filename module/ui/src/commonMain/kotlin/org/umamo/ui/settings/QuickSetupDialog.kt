@@ -125,10 +125,10 @@ fun QuickSetupDialog(onDismiss: () -> Unit) {
  *
  * The art is drawable/splash_banner.png: 2:1 at 1680x840 pixels, three times the banner's largest size
  * ([QUICK_SETUP_MAX_WIDTH] wide) so it stays sharp on high-density screens.  It is cropped to fill the
- * banner, so art at any other ratio loses its edges rather than stretching.  The name and the version are
- * overlays rather than part of the art, so a version bump never means new art; the art keeps those two
- * corners free of detail.  They sit on the viewport's badge pill, the palette's pair for text over content
- * the theme does not color, so they read on any art in either theme.
+ * banner, so art at any other ratio loses its edges rather than stretching.  The name, the version, and the
+ * artist credit are overlays rather than part of the art, so a version bump never means new art; the art keeps
+ * those three corners free of detail.  They sit on the viewport's badge pill, the palette's pair for text over
+ * content the theme does not color, so they read on any art in either theme.
  */
 @Composable
 private fun SplashBanner() {

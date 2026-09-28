@@ -188,7 +188,7 @@ internal fun KeybindingsEditor() {
 				commands[conflict.existingCommandId]?.title?.let { titleResource -> stringResource(titleResource) }
 					?: conflict.existingCommandId
 			val chordLabel = formatAccelerator(conflict.chord)
-			// The prompt goes through the shell's one confirm slot rather than a dialog of its own, so Enter
+			// The prompt goes through the shell's confirm queue rather than a dialog of its own, so Enter
 			// reassigns and Escape cancels it: a dialog drawn here sits outside the shell's key ladder, where
 			// Escape falls to the Preferences overlay and closes it behind the prompt.  The strings resolve
 			// here, where composition can read them, and the conflict clears once handed over.

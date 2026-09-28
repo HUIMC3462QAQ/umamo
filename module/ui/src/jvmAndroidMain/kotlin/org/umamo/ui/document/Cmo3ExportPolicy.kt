@@ -22,10 +22,11 @@ import org.umamo.ui.model.DrawableThumbnailer
 /**
  * Lowers [edited] into a CMO3 for [document], by whichever route the document's origin allows.
  *
- * A CMO3-origin document reconciles onto the graph it retained from import, which is what keeps its
- * real layered art and its byte-identity gates intact.  A MOC3-origin or artwork-origin document has
- * no retained graph, so a fresh one is synthesized from the blank skeleton plus its atlas pages and
- * then reconciled onto in exactly the same way.
+ * A CMO3-origin document reconciles onto a fresh read of the graph it retained from import, which is
+ * what keeps its real layered art and its byte-identity gates intact while the document's own graph is
+ * never written.  A MOC3-origin or artwork-origin document has no retained graph, so a fresh one is
+ * synthesized from the blank skeleton plus its atlas pages and then reconciled onto in exactly the same
+ * way.  Either way the returned model is the export's own, and nothing else reads it.
  *
  * The clock and the container key are PARAMETERS, not calls: [Cmo3Conversion.freshCmo3] is
  * deterministic given them, and that determinism is only reachable if the seam extends to the app
@@ -55,12 +56,17 @@ fun prepareCmo3Export(
 	modelThumbnail: RasterImage? = null,
 ): PreparedCmo3Export =
 	when (document) {
-		// A CMO3-origin document reconciles onto its retained graph.  The page patch is gated by
-		// INSTANCE identity: the session's resolver republishes the document's own textures whenever
-		// the atlas sits at its imported baseline (an unedited document, or a repack undone), so
-		// passing pages here happens exactly when the session composed new ones - the strict gate the
-		// byte-identity contract needs.
+		// A CMO3-origin document reconciles onto a working copy of its retained graph, read fresh from the
+		// archive's untouched main_xml entry.  The reconcile mutates its target pass by pass with no
+		// rollback, so the document's own graph - which its rasters, a source read, and a UMA save keep
+		// reading - is never the target: every export, a failed one included, leaves it as it was opened,
+		// and each export diffs against the file as imported.  The page patch is gated by INSTANCE
+		// identity: the session's resolver republishes the document's own textures whenever the atlas
+		// sits at its imported baseline (an unedited document, or a repack undone), so passing pages here
+		// happens exactly when the session composed new ones - the strict gate the byte-identity contract
+		// needs.
 		is Cmo3Document -> {
+			val workingCopy = Cmo3.read(document.cmo3.archive)
 			val recomposedPages =
 				if (effectiveTextures !== document.textures) {
 					effectiveTextures.atlases.map { page ->
@@ -70,17 +76,18 @@ fun prepareCmo3Export(
 					emptyList()
 				}
 			// The document's own rasters ride along so a reloaded tile rewrites its retained layer and
-			// an added tile mints one; the reconcile reads them only for tiles the graph must change.
+			// an added tile mints one; the reconcile reads them only for tiles the graph must change, and
+			// through the uncached decode, which is safe off the UI thread.
 			val report =
 				Cmo3Export.apply(
 					edited,
-					document.cmo3,
+					workingCopy,
 					recomposedPages = recomposedPages,
 					tileRasters = { tileId -> document.artRasters.decodeRaster(tileId)?.let { decoded -> RasterImage(decoded.width, decoded.height, decoded.rgba) } },
 					nowMillis = nowMillis,
 					modelThumbnail = modelThumbnail,
 				)
-			PreparedCmo3Export(document.cmo3, report)
+			PreparedCmo3Export(workingCopy, report)
 		}
 		// An artwork-origin document has no retained graph either: the pages it packed at open, or the
 		// session's repack of them, are re-encoded and synthesized into a fresh graph the same way,
@@ -155,9 +162,8 @@ class RenderedCmo3Export(val bytes: ByteArray, val report: ExportReport)
  *
  * One call so that nothing else outlives it: the lowered model graph with every PNG entry it carries is
  * unreachable by the time the caller writes the bytes anywhere, rather than held across the write.  Reads only
- * immutable state, so the caller may run it off the UI thread - except for a [Cmo3Document], whose lowering
- * edits the retained graph the document's own rasters read from the UI thread, and which the caller therefore
- * lowers there itself.
+ * immutable state - a [Cmo3Document]'s lowering included, since it reconciles onto a working copy read from the
+ * document's archive and decodes the document's rasters uncached - so the caller may run it off the UI thread.
  *
  * @param PuppetDocument document          The document being exported.
  * @param PuppetModel    edited            The model to write; see [exportedModelFor].
