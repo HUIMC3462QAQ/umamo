@@ -4,7 +4,7 @@ import org.umamo.interop.ExportFormat
 import org.umamo.interop.ExportReport
 import org.umamo.ui.document.DocumentOpenError
 import org.umamo.ui.document.DocumentOpenFailure
-import org.umamo.ui.model.AtlasRepackReport
+import org.umamo.ui.model.repack.AtlasRepackReport
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_mesh_grab
 import org.umamo.ui.resources.confirm_quit_unsaved

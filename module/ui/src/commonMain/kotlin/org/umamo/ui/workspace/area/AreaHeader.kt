@@ -16,11 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.ui.kit.BelowAnchorPositionProvider
-import org.umamo.ui.kit.DropdownChip
-import org.umamo.ui.kit.Menu
-import org.umamo.ui.kit.MenuItem
-import org.umamo.ui.kit.OverflowRow
 import org.umamo.ui.kit.Surface
+import org.umamo.ui.kit.chip.DropdownChip
+import org.umamo.ui.kit.container.OverflowRow
+import org.umamo.ui.kit.menu.Menu
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.workspace.AreaScope
 import org.umamo.ui.workspace.LocalSpaceRegistry

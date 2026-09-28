@@ -13,9 +13,9 @@ import org.umamo.runtime.model.AtlasTile
 import org.umamo.runtime.model.drawableIdsByAtlasTile
 import org.umamo.ui.action.rankCommandMatches
 import org.umamo.ui.kit.BelowAnchorPositionProvider
-import org.umamo.ui.kit.DropdownChip
-import org.umamo.ui.kit.Menu
-import org.umamo.ui.kit.MenuItem
+import org.umamo.ui.kit.chip.DropdownChip
+import org.umamo.ui.kit.menu.Menu
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.resources.*

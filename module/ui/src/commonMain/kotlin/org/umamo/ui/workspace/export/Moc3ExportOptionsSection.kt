@@ -9,10 +9,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
-import org.umamo.ui.kit.Checkbox
-import org.umamo.ui.kit.FieldRow
-import org.umamo.ui.kit.NumberField
 import org.umamo.ui.kit.Text
+import org.umamo.ui.kit.field.Checkbox
+import org.umamo.ui.kit.field.FieldRow
+import org.umamo.ui.kit.field.NumberField
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.export_options_canvas_in_units
 import org.umamo.ui.resources.export_options_guide_parts

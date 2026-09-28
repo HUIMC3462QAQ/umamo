@@ -21,12 +21,12 @@ import org.umamo.edit.seed.ParameterTemplate
 import org.umamo.interop.art.ArtworkAnchor
 import org.umamo.reimport.WatchMode
 import org.umamo.ui.app.CHECK_FOR_UPDATES_KEY
-import org.umamo.ui.kit.Checkbox
-import org.umamo.ui.kit.HexColorField
-import org.umamo.ui.kit.NumberField
-import org.umamo.ui.kit.SelectField
 import org.umamo.ui.kit.Text
 import org.umamo.ui.kit.VerticalScrollbarOverlay
+import org.umamo.ui.kit.field.Checkbox
+import org.umamo.ui.kit.field.HexColorField
+import org.umamo.ui.kit.field.NumberField
+import org.umamo.ui.kit.field.SelectField
 import org.umamo.ui.l10n.FALLBACK_LOCALE_TAG
 import org.umamo.ui.l10n.LOCALE_SETTINGS_KEY
 import org.umamo.ui.l10n.UI_LANGUAGE_ENDONYMS

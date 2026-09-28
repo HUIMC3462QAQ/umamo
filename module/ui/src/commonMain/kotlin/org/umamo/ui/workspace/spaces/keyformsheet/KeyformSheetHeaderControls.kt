@@ -1,10 +1,10 @@
 package org.umamo.ui.workspace.spaces.keyformsheet
 
 import org.jetbrains.compose.resources.stringResource
-import org.umamo.ui.kit.Checkbox
-import org.umamo.ui.kit.FilterPopupChip
-import org.umamo.ui.kit.FilterSectionLabel
-import org.umamo.ui.kit.OverflowRowScope
+import org.umamo.ui.kit.chip.FilterPopupChip
+import org.umamo.ui.kit.chip.FilterSectionLabel
+import org.umamo.ui.kit.container.OverflowRowScope
+import org.umamo.ui.kit.field.Checkbox
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.workspace.AreaScope

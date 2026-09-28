@@ -21,7 +21,7 @@ import org.umamo.storage.FilePicker
 import org.umamo.ui.LocalSettings
 import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.action.rememberLiveKeymap
-import org.umamo.ui.kit.TopLevelMenu
+import org.umamo.ui.kit.menu.TopLevelMenu
 import org.umamo.ui.l10n.rememberLocaleTag
 import org.umamo.ui.resources.*
 import org.umamo.ui.workspace.LocalViewportChrome

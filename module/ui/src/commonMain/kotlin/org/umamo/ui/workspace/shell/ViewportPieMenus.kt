@@ -2,7 +2,7 @@ package org.umamo.ui.workspace.shell
 
 import org.jetbrains.compose.resources.StringResource
 import org.umamo.edit.PieMenuKind
-import org.umamo.ui.kit.PieMenuEntry
+import org.umamo.ui.kit.menu.PieMenuEntry
 import org.umamo.ui.resources.*
 
 /**

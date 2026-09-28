@@ -1,8 +1,8 @@
 package org.umamo.ui.workspace.spaces.properties
 
-import org.umamo.ui.kit.OverflowRowScope
-import org.umamo.ui.kit.SEARCH_FIELD_MIN_WIDTH
-import org.umamo.ui.kit.SearchField
+import org.umamo.ui.kit.container.OverflowRowScope
+import org.umamo.ui.kit.field.SEARCH_FIELD_MIN_WIDTH
+import org.umamo.ui.kit.field.SearchField
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.properties.PROPERTIES_VIEW_STATE_KEY
 import org.umamo.ui.properties.PropertiesViewState

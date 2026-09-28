@@ -58,7 +58,7 @@ import androidx.compose.ui.graphics.Color
  *   hover state).
  * @property Color controlGlyph       Icon glyphs on neutral control and chip fills.
  * @property Color keyedOnKey         Text/glyph tint for a field whose channel is keyed and the pose sits
- *   exactly on one of its keys (Blender-style keyframe tinting; see [org.umamo.ui.model.KeyedFieldState]).
+ *   exactly on one of its keys (Blender-style keyframe tinting; see [org.umamo.ui.kit.field.KeyedFieldState]).
  * @property Color keyedBetween       Text/glyph tint for a field whose channel is keyed but the pose is not
  *   sitting on one of its keys - an edit here needs an explicit key to survive.
  * @property Color keyedModified      Text/glyph tint for a field with an edit made and not yet keyed; it is

@@ -7,10 +7,10 @@ import org.umamo.runtime.model.KeyableTarget
 import org.umamo.ui.action.LocalCommands
 import org.umamo.ui.action.LocalKeymap
 import org.umamo.ui.action.formatAccelerator
-import org.umamo.ui.kit.ContextMenuArea
-import org.umamo.ui.kit.MenuItem
-import org.umamo.ui.model.keyableTarget
+import org.umamo.ui.kit.menu.ContextMenuArea
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.resources.*
+import org.umamo.ui.workspace.keyableTarget
 
 /*
  * The keyable-property row wrapper: hover targeting plus the Insert / Remove Keyframe context menu.

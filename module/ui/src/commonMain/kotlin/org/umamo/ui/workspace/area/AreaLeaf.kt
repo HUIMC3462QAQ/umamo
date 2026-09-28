@@ -26,9 +26,9 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
-import org.umamo.ui.kit.ContextMenuArea
-import org.umamo.ui.kit.MenuItem
 import org.umamo.ui.kit.Surface
+import org.umamo.ui.kit.menu.ContextMenuArea
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.theme.LocalUmamoCursors

@@ -34,11 +34,11 @@ import org.umamo.ui.kit.Text
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.model.LocalSelection
-import org.umamo.ui.model.noticeText
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.theme.LocalUmamoTypography
 import org.umamo.ui.workspace.LocalHoveredSurfaceTracker
+import org.umamo.ui.workspace.noticeText
 
 /*
  * The status bar: the strip itself (this file), the shortcut suggestions it derives from command hints

@@ -23,10 +23,10 @@ import org.umamo.interop.art.SourceArtImportOptions
 import org.umamo.interop.cmo3.Cmo3Import
 import org.umamo.interop.cmo3.cmo3AtlasIngest
 import org.umamo.interop.cmo3.cmo3SourceArtOf
-import org.umamo.ui.model.AddArtworkRequest
-import org.umamo.ui.model.AtlasRepackHost
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.runAddArtwork
+import org.umamo.ui.model.artwork.AddArtworkRequest
+import org.umamo.ui.model.artwork.runAddArtwork
+import org.umamo.ui.model.repack.AtlasRepackHost
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

@@ -29,9 +29,9 @@ import org.umamo.ui.action.LocalCommands
 import org.umamo.ui.action.LocalKeymap
 import org.umamo.ui.action.loadKeymap
 import org.umamo.ui.action.parseKeyChord
-import org.umamo.ui.kit.ConfirmDialog
-import org.umamo.ui.kit.KeyCaptureController
-import org.umamo.ui.kit.LocalKeyCapture
+import org.umamo.ui.kit.dialog.ConfirmDialog
+import org.umamo.ui.kit.textentry.KeyCaptureController
+import org.umamo.ui.kit.textentry.LocalKeyCapture
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_mesh_grab
 import org.umamo.ui.resources.cmd_preferences

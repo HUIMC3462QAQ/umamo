@@ -9,8 +9,8 @@ import org.umamo.edit.removingKeys
 import org.umamo.ui.action.Command
 import org.umamo.ui.action.CommandHint
 import org.umamo.ui.action.CommandSpaces
-import org.umamo.ui.model.KeyformHover
 import org.umamo.ui.resources.*
+import org.umamo.ui.workspace.KeyformHover
 import org.umamo.ui.workspace.KeyformSheetViews
 import org.umamo.ui.workspace.SpaceKind
 

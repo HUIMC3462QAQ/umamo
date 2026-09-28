@@ -7,10 +7,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.ui.kit.BelowAnchorPositionProvider
-import org.umamo.ui.kit.DropdownChip
-import org.umamo.ui.kit.Menu
-import org.umamo.ui.kit.MenuItem
-import org.umamo.ui.kit.OverflowRowScope
+import org.umamo.ui.kit.chip.DropdownChip
+import org.umamo.ui.kit.container.OverflowRowScope
+import org.umamo.ui.kit.menu.Menu
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.model.LocalPuppetTextures
 import org.umamo.ui.resources.*

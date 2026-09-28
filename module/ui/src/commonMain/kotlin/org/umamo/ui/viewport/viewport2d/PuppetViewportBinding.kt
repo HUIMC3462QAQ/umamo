@@ -50,7 +50,6 @@ import org.umamo.runtime.model.visibleDrawableIds
 import org.umamo.storage.UmamoLog
 import org.umamo.ui.LocalSettings
 import org.umamo.ui.model.DrawableThumbnailProvider
-import org.umamo.ui.model.OverlapPickerPopup
 import org.umamo.ui.model.PuppetRenderSync
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.theme.LocalUmamoCursors
@@ -58,6 +57,7 @@ import org.umamo.ui.theme.umamoPointerIcon
 import org.umamo.ui.viewport.AreaCameraKey
 import org.umamo.ui.viewport.AtlasPageBinding
 import org.umamo.ui.viewport.LiveParams
+import org.umamo.ui.viewport.OverlapPickerPopup
 import org.umamo.ui.viewport.OverlapState
 import org.umamo.ui.viewport.PuppetViewportService
 import org.umamo.ui.viewport.PuppetViewportServiceFactory

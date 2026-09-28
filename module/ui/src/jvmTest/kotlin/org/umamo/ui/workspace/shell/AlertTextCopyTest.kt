@@ -33,7 +33,7 @@ import org.umamo.ui.action.Command
 import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.action.Keymap
 import org.umamo.ui.action.parseKeyChord
-import org.umamo.ui.kit.MessageDialog
+import org.umamo.ui.kit.dialog.MessageDialog
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_mesh_grab
 import org.umamo.ui.theme.UmamoTheme

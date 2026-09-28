@@ -3,7 +3,7 @@ package org.umamo.ui.workspace.commands
 import org.umamo.interop.ExportReport
 import org.umamo.ui.action.Command
 import org.umamo.ui.document.DocumentOpenFailure
-import org.umamo.ui.model.AtlasRepackReport
+import org.umamo.ui.model.repack.AtlasRepackReport
 import org.umamo.ui.resources.*
 import org.umamo.ui.workspace.AlertRequest
 import org.umamo.ui.workspace.ConfirmRequest

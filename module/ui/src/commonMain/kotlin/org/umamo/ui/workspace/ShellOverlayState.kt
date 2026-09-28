@@ -8,7 +8,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import org.jetbrains.compose.resources.StringResource
 import org.umamo.interop.ExportReport
 import org.umamo.ui.document.DocumentOpenFailure
-import org.umamo.ui.model.AtlasRepackReport
+import org.umamo.ui.model.repack.AtlasRepackReport
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.dialog_cancel
 import org.umamo.ui.resources.dialog_confirm

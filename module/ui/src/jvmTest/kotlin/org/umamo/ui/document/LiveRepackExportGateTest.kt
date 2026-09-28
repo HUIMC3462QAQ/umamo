@@ -11,11 +11,11 @@ import org.umamo.format.cmo3.model.custom.CModelSource
 import org.umamo.interop.cmo3.Cmo3Import
 import org.umamo.interop.cmo3.cmo3AtlasPages
 import org.umamo.render.encodeAtlasPng
-import org.umamo.ui.model.AtlasRepackHost
-import org.umamo.ui.model.AtlasRepackReport
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.repackPageSizeOf
-import org.umamo.ui.model.runAtlasRepack
+import org.umamo.ui.model.repack.AtlasRepackHost
+import org.umamo.ui.model.repack.AtlasRepackReport
+import org.umamo.ui.model.repack.repackPageSizeOf
+import org.umamo.ui.model.repack.runAtlasRepack
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

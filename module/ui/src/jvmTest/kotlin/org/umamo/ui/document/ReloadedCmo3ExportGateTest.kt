@@ -25,10 +25,10 @@ import org.umamo.interop.cmo3.cmo3AtlasPages
 import org.umamo.interop.cmo3.cmo3SourceArtOf
 import org.umamo.render.encodeAtlasPng
 import org.umamo.runtime.model.lineageRoot
-import org.umamo.ui.model.AtlasRepackHost
-import org.umamo.ui.model.RelinkArtworkRequest
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.runRelinkArtwork
+import org.umamo.ui.model.artwork.RelinkArtworkRequest
+import org.umamo.ui.model.artwork.runRelinkArtwork
+import org.umamo.ui.model.repack.AtlasRepackHost
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

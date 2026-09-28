@@ -56,14 +56,12 @@ import org.umamo.runtime.model.ParameterId
 import org.umamo.ui.action.LocalCommands
 import org.umamo.ui.action.LocalKeymap
 import org.umamo.ui.action.formatAccelerator
-import org.umamo.ui.kit.DisclosureChevron
-import org.umamo.ui.kit.MenuItem
 import org.umamo.ui.kit.SCROLLBAR_THICKNESS
 import org.umamo.ui.kit.Text
 import org.umamo.ui.kit.VerticalScrollbarOverlay
-import org.umamo.ui.model.KeyformHover
+import org.umamo.ui.kit.button.DisclosureChevron
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.model.LocalEditorSession
-import org.umamo.ui.model.LocalKeyableHover
 import org.umamo.ui.model.LocalLiveParams
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.properties.formChannelLabelRes
@@ -88,7 +86,9 @@ import org.umamo.ui.tracks.flattenTrackRows
 import org.umamo.ui.tracks.laneMarkOffsetX
 import org.umamo.ui.tracks.trackWindowGestures
 import org.umamo.ui.workspace.AreaScope
+import org.umamo.ui.workspace.KeyformHover
 import org.umamo.ui.workspace.KeyformSheetSurface
+import org.umamo.ui.workspace.LocalKeyableHover
 import org.umamo.ui.workspace.LocalKeyformSheetViews
 
 /*
@@ -525,8 +525,8 @@ private fun KeyformSheetSection(
 	val deleteLabel = stringResource(Res.string.cmd_keyform_delete)
 	// The playhead follows the live scrub through snapshotFlow rather than a composition read:
 	// observedValues is one whole-map state replaced on every preview move of ANY parameter, so reading
-	// it while composing invalidated the entire sheet per pointer move (ParametersSpace documents the
-	// same rule).  The initial read is deliberately unobserved; the flow delivers every later change to
+	// it while composing invalidated the entire sheet per pointer move (rememberParameterPoseState
+	// documents the same rule).  The initial read is deliberately unobserved; the flow delivers every later change to
 	// this section's own state alone.
 	var playhead by remember(parameter.id) {
 		mutableStateOf(

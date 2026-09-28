@@ -26,11 +26,11 @@ import org.umamo.ui.action.KeyChord
 import org.umamo.ui.action.Keymap
 import org.umamo.ui.document.DocumentOpenError
 import org.umamo.ui.document.DocumentOpenFailure
-import org.umamo.ui.kit.InlineEditController
-import org.umamo.ui.kit.KeyCaptureController
-import org.umamo.ui.kit.MenuBarController
-import org.umamo.ui.model.AtlasRepackReport
+import org.umamo.ui.kit.menu.MenuBarController
+import org.umamo.ui.kit.textentry.InlineEditController
+import org.umamo.ui.kit.textentry.KeyCaptureController
 import org.umamo.ui.model.SelectionHandle
+import org.umamo.ui.model.repack.AtlasRepackReport
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_mesh_grab
 import org.umamo.ui.settings.QuickSetupState

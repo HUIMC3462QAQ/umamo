@@ -5,7 +5,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.compose.resources.StringResource
-import org.umamo.ui.kit.OverflowRowScope
+import org.umamo.ui.kit.container.OverflowRowScope
 import org.umamo.ui.theme.UmamoIcon
 
 /**
@@ -105,7 +105,7 @@ class AreaScope(
  * The slot declares ITEMS into an overflow-aware strip rather than emitting composables into a Row: a
  * control that does not fit collapses into the strip's trailing dropdown instead of being squeezed to
  * nothing.  Because the builder is not itself composable, a CompositionLocal may only be read inside an
- * item's body - see [org.umamo.ui.kit.OverflowRowScope].
+ * item's body - see [org.umamo.ui.kit.container.OverflowRowScope].
  *
  * @property SpaceKind kind The space type this describes.
  * @property StringResource title The localized dropdown label.

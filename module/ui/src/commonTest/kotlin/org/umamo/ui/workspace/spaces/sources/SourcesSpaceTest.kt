@@ -6,7 +6,7 @@ import org.umamo.runtime.model.ArtSourceLayer
 import org.umamo.runtime.model.AtlasTileId
 import org.umamo.runtime.model.DrawableId
 import org.umamo.runtime.model.SourceLayerRef
-import org.umamo.ui.model.percentOf
+import org.umamo.ui.model.artwork.percentOf
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.umamoDarkColors

@@ -4,7 +4,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import org.umamo.render.pick.PickCandidate
 import org.umamo.runtime.model.DrawableId
-import org.umamo.ui.model.OverlapEntry
 import kotlin.math.roundToInt
 
 /**

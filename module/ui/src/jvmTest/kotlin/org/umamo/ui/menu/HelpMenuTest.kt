@@ -3,8 +3,8 @@ package org.umamo.ui.menu
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
 import org.umamo.ui.action.Keymap
-import org.umamo.ui.kit.MenuItem
-import org.umamo.ui.kit.TopLevelMenu
+import org.umamo.ui.kit.menu.MenuItem
+import org.umamo.ui.kit.menu.TopLevelMenu
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

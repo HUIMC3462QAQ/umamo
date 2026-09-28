@@ -19,12 +19,12 @@ import org.umamo.render.SourceArtRasters
 import org.umamo.runtime.model.ArtSourceId
 import org.umamo.runtime.model.AtlasTileId
 import org.umamo.runtime.model.PuppetModel
-import org.umamo.ui.model.AtlasRepackHost
-import org.umamo.ui.model.ReloadArtworkRequest
-import org.umamo.ui.model.ReloadArtworkResult
-import org.umamo.ui.model.ReloadEntry
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.runReloadArtwork
+import org.umamo.ui.model.artwork.ReloadArtworkRequest
+import org.umamo.ui.model.artwork.ReloadArtworkResult
+import org.umamo.ui.model.artwork.ReloadEntry
+import org.umamo.ui.model.artwork.runReloadArtwork
+import org.umamo.ui.model.repack.AtlasRepackHost
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

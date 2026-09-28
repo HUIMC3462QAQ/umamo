@@ -11,9 +11,9 @@ import org.umamo.edit.TransformParameterKeys
 import org.umamo.edit.choiceKey
 import org.umamo.edit.parameterKey
 import org.umamo.interop.art.ArtworkAnchor
-import org.umamo.ui.model.ImportParameterKeys
-import org.umamo.ui.model.MatchParameterKeys
-import org.umamo.ui.model.RepackParameterKeys
+import org.umamo.ui.model.artwork.ImportParameterKeys
+import org.umamo.ui.model.artwork.MatchParameterKeys
+import org.umamo.ui.model.repack.RepackParameterKeys
 import org.umamo.ui.resources.*
 import org.umamo.ui.viewport.falloffLabel
 import org.umamo.ui.viewport.uv.PlacementParameterKeys
