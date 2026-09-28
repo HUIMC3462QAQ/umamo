@@ -2,9 +2,10 @@
 # self-contained app images plus runnable uber jars for all five supported desktop targets, installs each
 # installer on a clean runner, and publishes them.
 #
-# The installers are an MSI (Windows), a DEB and an RPM (Linux), and a DMG (macOS arm64), which is built and
-# tested here but published only once it can be notarized (docs/plan/distribution.md D5). Not yet: code
-# signing, notarization, and an update notice. Umamo never updates itself (D8). See RELEASING.md.
+# The installers are an MSI (Windows), a DEB and an RPM (Linux), and a DMG (macOS arm64). The macOS app and DMG
+# are signed with the project's Developer ID, notarized, and stapled; the RPMs and SHA256SUMS.txt are signed with
+# the release OpenPGP key; a published release carries GitHub build-provenance attestations. Windows stays
+# unsigned for now (docs/plan/distribution.md Phase 3). Umamo never updates itself (D8). See RELEASING.md.
 name: Release
 
 on:
@@ -23,6 +24,9 @@ on:
   # publishes nothing — so the whole pipeline can be exercised from a branch before any tag exists.
   workflow_dispatch:
 
+# Every action is pinned to a commit, the release it belongs to in the comment beside it. A tag can be moved to
+# other code after the fact, a commit cannot, and the package and checksums jobs hold the signing keys.
+#
 # Least privilege at the workflow level; only the `release` job widens it, and only to contents:write.
 permissions:
   contents: read
@@ -32,6 +36,15 @@ permissions:
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+
+# The release signing identities (RELEASING.md § Signing): the Apple team whose Developer ID signs the macOS
+# downloads, and the OpenPGP key that signs the RPMs and SHA256SUMS.txt, whose public half is committed at
+# UMAMO_SIGNING_PUBLIC_KEY. Public values, pinned here so a certificate or key from anyone else in the secrets fails
+# the build; SigningIdentityTest holds them to the committed key, README, and RELEASING.
+env:
+  UMAMO_APPLE_TEAM_ID: 67UZJRR49L
+  UMAMO_SIGNING_KEY_FINGERPRINT: 67754C0DC58743270D574066F5499AE5C80A0F1C
+  UMAMO_SIGNING_PUBLIC_KEY: app/desktop/packaging/umamo-signing-key.asc
 
 jobs:
   # -----------------------------------------------------------------------------------------------
@@ -48,7 +61,7 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       publish: ${{ steps.resolve.outputs.publish }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Resolve and cross-check the version
         id: resolve
@@ -129,14 +142,20 @@ jobs:
   # 3. Packaging, one leg per shipped target. Each leg publishes:
   #      umamo-<target>-<version>.{tar.gz|zip}  — self-contained app image (bundled JRE)
   #      umamo-<target>-<version>.jar           — uber jar, needs a JDK/JRE 21 on the machine
-  #      umamo-<target>-<version>.{msi|deb|rpm} — the installers, on the legs that build them
-  #    and uploads, unpublished, the macOS DMG and the older installers the install test upgrades from.
+  #      umamo-<target>-<version>.{msi|deb|rpm|dmg} — the installers, on the legs that build them
+  #    and uploads, unpublished, the older installers the install test upgrades from. The macOS app and DMG are
+  #    signed and notarized here, and the RPMs signed, each checked before upload.
   #    Every leg builds ON its own OS/arch: an app image jlinks the HOST JDK into itself, so unlike
   #    the uber jar it genuinely cannot be cross-produced.
   # -----------------------------------------------------------------------------------------------
   package:
     name: Package ${{ matrix.target }}
     needs: [verify, test]
+    # The signing secrets belong to this environment, not to the repository, so they reach only a job that names
+    # it and has passed its protection rules: a reviewer's approval, from a ref the environment allows. A branch
+    # with a workflow of its own gets nothing. Every leg names it, the ones that sign nothing too, so one approval
+    # starts all five.
+    environment: release-signing
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -155,13 +174,15 @@ jobs:
       #
       # installerTasks builds the leg's installers; fixtureTasks builds older-numbered copies of them from the
       # same image, which the install-test job upgrades from (no fixture for the DMG: dragging a new app over
-      # the old one is all a DMG upgrade is).
+      # the old one is all a DMG upgrade is). The DMG is built with createDistributable excluded: by then the app
+      # image is signed, notarized, and stapled, and rebuilding it would throw that away - jpackage copies a
+      # signed app image into the DMG as it is.
       matrix:
         include:
           - { target: linux-x64, runner: ubuntu-latest, appImage: true, installerTasks: ":desktop:packageLinuxDeb :desktop:packageLinuxRpm", fixtureTasks: ":desktop:packageLinuxDeb :desktop:packageLinuxRpm" }
           - { target: linux-arm64, runner: ubuntu-24.04-arm, appImage: true, installerTasks: ":desktop:packageLinuxDeb :desktop:packageLinuxRpm", fixtureTasks: ":desktop:packageLinuxDeb :desktop:packageLinuxRpm" }
           - { target: windows-x64, runner: windows-latest, appImage: true, installerTasks: ":desktop:packageWindowsMsi", fixtureTasks: ":desktop:packageWindowsMsi" }
-          - { target: macos-arm64, runner: macos-latest, appImage: true, packagingJdk: "27", installerTasks: ":desktop:packageDmg" }
+          - { target: macos-arm64, runner: macos-latest, appImage: true, packagingJdk: "27", installerTasks: ":desktop:packageDmg -x :desktop:createDistributable" }
           # macos-15-intel is the last x86-64 macOS image GitHub will offer; it retires in August
           # 2027, after which this leg has to go and Intel Mac users fall back to the uber jar under
           # an x64 JDK. (The older macos-13 label was retired in December 2025 — do not resurrect it.)
@@ -172,7 +193,7 @@ jobs:
       UMAMO_APP_IMAGE: ${{ matrix.appImage }}
       UMAMO_PACKAGING_JDK: ${{ matrix.packagingJdk }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The packaging JDK, on the legs that name one. Set up BEFORE JDK 21 so that JAVA_HOME and PATH
       # end on 21 for Gradle; every packaging step hands this one's path to Gradle as
@@ -180,7 +201,7 @@ jobs:
       - name: Set up the packaging JDK
         id: packaging-jdk
         if: matrix.packagingJdk
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: ${{ matrix.packagingJdk }}
@@ -191,7 +212,7 @@ jobs:
       # JDK above. Temurin specifically: the plugin's checkRuntime task hard-errors on a Homebrew
       # JDK, which is what a bare `brew install` leaves on PATH.
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -215,12 +236,25 @@ jobs:
           sudo apt-get install -y --no-install-recommends rpm fakeroot
 
       - name: Set up Gradle (with caching)
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           # A tag build is read-only by default (it is not the default branch), but say so
           # explicitly: five legs racing to write one cache is pure waste, and a release must never
           # be the run that poisons the cache every PR then reads.
           cache-read-only: true
+
+      # The Developer ID certificate, in a keychain of its own, before anything is built: gradle-package.sh
+      # switches the Compose plugin's signing on once this step has named the identity and the keychain. The
+      # script checks the identity belongs to the pinned team.
+      - name: Set up the signing keychain (macOS)
+        if: matrix.appImage && runner.os == 'macOS'
+        shell: bash
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/macos-signing-keychain.sh "${RUNNER_TEMP}/umamo-signing.keychain-db" "${UMAMO_APPLE_TEAM_ID}"
 
       # Every packaging step runs Gradle through .github/scripts/gradle-package.sh, which carries the flags they
       # share (the explicit target, the host check, the heap limits, the packaging JDK) and says why.
@@ -266,6 +300,23 @@ jobs:
           done
           ls -lh fixtures/
 
+      # The app image is notarized on its own, and its ticket stapled into it, before the DMG is built around it:
+      # the app a rigger drags out of the DMG, like the one in the zip, then carries its own ticket and passes
+      # Gatekeeper on a first launch with no network.
+      - name: Notarize and staple the app (macOS)
+        if: matrix.appImage && runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          app="app/desktop/build/compose/binaries/main/app/Umamo.app"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          ditto -c -k --keepParent "${app}" "${RUNNER_TEMP}/Umamo-notarize.zip"
+          bash .github/scripts/macos-notarize.sh "${RUNNER_TEMP}/Umamo-notarize.zip" "${app}"
+
       - name: Build the installers
         if: matrix.installerTasks
         shell: bash
@@ -277,6 +328,34 @@ jobs:
           # shellcheck disable=SC2086  # a deliberate word-split list of Gradle task paths.
           bash .github/scripts/gradle-package.sh ${UMAMO_INSTALLER_TASKS}
           ls -lh app/desktop/build/compose/binaries/main/*/
+
+      # jpackage does not sign a DMG, so the DMG is signed here, then notarized and stapled in its own right.
+      - name: Sign, notarize, and staple the DMG (macOS)
+        if: matrix.installerTasks && runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          dmg="$(ls app/desktop/build/compose/binaries/main/dmg/*.dmg)"
+          codesign --force --timestamp --sign "${UMAMO_MAC_SIGNING_IDENTITY}" --keychain "${UMAMO_MAC_SIGNING_KEYCHAIN}" "${dmg}"
+          codesign --verify --verbose=2 "${dmg}"
+          bash .github/scripts/macos-notarize.sh "${dmg}" "${dmg}"
+
+      # Both RPMs, the upgrade fixture too, so the install test's Fedora 45 installs each with its signature checks
+      # on. sign-rpm.sh verifies every signature against the committed public key before anything is uploaded.
+      - name: Sign the RPMs (Linux)
+        if: matrix.installerTasks && runner.os == 'Linux'
+        shell: bash
+        env:
+          LINUX_SIGNING_KEY: ${{ secrets.LINUX_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="${RUNNER_TEMP}/gnupg"
+          bash .github/scripts/linux-signing-key.sh "${GNUPGHOME}" "${UMAMO_SIGNING_PUBLIC_KEY}" "${UMAMO_SIGNING_KEY_FINGERPRINT}"
+          bash .github/scripts/sign-rpm.sh "${UMAMO_SIGNING_PUBLIC_KEY}" fixtures/*.rpm app/desktop/build/compose/binaries/main/rpm/*.rpm
 
       # The uber jar's manifest: the Main-Class the plugin writes, plus what :desktop adds for `java -jar` -
       # Multi-Release, without which the JVM ignores every merged jar's version-specific classes, and the
@@ -440,6 +519,12 @@ jobs:
           rpm_scripts="$(rpm -qp --scripts "${rpm_file}")"
           # shellcheck disable=SC2016  # the scriptlet's own text, matched literally.
           grep -qF 'if [ "$1" = 0 ]; then' <<< "${rpm_scripts}" || fail "the .rpm's preun is not packaging/linux/umamo.spec's guarded one"
+          # Signed with the release key, as a machine that imported only the committed public key sees it.
+          rpm_database="$(mktemp -d)"
+          rpmkeys --dbpath "${rpm_database}" --import "${UMAMO_SIGNING_PUBLIC_KEY}"
+          rpm_signature="$(rpmkeys --dbpath "${rpm_database}" --checksig "${rpm_file}")"
+          echo "${rpm_signature}"
+          [[ "${rpm_signature}" == *": digests signatures OK" ]] || fail "the .rpm is not signed by the release key"
 
       # The MSI's identity, read out of its Property table: the upgrade code every later MSI finds this one by
       # (InstallerIdentityTest holds the build script to it), the name the Start menu and Settings > Apps show,
@@ -513,7 +598,27 @@ jobs:
           check CFBundleName Umamo
           check CFBundleIdentifier org.umamo.editor
           check LSMinimumSystemVersion 11.0
-          codesign -dv "${app}" 2>&1 || true
+          # Signed by the pinned team's Developer ID, under the hardened runtime notarization requires, and accepted
+          # by Gatekeeper as notarized - the app and the DMG, each with its ticket stapled.
+          dmg="$(ls app/desktop/build/compose/binaries/main/dmg/*.dmg)"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          signature="$(codesign --display --verbose=2 "${app}" 2>&1)"
+          echo "${signature}"
+          [[ "${signature}" == *"Authority=Developer ID Application: "*"(${UMAMO_APPLE_TEAM_ID})"* ]] ||
+            { echo "::error::the app is not signed by a Developer ID of team ${UMAMO_APPLE_TEAM_ID}"; exit 1; }
+          [[ "${signature}" == *"TeamIdentifier=${UMAMO_APPLE_TEAM_ID}"* ]] ||
+            { echo "::error::the app's TeamIdentifier is not ${UMAMO_APPLE_TEAM_ID}"; exit 1; }
+          [[ "${signature}" == *"flags=0x10000(runtime)"* ]] ||
+            { echo "::error::the app is not signed with the hardened runtime notarization requires"; exit 1; }
+          for assessment in "--type execute ${app}" "--type open --context context:primary-signature ${dmg}"; do
+            # shellcheck disable=SC2086  # the assessment's arguments, split on purpose; no path here has a space.
+            verdict="$(spctl --assess -vv ${assessment} 2>&1 || true)"
+            echo "${verdict}"
+            [[ "${verdict}" == *"accepted"*"source=Notarized Developer ID"* ]] ||
+              { echo "::error::Gatekeeper does not accept ${assessment##* } as notarized Developer ID code"; exit 1; }
+          done
+          xcrun stapler validate "${app}"
+          xcrun stapler validate "${dmg}"
 
       # ditto, not zip: a .app is a bundle of symlinks, execute bits and extended attributes, and
       # /usr/bin/zip flattens enough of that to produce something Finder refuses to open.
@@ -611,8 +716,7 @@ jobs:
       # The jar: an exact path, not a glob - the name is pinned by :desktop's archiveFileName override, so
       # if that convention ever changes this fails here instead of shipping a release with a hole in it.
       # The installers: jpackage names them its own way (umamo_0.4.0_amd64.deb, Umamo-0.4.0.msi), so each
-      # is renamed to umamo-<target>-<version>.<ext>, the full version a dry run's -dev included. The DMG
-      # goes aside, unpublished, until it can be notarized (D5).
+      # is renamed to umamo-<target>-<version>.<ext>, the full version a dry run's -dev included.
       - name: Collect the uber jar and the installers
         shell: bash
         run: |
@@ -621,18 +725,12 @@ jobs:
           cp "app/desktop/build/compose/jars/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.jar" dist/
           for extension in msi deb rpm dmg; do
             for built in app/desktop/build/compose/binaries/main/"${extension}"/*."${extension}"; do
-              if [ ! -f "${built}" ]; then
-                continue
-              fi
-              if [ "${extension}" = "dmg" ]; then
-                mkdir -p unpublished
-                cp "${built}" "unpublished/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.dmg"
-              else
+              if [ -f "${built}" ]; then
                 cp "${built}" "dist/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.${extension}"
               fi
             done
           done
-          ls -lh dist/ unpublished/ 2> /dev/null || true
+          ls -lh dist/
 
       # The jar's self-check on the Java 21 this job set up: every leg ships a jar, and the macos-x64 leg
       # ships nothing else, so this is the only runtime check that leg gets.
@@ -643,7 +741,7 @@ jobs:
           bash .github/scripts/self-check.sh java -jar "dist/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.jar"
 
       - name: Upload this target's artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Must be unique per matrix leg — the action errors rather than merging same-named uploads.
           # The release job re-merges them with `pattern` + `merge-multiple`.
@@ -658,25 +756,14 @@ jobs:
           # failed publish, short enough not to hoard a run's gigabytes.
           retention-days: 7
 
-      # Neither of these names starts with umamo-, the pattern the release job downloads, so neither is
-      # ever published: the older installers exist for the install-test job's upgrade, and the DMG waits
-      # for notarization.
+      # This name does not start with umamo-, the pattern the release job downloads, so it is never published:
+      # the older installers exist for the install-test job's upgrade.
       - name: Upload the upgrade-test installers
         if: matrix.fixtureTasks
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: upgrade-fixtures-${{ matrix.target }}
           path: fixtures/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
-
-      - name: Upload the unpublished DMG
-        if: matrix.installerTasks && runner.os == 'macOS'
-        uses: actions/upload-artifact@v7
-        with:
-          name: unpublished-dmg-${{ matrix.target }}
-          path: unpublished/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -696,15 +783,29 @@ jobs:
             echo "::endgroup::"
           done
 
+      # The signing material leaves with the job, whatever became of it: the keychain holding the Developer ID
+      # key, and the GnuPG home holding the release key. The keychain is named by a setup that finished; one that
+      # failed has deleted its keychain itself (macos-signing-keychain.sh).
+      - name: Remove the signing material
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${UMAMO_MAC_SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "${UMAMO_MAC_SIGNING_KEYCHAIN}" || true
+          fi
+          rm -rf "${RUNNER_TEMP}/gnupg"
+
   # -----------------------------------------------------------------------------------------------
   # 4. Install tests, each on a clean runner that never built anything: each MSI, DEB, and RPM is
   #    installed over an older copy of itself (the upgrade a rigger's next release performs), checked
   #    for what it registered - the menu entry, the .uma type, the file association - self-checked
   #    and, where a display is up, started, then removed again, settings left alone. The Linux
   #    packages also install in the distributions' own containers: the DEB on Debian 12 and Ubuntu
-  #    22.04 (its curated dependencies), the RPM on Fedora 44 and 45 (acceptance test is `dnf install`
-  #    on Fedora; 45 enforces signature checks). The DMG, which has no install of its own, is mounted,
-  #    and the app copied out of it is self-checked and started.
+  #    22.04 (its curated dependencies), the RPM on Fedora 44 and 45 with the release key imported
+  #    (acceptance test is `dnf install` on Fedora; 45 refuses it without the key). The DMG and the zip,
+  #    marked as downloads, must pass Gatekeeper as notarized, and the app copied out is self-checked
+  #    and started.
   # -----------------------------------------------------------------------------------------------
   install-test:
     name: Install test ${{ matrix.target }}
@@ -723,27 +824,20 @@ jobs:
       UMAMO_VERSION: ${{ needs.verify.outputs.version }}
       UMAMO_TARGET: ${{ matrix.target }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download this target's installers
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: umamo-${{ matrix.target }}
           path: dist
 
       - name: Download the upgrade-test installers
         if: runner.os != 'macOS'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: upgrade-fixtures-${{ matrix.target }}
           path: fixtures
-
-      - name: Download the DMG
-        if: runner.os == 'macOS'
-        uses: actions/download-artifact@v8
-        with:
-          name: unpublished-dmg-${{ matrix.target }}
-          path: unpublished
 
       - name: Install a headless display (Linux)
         if: runner.os == 'Linux'
@@ -772,6 +866,11 @@ jobs:
       # package's dependencies bring every library the runtime and Skia load. Fedora's images come from
       # Fedora's own registry. Fedora 45 is Rawhide until it is released. Runs even when the runner's own
       # test failed, so one run reports every distribution.
+      #
+      # The RPM runs import the committed public key first, as the README tells a rigger to, and install with
+      # dnf's signature check switched on (localpkg_gpgcheck: Fedora's defaults skip it for a local file). A
+      # control run installs the signed RPM on Fedora 45 with the check on but WITHOUT the key, and must be
+      # refused: it is what shows the signature is really checked, rather than the check being skipped.
       - name: Install the DEB and RPM in distribution containers (Linux)
         if: runner.os == 'Linux' && !cancelled()
         shell: bash
@@ -779,12 +878,14 @@ jobs:
           set -euo pipefail
           numeric="${UMAMO_VERSION%%-*}"
           failures=0
-          # run_in <image> <package> <older package> [<dnf flag>]: one install test in a fresh container.
+          key_directory="$(cd "$(dirname "${UMAMO_SIGNING_PUBLIC_KEY}")" && pwd)"
+          key_in_container="/keys/$(basename "${UMAMO_SIGNING_PUBLIC_KEY}")"
+          # run_in <image> <package> <older package>: one install test in a fresh container.
           run_in() {
             echo "::group::$1: $2"
-            # shellcheck disable=SC2086  # the flag is one optional word.
             if ! docker run --rm -v "${PWD}/dist:/dist:ro" -v "${PWD}/fixtures:/fixtures:ro" -v "${PWD}/.github/scripts:/scripts:ro" \
-              "$1" bash /scripts/install-test-linux.sh "/dist/$2" "${numeric}" "/fixtures/$3" ${4:-}; then
+              -v "${key_directory}:/keys:ro" -e UMAMO_SIGNING_KEY="${key_in_container}" \
+              "$1" bash /scripts/install-test-linux.sh "/dist/$2" "${numeric}" "/fixtures/$3"; then
               echo "::error::the install test failed on $1"
               failures=$((failures + 1))
             fi
@@ -800,7 +901,15 @@ jobs:
             echo "::notice::no Fedora 45 image yet; testing Rawhide in its place"
             fedora_45="registry.fedoraproject.org/fedora:rawhide"
           fi
-          run_in "${fedora_45}" "${rpm_file}" "umamo-${UMAMO_TARGET}-upgrade-fixture.rpm" --no-gpgchecks
+          run_in "${fedora_45}" "${rpm_file}" "umamo-${UMAMO_TARGET}-upgrade-fixture.rpm"
+          echo "::group::${fedora_45}: ${rpm_file} without the release key (must be refused)"
+          if docker run --rm -v "${PWD}/dist:/dist:ro" "${fedora_45}" dnf install -y --setopt=localpkg_gpgcheck=1 "/dist/${rpm_file}"; then
+            echo "::error::${fedora_45} installed the RPM without its signing key: dnf is not checking the signature"
+            failures=$((failures + 1))
+          else
+            echo "refused, as it should be"
+          fi
+          echo "::endgroup::"
           [ "${failures}" -eq 0 ]
 
       - name: Install, upgrade, check, and uninstall the MSI (Windows)
@@ -818,46 +927,122 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/install-test-macos.sh "unpublished/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.dmg"
+          bash .github/scripts/install-test-macos.sh \
+            "dist/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.dmg" "dist/umamo-${UMAMO_TARGET}-${UMAMO_VERSION}.zip" "${UMAMO_APPLE_TEAM_ID}"
 
   # -----------------------------------------------------------------------------------------------
-  # 5. Publish. Uses the gh CLI rather than a marketplace action on purpose: gh is preinstalled on
+  # 5. Checksums, on every run: SHA256SUMS.txt over every download, signed with the release key as
+  #    SHA256SUMS.txt.asc and verified against the committed public key alone. It covers what carries no
+  #    signature of its own - the DEB, the jars, the archives. Its artifact name starts with umamo-, so
+  #    the release job publishes it with everything else.
+  # -----------------------------------------------------------------------------------------------
+  checksums:
+    name: Sign the checksums
+    needs: [verify, package]
+    # The release key is the environment's, as in the package job; this job waits for an approval of its own.
+    environment: release-signing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download every target's artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: umamo-*
+          merge-multiple: true
+          path: dist
+
+      - name: Write, sign, and verify SHA256SUMS.txt
+        shell: bash
+        env:
+          LINUX_SIGNING_KEY: ${{ secrets.LINUX_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="${RUNNER_TEMP}/gnupg"
+          # The release key leaves with this step however it ends, a failed signature included.
+          trap 'rm -rf "${GNUPGHOME}"' EXIT
+          bash .github/scripts/linux-signing-key.sh "${GNUPGHOME}" "${UMAMO_SIGNING_PUBLIC_KEY}" "${UMAMO_SIGNING_KEY_FINGERPRINT}"
+          bash .github/scripts/sign-checksums.sh dist "${UMAMO_SIGNING_PUBLIC_KEY}"
+          mkdir -p checksums
+          mv dist/SHA256SUMS.txt dist/SHA256SUMS.txt.asc checksums/
+
+      - name: Upload the signed checksums
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: umamo-checksums
+          path: checksums/*
+          if-no-files-found: error
+          retention-days: 7
+          # A re-run of this job replaces its own earlier upload.
+          overwrite: true
+
+  # -----------------------------------------------------------------------------------------------
+  # 6. Build provenance, on published runs only: a signed SLSA provenance attestation for every file the
+  #    release carries, which `gh attestation verify <file> -R umamoorg/umamo` checks against this
+  #    workflow and commit. A job of its own, so the OIDC token that signs them is never handed to a job
+  #    that runs build code. Dry runs skip it: an attestation enters the public, permanent Sigstore
+  #    transparency log, and a dry run's builds are never meant to be anyone's download.
+  # -----------------------------------------------------------------------------------------------
+  attest:
+    name: Attest build provenance
+    needs: [verify, install-test, checksums]
+    if: needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download every target's artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: umamo-*
+          merge-multiple: true
+          path: dist
+
+      - name: Attest every download
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+
+  # -----------------------------------------------------------------------------------------------
+  # 7. Publish. Uses the gh CLI rather than a marketplace action on purpose: gh is preinstalled on
   #    every GitHub-hosted runner, so this — the only job holding contents:write — hands that token
   #    to no third-party code. It is also one less action version to pin and audit, and the
   #    behaviour on a re-run is ours to define rather than something to discover.
   # -----------------------------------------------------------------------------------------------
   release:
     name: Publish GitHub release
-    needs: [verify, package, install-test]
+    needs: [verify, package, install-test, checksums, attest]
     # Dry runs stop after the install tests: the artifacts are on the run page, nothing is published,
     # and there is nothing to clean up afterwards.
     if: needs.verify.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      # The only elevated permission anywhere in this workflow, scoped to the one job that needs it.
-      # Creating a release and uploading its assets is all contents:write buys; nothing here wants
-      # packages:, id-token: or actions:.
+      # Scoped to the one job that needs it. Creating a release and uploading its assets is all
+      # contents:write buys; nothing here wants packages:, id-token: or actions: - the attest job holds
+      # the only other elevated permissions, and runs nothing but GitHub's own attestation action.
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download every target's artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: umamo-*
           merge-multiple: true
           path: dist
 
-      # Computed here, once, on one machine, in one format — rather than five per-OS variants of
-      # sha256sum/shasum/Get-FileHash that would then have to agree on output shape. The explicit
-      # `umamo-*` prefix keeps the checksum file from ever hashing itself.
-      - name: Generate SHA-256 checksums
+      # The checksums job's SHA256SUMS.txt and its signature arrive with the rest, under umamo-checksums.
+      - name: List the release's files
         working-directory: dist
         run: |
           set -euo pipefail
-          sha256sum umamo-* | tee SHA256SUMS.txt
           ls -lh
+          test -f SHA256SUMS.txt && test -f SHA256SUMS.txt.asc
 
       - name: Create the release
         env:
@@ -867,9 +1052,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The unsigned-build warnings are not boilerplate: without them the first thing most users
-          # meet is an OS refusing to run the download. Unsigned is a deliberate pre-alpha choice, so
-          # the consequence belongs at the point of download.
+          # The signing notes are not boilerplate: Windows is still unsigned, so without the SmartScreen
+          # step the first thing its users meet is an OS refusing the download, and the RPM installs only
+          # once its key is imported. The consequence belongs at the point of download.
           notes="$(mktemp)"
           cat > "${notes}" <<'NOTES'
           ## Downloads
@@ -877,25 +1062,33 @@ jobs:
           | File                                       | Note                                                                                                                                                                                                                                                                                                  |
           | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
           | `umamo-windows-x64-<version>.msi`          | Windows installer.  Installs for your user alone, with no administrator rights needed, and opens `.uma` files.                                                                                                                                                                                        |
+          | `umamo-macos-arm64-<version>.dmg`          | Apple silicon Macs: open it and drag Umamo to Applications.  Signed and notarized by Apple.                                                                                                                                                                                                           |
           | `umamo-linux-<arch>-<version>.deb`         | Debian 12+, Ubuntu 22.04+, Linux Mint 21+: `sudo apt install ./umamo-linux-<arch>-<version>.deb`                                                                                                                                                                                                      |
-          | `umamo-linux-<arch>-<version>.rpm`         | Fedora and other RPM distributions: `sudo dnf install ./umamo-linux-<arch>-<version>.rpm` (on Fedora 45 or newer add `--no-gpgchecks`: the package is not signed yet).                                                                                                                                |
+          | `umamo-linux-<arch>-<version>.rpm`         | Fedora and other RPM distributions: `sudo rpm --import https://umamo.org/keys/umamo-signing-key.asc`, then `sudo dnf install --setopt=localpkg_gpgcheck=1 ./umamo-linux-<arch>-<version>.rpm`                                                                                                         |
           | `umamo-<target>-<version>.zip` / `.tar.gz` | Java SDK not required, just unpack it and run it directly.                                                                                                                                                                                                                                            |
           | `umamo-<target>-<version>.jar`             | You will need Java SDK 21 or higher to run.  When Java's default would give Umamo less than 3 GB of memory, it restarts itself with room for up to half of your computer's memory.  To always allow half, start it from a terminal: `java -XX:MaxRAMPercentage=50 -jar umamo-<target>-<version>.jar`. |
 
           Targets: `linux-x64`, `linux-arm64`, `windows-x64`, `macos-arm64`, `macos-x64`.
-          Verify your download against `SHA256SUMS.txt`.
 
-          **MacOS:** Apple silicon Macs (`macos-arm64`) get `Umamo.app` in a zip.  Intel Macs (`macos-x64`) use the jar: install a JDK 21 or newer and run `java -XX:MaxRAMPercentage=50 -jar umamo-<target>-<version>.jar`.
+          **MacOS:** Apple silicon Macs (`macos-arm64`) get the DMG, or `Umamo.app` in a zip.  Intel Macs (`macos-x64`) use the jar: install a JDK 21 or newer and run `java -XX:MaxRAMPercentage=50 -jar umamo-<target>-<version>.jar`.
 
-          ## These builds are not signed
+          ## Signing and verification
 
-          Code signing and notarization arrive at alpha. Until then:
+          * MacOS: the DMG and `Umamo.app` are signed with the project's Developer ID and notarized by Apple, so they open like any other downloaded app.  The jar is unaffected.
+          * Linux: the RPM is signed with the Umamo release key, fingerprint `67754C0DC58743270D574066F5499AE5C80A0F1C`.  Import it once with the `rpm --import` command above; `--setopt=localpkg_gpgcheck=1` makes dnf check it, which it skips for a downloaded file by default.  The DEB and RPM install to `/opt/umamo` and add Umamo to the application menu.  For the tarball, extract `tar xzf umamo-*.tar.gz` and run `umamo/bin/umamo`.
+          * Windows: not signed yet.  SmartScreen shows "Windows protected your PC" for the installer and for the zip's `Umamo.exe`.  Choose *More info* → *Run anyway*.
 
-          * Windows: SmartScreen shows "Windows protected your PC" for the installer and for the zip's `Umamo.exe`. Choose *More info* → *Run anyway*.
-          * MacOS (`Umamo.app`): Gatekeeper refuses the first launch.  Open System Settings → Privacy & Security and choose *Open Anyway*, or run `xattr -dr com.apple.quarantine /path/to/Umamo.app` in Terminal.  The jar is unaffected.
-          * Linux: No equivalent prompt.  The DEB and RPM install to `/opt/umamo` and add Umamo to the application menu.  For the tarball, extract `tar xzf umamo-*.tar.gz` and run `umamo/bin/umamo`.
+          Every file is listed in `SHA256SUMS.txt`, which is signed with the same release key as `SHA256SUMS.txt.asc`:
 
-          There is no auto-update.  To upgrade, install the new MSI, DEB, or RPM over the old one; for the zip or tar.gz, delete the old folder and unpack the new one.  Your settings stay either way, and uninstalling leaves them too.
+          ```
+          gpg --fetch-keys https://umamo.org/umamo-signing-key.asc
+          gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+          ```
+
+          Each file also carries a build provenance attestation: `gh attestation verify <file> --repo umamoorg/umamo` confirms it was built by this repository's release workflow.
+
+          There is no auto-update.  To upgrade, install the new MSI, DEB, or RPM over the old one; from the DMG, drag the new Umamo over the old one; for the zip or tar.gz, delete the old folder and unpack the new one.  Your settings stay either way, and uninstalling leaves them too.
 
           ## Status
 

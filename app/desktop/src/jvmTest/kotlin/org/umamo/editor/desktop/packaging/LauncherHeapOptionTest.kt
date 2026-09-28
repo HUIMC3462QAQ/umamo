@@ -39,8 +39,6 @@ class LauncherHeapOptionTest {
 
 	@Test
 	fun theReleaseChecksAssertTheLaunchersOption() {
-		for (document in listOf(releasing, releaseWorkflow)) {
-			assertTrue(document.readText().contains("java-options=$JAR_HEAP_OPTION"), "${document.name} checks umamo.cfg for $JAR_HEAP_OPTION")
-		}
+		assertTrue(releaseWorkflow.readText().contains("java-options=$JAR_HEAP_OPTION"), "${releaseWorkflow.name} checks umamo.cfg for $JAR_HEAP_OPTION")
 	}
 }

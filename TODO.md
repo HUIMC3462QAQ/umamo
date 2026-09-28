@@ -118,6 +118,9 @@ https://hollisbrown.github.io/blendershortcuts/ - I should make a page like this
 ## Parameters
 * Parameter templates:
 	* Need a way to apply these without having to do a fresh import.
+* Parameters Area Improvements
+	* Snap to key on the parameter scrubber, either by the context menu or a snapping option.  The keyform sheet can do this right by clicking on a parameter pip.
+		* I'm leaning towards a snapping option in the area header, but the header is a bit crowded right now.
 
 ## Menus
 * Clicking again should close instead of reopen the menu.

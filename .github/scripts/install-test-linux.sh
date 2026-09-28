@@ -3,6 +3,9 @@
 # self-check, and removes it again - on the release runner itself or inside a distribution's container.
 #
 # What it proves, in order:
+#   * with UMAMO_SIGNING_KEY naming the release public key, an RPM run imports it the way the README tells a rigger
+#     to, both packages verify against it, and dnf installs them with its signature check switched on - it skips
+#     that check for a local file unless told (localpkg_gpgcheck, off in Fedora's defaults);
 #   * the older package installs, then the new one upgrades it in place (the package manager keeps one "umamo");
 #   * AFTER the upgrade the menu entry, the .uma type, and the file-manager association are still registered - the
 #     check that catches an RPM whose old %preun undoes the new %post (JDK-8301856, packaging/linux/umamo.spec);
@@ -15,7 +18,7 @@
 # installs regardless).
 #
 # Usage: install-test-linux.sh <package> <expected version> [<older package> [<package-manager flag>]]
-#   e.g. install-test-linux.sh /dist/umamo.rpm 0.4.0 /fixtures/umamo.rpm --no-gpgchecks
+#   e.g. UMAMO_SIGNING_KEY=/keys/umamo-signing-key.asc install-test-linux.sh /dist/umamo.rpm 0.4.0 /fixtures/umamo.rpm
 
 set -euo pipefail
 
@@ -69,12 +72,17 @@ package_manager() {
 	fi
 }
 
+signature_option=""
+if [ "${manager}" = "dnf" ] && [ -n "${UMAMO_SIGNING_KEY:-}" ]; then
+	signature_option="--setopt=localpkg_gpgcheck=1"
+fi
+
 # install_package <file>: installs or upgrades from a local file, resolving dependencies from the distribution.
 install_package() {
 	if [ "${manager}" = "apt" ]; then
 		package_manager install -y --no-install-recommends "$1"
 	else
-		package_manager install -y "$1"
+		package_manager install -y ${signature_option:+"${signature_option}"} "$1"
 	fi
 }
 
@@ -132,6 +140,19 @@ else
 	package_manager install -y -q desktop-file-utils shared-mime-info
 fi
 ${sudo_command} mkdir -p /usr/share/desktop-directories /etc/xdg/menus /usr/share/icons/hicolor
+
+if [ "${manager}" = "dnf" ] && [ -n "${UMAMO_SIGNING_KEY:-}" ]; then
+	echo "---- importing the release key ${UMAMO_SIGNING_KEY}"
+	${sudo_command} rpm --import "${UMAMO_SIGNING_KEY}"
+	for rpm_file in ${older_package:+"${older_package}"} "${package}"; do
+		verdict="$(rpmkeys --checksig "${rpm_file}")"
+		echo "${verdict}"
+		case "${verdict}" in
+			*": digests signatures OK") ;;
+			*) fail "$(basename "${rpm_file}") does not verify against the release key" ;;
+		esac
+	done
+fi
 
 settings_directory="${XDG_CONFIG_HOME:-${HOME}/.config}/umamo"
 mkdir -p "${settings_directory}"
