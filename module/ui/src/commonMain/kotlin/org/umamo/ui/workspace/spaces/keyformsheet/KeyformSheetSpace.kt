@@ -525,8 +525,8 @@ private fun KeyformSheetSection(
 	val deleteLabel = stringResource(Res.string.cmd_keyform_delete)
 	// The playhead follows the live scrub through snapshotFlow rather than a composition read:
 	// observedValues is one whole-map state replaced on every preview move of ANY parameter, so reading
-	// it while composing invalidated the entire sheet per pointer move (ParametersSpace documents the
-	// same rule).  The initial read is deliberately unobserved; the flow delivers every later change to
+	// it while composing invalidated the entire sheet per pointer move (rememberParameterPoseState
+	// documents the same rule).  The initial read is deliberately unobserved; the flow delivers every later change to
 	// this section's own state alone.
 	var playhead by remember(parameter.id) {
 		mutableStateOf(
