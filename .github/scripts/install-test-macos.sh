@@ -114,8 +114,9 @@ fi
 if [ -d "${applications}/Umamo.app" ]; then
 	launch_copy="${work_directory}/launch/Umamo.app"
 	mkdir -p "$(dirname "${launch_copy}")"
-	ditto "${applications}/Umamo.app" "${launch_copy}"
-	xattr -dr com.apple.quarantine "${launch_copy}"
+	# --noqtn copies without the quarantine mark.  Stripping it afterwards cannot work: the runtime's legal files are
+	# read-only, and macOS refuses to remove an attribute from a file the caller may not write.
+	ditto --noqtn "${applications}/Umamo.app" "${launch_copy}"
 	bash "${script_directory}/self-check.sh" "${launch_copy}/Contents/MacOS/Umamo" || fail "the copied app's self-check failed"
 	bash "${script_directory}/launch-smoke-test.sh" "${launch_copy}/Contents/MacOS/Umamo" "${HOME}/Library/Application Support/umamo/logs" false ||
 		fail "the copied app's launch smoke test failed"
