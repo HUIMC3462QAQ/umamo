@@ -61,10 +61,12 @@ class UpdateCheckControllerTest {
 		runTest {
 			val fixture = AppControllerFixture(this)
 
-			checkForUpdatesOnRequest(fixture.services, answering(release("v0.0.1")), openPage = {}, nowMillis = { now })
-			checkForUpdatesOnRequest(fixture.services, answering(TransportResponse(404, "{}")), openPage = {}, nowMillis = { now })
-			checkForUpdatesOnRequest(fixture.services, answering(null), openPage = {}, nowMillis = { now })
-			fixture.settle()
+			// Each check fetches on a real IO thread, so checks left running together raise their alerts in the
+			// order their threads finish.  Settling after each one keeps the alerts in the order asked.
+			for (response in listOf(release("v0.0.1"), TransportResponse(404, "{}"), null)) {
+				checkForUpdatesOnRequest(fixture.services, answering(response), openPage = {}, nowMillis = { now })
+				fixture.settle()
+			}
 
 			val alerts = fixture.argumentsOf("document.alert").map { argument -> argument as AlertRequest }
 			assertEquals(
