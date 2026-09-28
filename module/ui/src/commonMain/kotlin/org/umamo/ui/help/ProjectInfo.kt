@@ -15,4 +15,5 @@ object ProjectInfo {
 	const val DOCUMENTATION_URL = "https://docs.umamo.org/"
 	const val RELEASES_URL = "https://github.com/umamoorg/umamo/releases"
 	const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/umamoorg/umamo/releases/latest"
+	const val DOWNLOAD_URL = "https://www.umamo.org/#download"
 }

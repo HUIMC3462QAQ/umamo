@@ -228,7 +228,7 @@ internal suspend fun checkForUpdate(
 		ReleaseVersion.parse(release.tagName)
 			?: return UpdateCheckOutcome.Failed("the latest release's tag ${release.tagName} is not a version", answered = true)
 	return if (latest > current) {
-		UpdateCheckOutcome.Newer(latest, currentVersion, release.htmlUrl ?: ProjectInfo.RELEASES_URL)
+		UpdateCheckOutcome.Newer(latest, currentVersion, ProjectInfo.DOWNLOAD_URL)
 	} else {
 		UpdateCheckOutcome.UpToDate(currentVersion)
 	}
