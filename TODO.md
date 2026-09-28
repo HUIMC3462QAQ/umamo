@@ -172,7 +172,6 @@ See format planning document: docs/plan/uma-format.md
 	* The color-blind-assist first pass — vertex/edge/face gizmo colors plus the selection highlight — already exists in Settings > Colors.
 
 ## Refactor
-* module/render/src/commonMain/kotlin/org/umamo/render/puppet/PuppetRenderer.kt
 * module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/EditorShell.kt
 	* Also reorganize the workspace folder.
 
