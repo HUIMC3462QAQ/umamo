@@ -70,7 +70,8 @@ private val RANGE_FIELD_LIMIT = -1_000_000f..1_000_000f
  * the one before it and the control taking it skips.
  *
  * @param Boolean  renaming Whether this name is being edited in place.
- * @param Function onStart  Called on a double click of the name to open the field.
+ * @param Function onStart  Called on a double click of the name to open the field.  The double click's
+ *   first press has already run the name's single click by then, so this undoes it.
  * @param Function onCommit Called with the new name when the field commits.
  * @param Function onCancel Called when the field is abandoned.
  */
@@ -387,7 +388,14 @@ private fun ParameterValueRow(
 			// uses raw pointerInput (never requests focus, so keyboard dispatch stays on the shell root) and
 			// fires the single click immediately - no double-tap wait. While renaming, the field below consumes
 			// its own presses, so this gesture does not fight it.
-			modifier = Modifier.weight(1f).singleOrDoubleClick(onSingle = { onToggleRange() }, onDouble = rename.onStart),
+			//
+			// The press is claimed.  The name sits inside the island, whose own surface targets the row, and a
+			// press left unconsumed would reach it: opening a range editor would retarget the keyform sheet and
+			// record a step.
+			modifier =
+				Modifier
+					.weight(1f)
+					.singleOrDoubleClick(onSingle = { onToggleRange() }, onDouble = rename.onStart, consumePress = true),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
 			if (showLeadingSlot) {

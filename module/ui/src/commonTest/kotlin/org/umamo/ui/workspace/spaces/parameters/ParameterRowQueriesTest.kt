@@ -16,7 +16,9 @@ import org.umamo.runtime.model.ParameterId
 import org.umamo.runtime.model.PuppetModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Pins what the panel asks of its rows: which parameters a press on a row targets, what a dragged row
@@ -147,6 +149,44 @@ class ParameterRowQueriesTest {
 	fun bothFiltersIntersect() {
 		assertEquals(setOf(bodyX), visibleParameterIds(model(), artSelected, showOnlySelected = true, searchQuery = "body"))
 		assertEquals(emptySet(), visibleParameterIds(model(), artSelected, showOnlySelected = true, searchQuery = "angle"))
+	}
+
+	/** The parameter being named is kept although neither filter would keep it. */
+	@Test
+	fun theParameterBeingNamedPassesEveryFilter() {
+		assertEquals(
+			setOf(angleX, angleY, breath),
+			visibleParameterIds(model(), Selection(), showOnlySelected = false, searchQuery = "angle", namingParameterId = breath),
+		)
+		assertEquals(
+			setOf(bodyX, breath),
+			visibleParameterIds(model(), artSelected, showOnlySelected = true, searchQuery = "", namingParameterId = breath),
+		)
+		assertEquals(
+			setOf(breath),
+			visibleParameterIds(model(), artSelected, showOnlySelected = true, searchQuery = "angle", namingParameterId = breath),
+		)
+	}
+
+	/** With no filter on there is still no restriction: a name open for editing does not make one. */
+	@Test
+	fun aNameOpenForEditingMakesNoFilter() {
+		assertNull(visibleParameterIds(model(), Selection(), showOnlySelected = false, searchQuery = "", namingParameterId = breath))
+	}
+
+	/** A row is being named when it holds the name that is open, and a pad holds two. */
+	@Test
+	fun aRowIsBeingNamedByWhatItHolds() {
+		assertTrue(isBeingNamed(rows[0], renamingGroupId = face, renamingParameterId = null))
+		assertTrue(isBeingNamed(rows[3], renamingGroupId = null, renamingParameterId = bodyX))
+		assertTrue(isBeingNamed(rows[2], renamingGroupId = null, renamingParameterId = angleY))
+		assertFalse(isBeingNamed(rows[1], renamingGroupId = face, renamingParameterId = bodyX))
+	}
+
+	/** With no name open, no row is being named. */
+	@Test
+	fun noRowIsBeingNamedWithNoNameOpen() {
+		rows.forEach { row -> assertFalse(isBeingNamed(row, renamingGroupId = null, renamingParameterId = null)) }
 	}
 
 	/** The row being renamed is found by its group or by its parameter. */

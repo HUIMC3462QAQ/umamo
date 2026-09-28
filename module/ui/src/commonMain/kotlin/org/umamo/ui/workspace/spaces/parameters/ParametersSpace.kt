@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -117,16 +119,26 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	// memo key and the match both read the same string.
 	val searchQuery = viewState.query.trim()
 	val visibleParamIds =
-		remember(puppet, selection, viewState.showOnlySelected, searchQuery) {
-			visibleParameterIds(puppet, selection, viewState.showOnlySelected, searchQuery)
+		remember(puppet, selection, viewState.showOnlySelected, searchQuery, viewState.renamingParameterId) {
+			visibleParameterIds(puppet, selection, viewState.showOnlySelected, searchQuery, viewState.renamingParameterId)
 		}
 
 	// Built each recomposition so a group toggle reflects immediately; reading [expandedGroups] here
 	// registers the snapshot reads that drive the rebuild.  While a search is running every group renders
 	// open, so a match inside a collapsed one is still reachable.
-	val rows = buildParameterRows(puppet, linkInfo, parameterById, expandedGroups, visibleParamIds, forceExpanded = searchQuery.isNotEmpty())
+	val rows =
+		buildParameterRows(
+			puppet,
+			linkInfo,
+			parameterById,
+			expandedGroups,
+			visibleParamIds,
+			forceExpanded = viewState.searching,
+			namingGroupId = viewState.renamingGroupId,
+		)
 	val labels = parameterLabels()
 	val listState = rememberLazyListState()
+	HoldListTopEffect(listState, firstRowKey = rows.firstOrNull()?.let { row -> rowKey(row) })
 
 	// A newly created group or parameter is prepended at the top and immediately opened for inline rename;
 	// scroll its row into view when it is not already visible (the created item can otherwise land just
@@ -214,6 +226,37 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 				cursorX = dragController.dragWindowX,
 				cursorY = dragController.dragWindowY,
 			)
+		}
+	}
+}
+
+/** The first row a list was last seen to hold, by its key. */
+private class FirstRowMemo(var key: String?)
+
+/**
+ * Keeps a list that rests at its very top resting there when a different row becomes its first.
+ *
+ * A lazy list holds its place on the row that was first in view, so that rows changing above a list
+ * scrolled part way down do not move what the rigger is looking at.  For a list at its top that same
+ * rule puts a row arriving above the first one out of sight, above a list that looks unscrolled: a
+ * created row, a row restored by undo, a row dragged to the top.  A list scrolled anywhere else is left
+ * to hold its place.
+ *
+ * A side effect, which runs once the rows are composed and before the list measures them, so the
+ * position it reads is still the one the old rows were laid out at.
+ *
+ * @param LazyListState listState The list's state.
+ * @param String? firstRowKey The key of the first row the list now holds, or null for an empty list.
+ */
+@Composable
+private fun HoldListTopEffect(listState: LazyListState, firstRowKey: String?) {
+	val lastSeen = remember { FirstRowMemo(firstRowKey) }
+	SideEffect {
+		if (lastSeen.key != firstRowKey) {
+			lastSeen.key = firstRowKey
+			if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+				listState.requestScrollToItem(0)
+			}
 		}
 	}
 }

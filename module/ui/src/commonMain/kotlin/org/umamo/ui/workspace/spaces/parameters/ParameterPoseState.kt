@@ -145,6 +145,15 @@ internal fun rememberParameterPoseState(puppet: PuppetModel, liveParams: LivePar
 		}
 	}
 	val parametersLocked = rememberParametersLocked(session)
+	// A scrub still held when the lock engages has previewed a value nothing will commit: the writer it
+	// reaches from here on refuses the rest of the drag and its release.  Drop the preview, so a locked
+	// panel shows the committed pose and not a value the rig never took.  The renderer needs no such
+	// care, since Edit mode hands it a pose of its own.
+	LaunchedEffect(parametersLocked, values) {
+		if (parametersLocked) {
+			followPose(values, pose)
+		}
+	}
 	// The values outlive the lock: a mode change builds a new writer around the same map, so what the
 	// sliders show carries across it.
 	return remember(values, liveParams, parametersLocked) {

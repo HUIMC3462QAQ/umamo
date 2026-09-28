@@ -3,8 +3,12 @@ package org.umamo.ui.workspace.spaces.parameters
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -78,12 +82,24 @@ internal fun ParameterRowView(
 			null
 		}
 	val isDragged = dragController.draggingKey == key
+	// A row being named asks to be shown whole.  Its rename field asks for itself the moment it takes
+	// focus, and a list scrolling toward the row stops for that as soon as the field is in view, which
+	// leaves whatever of the row sits above the field cut off.  The row's own request holds the field's
+	// inside it, so the list keeps going until both are met.
+	val wholeRow = remember { BringIntoViewRequester() }
+	val beingNamed = isBeingNamed(row, viewState.renamingGroupId, viewState.renamingParameterId)
+	LaunchedEffect(beingNamed) {
+		if (beingNamed) {
+			wholeRow.bringIntoView()
+		}
+	}
 	Row(
 		// Report the OUTER row's bounds (not the inner island's) so the drop band math
 		// measures the whole row. The group-depth indent sits here, beside the grip.
 		modifier =
 			Modifier
 				.fillMaxWidth()
+				.bringIntoViewRequester(wholeRow)
 				.onGloballyPositioned { coordinates ->
 					dragController.reportBounds(
 						key,
@@ -177,6 +193,9 @@ private fun ParameterGroupRow(
 ) {
 	val expandedGroups = viewState.expandedGroups
 	val renaming = viewState.renamingGroupId == row.groupId
+	// A search shows every group open whatever its fold says, so for as long as one runs a press has
+	// nothing to fold, and must not write a fold the rigger cannot see change.
+	val foldLocked = viewState.searching
 	ContextMenuArea(
 		items = parameterGroupMenuItems(row.groupId, labels, session, viewState),
 		modifier = modifier,
@@ -198,14 +217,21 @@ private fun ParameterGroupRow(
 				name = row.name,
 				expanded = row.expanded,
 				nesting = nesting,
-				onToggle = { expandedGroups[row.groupId] = !(expandedGroups[row.groupId] ?: row.expanded) },
+				onToggle = {
+					if (!foldLocked) {
+						expandedGroups[row.groupId] = !(expandedGroups[row.groupId] ?: row.expanded)
+					}
+				},
 				onStartRename = {
 					// The double-click's first press already fired the immediate single-click
 					// toggle; flip the group back so renaming does not also open / close it.
 					// Flip the LIVE map value, not the captured row's - the capture can be a
 					// recomposition stale under a fast double click, and flipping a stale
-					// value re-applies the first toggle instead of undoing it.
-					expandedGroups[row.groupId] = !(expandedGroups[row.groupId] ?: row.expanded)
+					// value re-applies the first toggle instead of undoing it.  Under a fold lock
+					// the first press toggled nothing, and there is nothing to flip back.
+					if (!foldLocked) {
+						expandedGroups[row.groupId] = !(expandedGroups[row.groupId] ?: row.expanded)
+					}
 					viewState.renamingGroupId = row.groupId
 				},
 			)
@@ -247,7 +273,7 @@ private fun ParameterSliderRow(
 	val parameter = row.parameter
 	val linkCandidateId = row.linkCandidateId
 	val rangeOpen = viewState.openRangeEditors[parameter.id] == true
-	val rename = parameterRenameSlot(parameter.id, viewState, session)
+	val rename = parameterRenameSlot(parameter.id, rangeEditorId = parameter.id, viewState, session)
 	// Link editing is a document edit, not a pose write, so it deliberately
 	// bypasses the Edit-mode parameter lock (the same policy as range edits).
 	val link =
@@ -331,9 +357,10 @@ private fun ParameterPadRow(
 	val horizontal = row.horizontal
 	val vertical = row.vertical
 	val rangeOpen = viewState.openRangeEditors[horizontal.id] == true
-	// Double-clicking an axis name renames it, as the menu's per-axis entry does.
-	val horizontalRename = parameterRenameSlot(horizontal.id, viewState, session)
-	val verticalRename = parameterRenameSlot(vertical.id, viewState, session)
+	// Double-clicking an axis name renames it, as the menu's per-axis entry does.  Either name toggles
+	// the one range editor the pad keys on its upper axis, so that is the one a double click gives back.
+	val horizontalRename = parameterRenameSlot(horizontal.id, rangeEditorId = horizontal.id, viewState, session)
+	val verticalRename = parameterRenameSlot(vertical.id, rangeEditorId = horizontal.id, viewState, session)
 	// Unlink splits the pad back into two sliders; a document edit, allowed
 	// in Edit mode like range edits.
 	val link =
@@ -402,15 +429,28 @@ private fun ParameterPadRow(
  * would hand back new lambdas on every call, and a slot that never equals its predecessor.
  *
  * @param ParameterId parameterId The parameter whose name the slot edits.
+ * @param ParameterId rangeEditorId The parameter the name's island keys its range editor on, which a
+ *   single click on the name toggles.
  * @param ParametersViewState viewState The panel's view state, which holds the rename target.
  * @param EditorSession? session The editing session the commit writes through, or null with none.
  * @return ParameterRenameSlot The rename as the row's name sees it.
  */
 @Composable
-private fun parameterRenameSlot(parameterId: ParameterId, viewState: ParametersViewState, session: EditorSession?): ParameterRenameSlot =
+private fun parameterRenameSlot(
+	parameterId: ParameterId,
+	rangeEditorId: ParameterId,
+	viewState: ParametersViewState,
+	session: EditorSession?,
+): ParameterRenameSlot =
 	ParameterRenameSlot(
 		renaming = viewState.renamingParameterId == parameterId,
-		onStart = { viewState.renamingParameterId = parameterId },
+		onStart = {
+			// The double click's first press already toggled the range editor; toggle it back, so that
+			// renaming a parameter does not also open or close its ranges.  From the LIVE value, as the
+			// group header does with its fold: a value captured in composition can be one press stale.
+			viewState.openRangeEditors[rangeEditorId] = viewState.openRangeEditors[rangeEditorId] != true
+			viewState.renamingParameterId = parameterId
+		},
 		onCommit = { newName ->
 			session?.renameParameter(parameterId, newName)
 			viewState.renamingParameterId = null

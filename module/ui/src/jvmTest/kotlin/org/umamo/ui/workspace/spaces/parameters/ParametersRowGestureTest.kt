@@ -51,9 +51,9 @@ class ParametersRowGestureTest {
 			assertEquals(true, harness.viewState.openRangeEditors[PanelIds.bodyX])
 		}
 
-	/** A press on a name lands on the island under it as well, so it targets the row. */
+	/** A press on a name is the name's alone: it opens the range editor and targets nothing. */
 	@Test
-	fun aClickOnANameAlsoTargetsTheRow() =
+	fun aClickOnANameLeavesTheTargetAlone() =
 		runComposeUiTest {
 			val harness = ParametersPanelHarness()
 			mountParametersPanel(harness)
@@ -61,20 +61,101 @@ class ParametersRowGestureTest {
 
 			clickAt(panelBoundsOfText(PanelNames.BODY_X).center)
 
-			assertEquals(ParameterSelection.of(PanelIds.bodyX), harness.session.parameterSelection.value)
-			assertEquals(cursorBefore + 1, harness.historyCursor, "targeting a row is a step of its own")
+			assertEquals(true, harness.viewState.openRangeEditors[PanelIds.bodyX], "the press must really have landed on the name")
+			assertEquals(ParameterSelection(), harness.session.parameterSelection.value)
+			assertEquals(cursorBefore, harness.historyCursor, "an open range editor is view state, not a step")
 		}
 
-	/** The double click's first press has already toggled the range editor, and nothing toggles it back. */
+	/** The chevron beside a slider's name is part of the name's press, and targets nothing either. */
 	@Test
-	fun aDoubleClickOnANameOpensRenameAndLeavesTheRangeEditorToggled() =
+	fun aClickOnASlidersChevronLeavesTheTargetAlone() =
 		runComposeUiTest {
 			val harness = ParametersPanelHarness()
 			mountParametersPanel(harness)
+			val cursorBefore = harness.historyCursor
+			// In list order the chevrons belong to Eye Open, Smile Shape, Smile, the pad, Body X, and Breath.
+			val bodyChevron = onAllNodesWithContentDescription(harness.text.rangeToggle, useUnmergedTree = true)[4]
+
+			clickAt(panelBoundsOf(bodyChevron).center)
+
+			assertEquals(true, harness.viewState.openRangeEditors[PanelIds.bodyX])
+			assertEquals(ParameterSelection(), harness.session.parameterSelection.value)
+			assertEquals(cursorBefore, harness.historyCursor)
+		}
+
+	/** A pad's axis names are held to the same. */
+	@Test
+	fun aClickOnAnAxisNameLeavesTheTargetAlone() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			val cursorBefore = harness.historyCursor
+
+			clickAt(panelBoundsOfText(PanelNames.ANGLE_Y).center)
+
+			assertEquals(true, harness.viewState.openRangeEditors[PanelIds.angleX], "a pad keys its editor on its upper axis")
+			assertEquals(ParameterSelection(), harness.session.parameterSelection.value)
+			assertEquals(cursorBefore, harness.historyCursor)
+		}
+
+	/** A double click renames, and leaves a closed range editor closed: its second press undoes the first's toggle. */
+	@Test
+	fun aDoubleClickOnANameOpensRenameAndLeavesTheRangeEditorClosed() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			val cursorBefore = harness.historyCursor
 
 			doubleClickAt(panelBoundsOfText(PanelNames.BODY_X).center)
 
 			assertEquals(PanelIds.bodyX, harness.viewState.renamingParameterId)
+			assertTrue(renameFieldOpen())
+			assertFalse(harness.viewState.openRangeEditors[PanelIds.bodyX] == true, "renaming a parameter must not open its range editor")
+			assertFalse(showsText(harness.text.rangeMinimum))
+			assertEquals(cursorBefore, harness.historyCursor, "nothing is recorded until the name commits")
+		}
+
+	/** The same from open: the parameter is renamed and its range editor stays open. */
+	@Test
+	fun aDoubleClickOnANameOpensRenameAndLeavesTheRangeEditorOpen() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			clickAt(panelBoundsOfText(PanelNames.BODY_X).center)
+			assertTrue(showsText(harness.text.rangeMinimum))
+
+			doubleClickAt(panelBoundsOfText(PanelNames.BODY_X).center)
+
+			assertTrue(renameFieldOpen())
+			assertEquals(true, harness.viewState.openRangeEditors[PanelIds.bodyX], "renaming a parameter must not close its range editor")
+			assertTrue(showsText(harness.text.rangeMinimum))
+		}
+
+	/** A pad's lower axis shares the upper one's range editor, and a double click on it leaves that one alone. */
+	@Test
+	fun aDoubleClickOnAnAxisNameLeavesThePadsRangeEditorClosed() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+
+			doubleClickAt(panelBoundsOfText(PanelNames.ANGLE_Y).center)
+
+			assertEquals(PanelIds.angleY, harness.viewState.renamingParameterId)
+			assertTrue(renameFieldOpen())
+			assertFalse(harness.viewState.openRangeEditors[PanelIds.angleX] == true)
+		}
+
+	/** Rename from the menu was never a press on the name, so it has no toggle to undo. */
+	@Test
+	fun renameFromTheMenuLeavesTheRangeEditorAlone() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			clickAt(panelBoundsOfText(PanelNames.BODY_X).center)
+
+			secondaryClickAt(panelBoundsOfText(PanelNames.BODY_X).center)
+			clickMenuEntry(harness.text.rename)
+
 			assertTrue(renameFieldOpen())
 			assertEquals(true, harness.viewState.openRangeEditors[PanelIds.bodyX])
 		}

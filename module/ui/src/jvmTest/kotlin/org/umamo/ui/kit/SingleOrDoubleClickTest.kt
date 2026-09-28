@@ -1,5 +1,6 @@
 package org.umamo.ui.kit
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
@@ -11,6 +12,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -174,6 +176,108 @@ class SingleOrDoubleClickTest {
 				dispatched,
 				"Ctrl twice toggles twice, a plain click after Ctrl selects, and Shift never completes a double",
 			)
+		}
+
+	/**
+	 * Mounts the target inside a clickable, the way a control sits inside a surface with a click of its own.
+	 *
+	 * @param ComposeUiTest test         The running UI test.
+	 * @param Boolean       consumePress Whether the target claims the presses it handles.
+	 * @param Function      onAncestor   Runs when the clickable around the target takes a click.
+	 */
+	private fun mountInsideAClickable(test: ComposeUiTest, consumePress: Boolean, onAncestor: () -> Unit) {
+		test.setContent {
+			Box(modifier = Modifier.size(width = 300.dp, height = 200.dp).clickable(onClick = onAncestor)) {
+				Box(
+					modifier =
+						Modifier
+							.size(width = 200.dp, height = 100.dp)
+							.testTag(TARGET_TAG)
+							.singleOrDoubleClick(
+								onSingle = { dispatched += "single" },
+								onDouble = { dispatched += "double" },
+								consumePress = consumePress,
+							),
+				)
+			}
+		}
+	}
+
+	/** Left alone, a handled press goes on up, and a clickable around the target clicks as well. */
+	@Test
+	fun anUnclaimedPressReachesAClickableAncestor() =
+		runComposeUiTest {
+			var ancestorClicks = 0
+			mountInsideAClickable(this, consumePress = false) { ancestorClicks += 1 }
+
+			// A clickable merges what sits inside it into one node, so the target is found in the unmerged tree.
+			onNodeWithTag(TARGET_TAG, useUnmergedTree = true).performMouseInput { click(Offset(150f, 50f)) }
+			waitForIdle()
+
+			assertEquals(listOf("single"), dispatched)
+			assertEquals(1, ancestorClicks)
+		}
+
+	/** A claimed press is the target's alone, on the single and on the double. */
+	@Test
+	fun aClaimedPressStaysFromAClickableAncestor() =
+		runComposeUiTest {
+			var ancestorClicks = 0
+			mountInsideAClickable(this, consumePress = true) { ancestorClicks += 1 }
+
+			// A clickable merges what sits inside it into one node, so the target is found in the unmerged tree.
+			onNodeWithTag(TARGET_TAG, useUnmergedTree = true).performMouseInput {
+				click(Offset(150f, 50f))
+				advanceEventTime(100L)
+				click(Offset(150f, 50f))
+			}
+			waitForIdle()
+
+			assertEquals(listOf("single", "double"), dispatched)
+			assertEquals(0, ancestorClicks)
+		}
+
+	/** A claim covers what the target handles and nothing else: a right press still goes on up. */
+	@Test
+	fun aClaimLeavesASecondaryPressAlone() =
+		runComposeUiTest {
+			var secondaryPresses = 0
+			setContent {
+				Box(
+					modifier =
+						Modifier
+							.size(width = 300.dp, height = 200.dp)
+							.pointerInput(Unit) {
+								awaitPointerEventScope {
+									while (true) {
+										val event = awaitPointerEvent()
+										val unconsumed = event.changes.none { change -> change.isConsumed }
+										if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && unconsumed) {
+											secondaryPresses += 1
+										}
+									}
+								}
+							},
+				) {
+					Box(
+						modifier =
+							Modifier
+								.size(width = 200.dp, height = 100.dp)
+								.testTag(TARGET_TAG)
+								.singleOrDoubleClick(onSingle = { dispatched += "single" }, onDouble = { dispatched += "double" }, consumePress = true),
+					)
+				}
+			}
+
+			onNodeWithTag(TARGET_TAG).performMouseInput {
+				moveTo(Offset(150f, 50f))
+				press(MouseButton.Secondary)
+				release(MouseButton.Secondary)
+			}
+			waitForIdle()
+
+			assertEquals(emptyList(), dispatched)
+			assertEquals(1, secondaryPresses)
 		}
 
 	private companion object {

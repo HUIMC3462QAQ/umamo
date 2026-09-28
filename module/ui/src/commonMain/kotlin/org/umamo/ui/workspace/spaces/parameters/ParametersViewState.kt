@@ -33,6 +33,12 @@ internal class ParametersViewState : PersistentSpaceState {
 	var query by mutableStateOf("")
 
 	/**
+	 * Whether a search is running.  While one is, every group renders open and a press on a group header
+	 * folds nothing.
+	 */
+	val searching: Boolean get() = query.isNotBlank()
+
+	/**
 	 * Parameter islands whose range editor is open, keyed by the island's primary parameter id (a pad
 	 * keys on its horizontal member, so the state survives the param <-> pair row-identity change on
 	 * link / unlink). Multiple islands may be open at once, so range editors on different parameters
