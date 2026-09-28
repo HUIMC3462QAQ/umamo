@@ -13,13 +13,6 @@ object ProjectInfo {
 	const val WEB_SITE_URL = "https://umamo.org"
 	const val SOURCE_CODE_URL = "https://github.com/umamoorg/umamo"
 	const val DOCUMENTATION_URL = "https://docs.umamo.org/"
-
-	/** Every release's page; the update notice falls back to it when GitHub's answer names no page of its own. */
 	const val RELEASES_URL = "https://github.com/umamoorg/umamo/releases"
-
-	/**
-	 * GitHub's newest full release - never a draft or a prerelease, which is why a release is published as a full
-	 * one (RELEASING.md) - which the update check compares [VERSION] with.
-	 */
 	const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/umamoorg/umamo/releases/latest"
 }
