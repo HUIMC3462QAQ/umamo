@@ -230,6 +230,12 @@ compose.desktop {
 				// LSMinimumSystemVersion.  11.0 is the floor of the JDK 27 runtime the arm64 app image bundles, which
 				// is every Apple silicon Mac; left alone the plugin writes 10.13, a promise the runtime cannot keep.
 				minimumSystemVersion = "11.0"
+				// Signing is never switched on here.  The release workflow switches it on from the command line
+				// (compose.desktop.mac.sign and the Developer ID it names, gradle-package.sh), so a build anywhere
+				// else stays ad-hoc signed and needs no certificate.  The plugin's default entitlements stay: the
+				// hardened runtime notarization requires would otherwise stop the JVM's JIT (allow-jit,
+				// allow-unsigned-executable-memory) and the natives LWJGL, sqlite-jdbc, and JNA extract from their
+				// jars at run time (disable-library-validation).
 			}
 			linux {
 				iconFile.set(project.file("icons/umamo.png"))
@@ -482,9 +488,10 @@ for (packageType in listOf("deb", "rpm")) {
 // The packaging tests read files straight from disk: OsAssociationFilesTest holds the OS registration files - this
 // script, the Android manifest, and the two freedesktop files - to the codec's Uma.MIME_TYPE, LauncherHeapOptionTest
 // holds this script, README, RELEASING, and the release workflow to the one heap option, LauncherJvmOptionsTest and
-// ShippedLicenseTest read this script (the first against the release workflow too), and InstallerIdentityTest pins
+// ShippedLicenseTest read this script (the first against the release workflow too), InstallerIdentityTest pins
 // the installers' identities and scriptlets across this script, the templates under packaging, and the release
-// workflow.  None of them is on the test classpath, so Gradle does not know the tests depend on them: left
+// workflow, and SigningIdentityTest holds the committed release key and the pinned Apple team to the workflow,
+// README, and RELEASING, and gradle.properties to never switching macOS signing on.  None of them is on the test classpath, so Gradle does not know the tests depend on them: left
 // undeclared, an edit to any one leaves jvmTest UP-TO-DATE and the check silently never runs against the change it
 // exists to catch.
 val filesReadByTests =
@@ -492,6 +499,7 @@ val filesReadByTests =
 		"resources/linux/umamo-uma.xml",
 		"resources/linux/umamo.desktop",
 		"packaging/windows/main.wxs",
+		"packaging/umamo-signing-key.asc",
 		"packaging/linux/umamo.spec",
 		"packaging/linux/control",
 		"packaging/linux/postinst",
@@ -499,6 +507,7 @@ val filesReadByTests =
 		"build.gradle.kts",
 		rootProject.file("app/android/src/main/AndroidManifest.xml"),
 		rootProject.file("README.md"),
+		rootProject.file("gradle.properties"),
 		rootProject.file("RELEASING.md"),
 		rootProject.file(".github/workflows/release.yml"),
 	)

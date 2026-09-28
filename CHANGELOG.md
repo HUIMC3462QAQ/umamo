@@ -30,7 +30,9 @@ Umamo is early alpha.
 * Diagnostics: Starting the desktop app with `--self-check` runs a headless check of its Java runtime, native libraries, and file formats then prints the results, and exits.
 * Packaging: Apple silicon Macs get a `Umamo.app` download, bundling Java 27.  Intel Macs keep using the jar.
 * Packaging: A JAR started without a memory option restarts itself with room for up to half of the system RAM when Java's default would give Umamo less than 3 GB.
-* Packaging: Installers are now built, but they are not code signed yet.
+* Packaging: Installers are now built: MSI for Windows, DEB and an RPM for Linux, and DMG for MacOS ARM64.
+* Packaging: MacOS ARM64 DMG/APP are now signed and notarized.
+* Packaging: The Linux RPM and each release's `SHA256SUMS.txt` are signed with the Umamo release key and every release is now attested.
 
 ### Changed
 * UI: The CTRL+O keybinding was changed to file open instead of import CMO3.
