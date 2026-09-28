@@ -3,9 +3,9 @@ package org.umamo.ui.workspace.shell
 import org.umamo.edit.EditorSession
 import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.action.Keymap
-import org.umamo.ui.kit.InlineEditController
-import org.umamo.ui.kit.KeyCaptureController
-import org.umamo.ui.kit.MenuBarController
+import org.umamo.ui.kit.menu.MenuBarController
+import org.umamo.ui.kit.textentry.InlineEditController
+import org.umamo.ui.kit.textentry.KeyCaptureController
 import org.umamo.ui.model.SelectionHandle
 import org.umamo.ui.workspace.KeyformSheetViews
 import org.umamo.ui.workspace.RelationPickController

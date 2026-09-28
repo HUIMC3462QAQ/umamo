@@ -29,7 +29,6 @@ import org.umamo.ui.action.LocalKeymap
 import org.umamo.ui.action.defaultKeymap
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
-import org.umamo.ui.model.noticeText
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.status_bind_grab
 import org.umamo.ui.resources.status_parts
@@ -40,6 +39,7 @@ import org.umamo.ui.workspace.LocalHoveredSurfaceTracker
 import org.umamo.ui.workspace.SpaceKind
 import org.umamo.ui.workspace.commands.commandFixtureSession
 import org.umamo.ui.workspace.commands.everyCommandTable
+import org.umamo.ui.workspace.noticeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

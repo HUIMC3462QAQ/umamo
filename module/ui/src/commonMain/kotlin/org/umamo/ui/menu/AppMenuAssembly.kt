@@ -9,7 +9,7 @@ import org.umamo.edit.EditorSession
 import org.umamo.settings.Settings
 import org.umamo.ui.action.rememberLiveKeymap
 import org.umamo.ui.document.recentFiles
-import org.umamo.ui.kit.TopLevelMenu
+import org.umamo.ui.kit.menu.TopLevelMenu
 import org.umamo.ui.l10n.applyAppLocale
 import org.umamo.ui.l10n.rememberLocaleTag
 

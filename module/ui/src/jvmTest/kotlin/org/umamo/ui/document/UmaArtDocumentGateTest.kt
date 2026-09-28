@@ -22,7 +22,7 @@ import org.umamo.render.SourceArtRasters
 import org.umamo.render.deriveAtlasTextures
 import org.umamo.runtime.model.AtlasTileId
 import org.umamo.runtime.model.DrawableMesh
-import org.umamo.ui.model.DrawableThumbnailer
+import org.umamo.ui.model.thumbnails.DrawableThumbnailer
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

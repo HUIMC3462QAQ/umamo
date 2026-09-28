@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.ui.kit.Surface
 import org.umamo.ui.kit.Text
-import org.umamo.ui.kit.TextField
+import org.umamo.ui.kit.field.TextField
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.search_hint
 import org.umamo.ui.theme.LocalUmamoColors

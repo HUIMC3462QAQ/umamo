@@ -21,7 +21,7 @@ import org.umamo.runtime.model.AtlasTileId
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.storage.UmamoLog
 import org.umamo.storage.writeReplacing
-import org.umamo.ui.model.DrawableThumbnailer
+import org.umamo.ui.model.thumbnails.DrawableThumbnailer
 import org.umamo.ui.viewport.AtlasPageBinding
 
 /** The size the saved thumbnail is fitted into (UMA §5.6). */

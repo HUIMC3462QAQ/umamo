@@ -12,9 +12,9 @@ import org.umamo.edit.slideParameters
 import org.umamo.edit.transformParameters
 import org.umamo.format.atlas.AtlasPackOptions
 import org.umamo.interop.art.SourceArtImportOptions
-import org.umamo.ui.model.addArtworkParameters
-import org.umamo.ui.model.matchArtworkParameters
-import org.umamo.ui.model.repackParameters
+import org.umamo.ui.model.artwork.addArtworkParameters
+import org.umamo.ui.model.artwork.matchArtworkParameters
+import org.umamo.ui.model.repack.repackParameters
 import org.umamo.ui.viewport.uv.PlacementDragStatus
 import org.umamo.ui.viewport.uv.placementParameters
 import kotlin.test.Test

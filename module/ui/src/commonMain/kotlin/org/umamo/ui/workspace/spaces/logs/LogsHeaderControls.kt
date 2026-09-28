@@ -9,9 +9,9 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.storage.UmamoLog
 import org.umamo.ui.action.LocalCommands
-import org.umamo.ui.kit.OverflowRowScope
 import org.umamo.ui.kit.button.IconButton
 import org.umamo.ui.kit.button.IconButtonAppearance
+import org.umamo.ui.kit.container.OverflowRowScope
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.LocalUmamoShapes

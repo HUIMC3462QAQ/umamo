@@ -18,7 +18,7 @@ import org.umamo.runtime.model.partNameByDrawable
 import org.umamo.runtime.model.pickableIndicesByDrawable
 import org.umamo.runtime.model.pickableUvsByDrawable
 import org.umamo.ui.model.DrawableThumbnailProvider
-import org.umamo.ui.model.DrawableThumbnailer
+import org.umamo.ui.model.thumbnails.DrawableThumbnailer
 
 /**
  * CPU-side hit-testing and art previews for the viewport, over the current deformed pose. Runs entirely on

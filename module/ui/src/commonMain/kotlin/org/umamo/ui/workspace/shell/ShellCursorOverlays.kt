@@ -23,13 +23,12 @@ import org.umamo.edit.NoticePlacement
 import org.umamo.edit.SelectionTarget
 import org.umamo.edit.resolveParameterChoice
 import org.umamo.ui.kit.AtPointPositionProvider
-import org.umamo.ui.kit.Menu
-import org.umamo.ui.kit.MenuItem
-import org.umamo.ui.kit.PieMenuOverlay
 import org.umamo.ui.kit.TooltipCard
+import org.umamo.ui.kit.menu.Menu
+import org.umamo.ui.kit.menu.MenuItem
+import org.umamo.ui.kit.menu.PieMenuOverlay
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
-import org.umamo.ui.model.noticeText
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.keyform_choose_parameter_insert
 import org.umamo.ui.resources.keyform_choose_parameter_remove
@@ -39,6 +38,7 @@ import org.umamo.ui.resources.pick_hover_part
 import org.umamo.ui.theme.LocalUmamoCursors
 import org.umamo.ui.theme.drawCursor
 import org.umamo.ui.workspace.LocalRelationPick
+import org.umamo.ui.workspace.noticeText
 import kotlin.math.roundToInt
 
 /** How long (ms) a near-cursor notice stays visible before it auto-dismisses. */

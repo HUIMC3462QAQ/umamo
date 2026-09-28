@@ -32,10 +32,10 @@ import org.umamo.runtime.model.partByDrawable
 import org.umamo.runtime.model.partSelfAndDescendants
 import org.umamo.runtime.model.worldXFromOriginRelative
 import org.umamo.runtime.model.worldZFromOriginRelative
-import org.umamo.ui.kit.FieldStack
-import org.umamo.ui.kit.NumberField
 import org.umamo.ui.kit.button.IconButton
 import org.umamo.ui.kit.button.IconButtonAppearance
+import org.umamo.ui.kit.field.FieldStack
+import org.umamo.ui.kit.field.NumberField
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.LocalUmamoShapes

@@ -43,7 +43,7 @@ private val SEGMENT_GAP = 1.dp
 
 /**
  * One segment of a [ButtonGroup]: an icon toggle that lights with the accent while [selected].  This is
- * a data model rather than a slot DSL (same reasoning as [MenuItem]) - the group must know each
+ * a data model rather than a slot DSL (same reasoning as [org.umamo.ui.kit.menu.MenuItem]) - the group must know each
  * segment's position to shape its corners, so callers hand over a list and one renderer draws it.
  *
  * ButtonGroup の 1 セグメント。selected の間アクセント色で点灯するアイコントグル。

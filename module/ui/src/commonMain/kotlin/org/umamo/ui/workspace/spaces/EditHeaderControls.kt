@@ -18,13 +18,13 @@ import org.umamo.edit.ProportionalFalloff
 import org.umamo.edit.TransformPivotMode
 import org.umamo.ui.action.LocalCommands
 import org.umamo.ui.kit.BelowAnchorPositionProvider
-import org.umamo.ui.kit.DropdownChip
-import org.umamo.ui.kit.Menu
-import org.umamo.ui.kit.MenuItem
 import org.umamo.ui.kit.button.ButtonGroup
 import org.umamo.ui.kit.button.ButtonGroupItem
 import org.umamo.ui.kit.button.IconButton
 import org.umamo.ui.kit.button.IconButtonAppearance
+import org.umamo.ui.kit.chip.DropdownChip
+import org.umamo.ui.kit.menu.Menu
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons

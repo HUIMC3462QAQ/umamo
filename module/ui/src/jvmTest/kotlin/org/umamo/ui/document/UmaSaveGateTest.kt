@@ -29,12 +29,12 @@ import org.umamo.interop.art.ArtSourceDescriptor
 import org.umamo.interop.diffPuppetModels
 import org.umamo.render.ViewportCamera
 import org.umamo.runtime.model.PartId
-import org.umamo.ui.model.AddArtworkRequest
-import org.umamo.ui.model.AtlasRepackHost
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.repackPageSizeOf
-import org.umamo.ui.model.runAddArtwork
-import org.umamo.ui.model.runAtlasRepack
+import org.umamo.ui.model.artwork.AddArtworkRequest
+import org.umamo.ui.model.artwork.runAddArtwork
+import org.umamo.ui.model.repack.AtlasRepackHost
+import org.umamo.ui.model.repack.repackPageSizeOf
+import org.umamo.ui.model.repack.runAtlasRepack
 import org.umamo.ui.viewport.AreaCameraKey
 import org.umamo.ui.viewport.AtlasPageBinding
 import org.umamo.ui.viewport.CameraSurface

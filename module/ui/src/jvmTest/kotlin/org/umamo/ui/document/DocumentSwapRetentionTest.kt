@@ -4,8 +4,8 @@ import org.umamo.edit.EditorSession
 import org.umamo.edit.ParameterChange
 import org.umamo.edit.SelectionOps
 import org.umamo.edit.SelectionTarget
-import org.umamo.ui.model.DrawableThumbnailer
 import org.umamo.ui.model.SessionAtlasPages
+import org.umamo.ui.model.thumbnails.DrawableThumbnailer
 import java.io.File
 import java.lang.ref.WeakReference
 import kotlin.test.Test

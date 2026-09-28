@@ -54,9 +54,9 @@ import org.umamo.ui.graphics.formatHexColor
 import org.umamo.ui.graphics.parseHexColor
 import org.umamo.ui.graphics.toColorRgb
 import org.umamo.ui.graphics.toComposeColor
-import org.umamo.ui.kit.HexColorField
-import org.umamo.ui.kit.NumberField
-import org.umamo.ui.kit.SelectField
+import org.umamo.ui.kit.field.HexColorField
+import org.umamo.ui.kit.field.NumberField
+import org.umamo.ui.kit.field.SelectField
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.UmamoIcon

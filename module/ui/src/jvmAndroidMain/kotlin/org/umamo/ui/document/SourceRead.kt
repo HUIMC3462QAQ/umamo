@@ -8,7 +8,7 @@ import org.umamo.interop.art.placedFor
 import org.umamo.interop.cmo3.cmo3SourceArtOf
 import org.umamo.runtime.model.ArtSource
 import org.umamo.storage.UmamoLog
-import org.umamo.ui.model.SourceFilePresence
+import org.umamo.ui.model.artwork.SourceFilePresence
 
 /**
  * One listed file's art as an operation read it.

@@ -5,8 +5,8 @@ import org.jetbrains.compose.resources.stringResource
 import org.umamo.ui.action.Keymap
 import org.umamo.ui.action.formatAccelerator
 import org.umamo.ui.document.fileDisplayName
-import org.umamo.ui.kit.MenuItem
-import org.umamo.ui.kit.TopLevelMenu
+import org.umamo.ui.kit.menu.MenuItem
+import org.umamo.ui.kit.menu.TopLevelMenu
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_workspace_next
 import org.umamo.ui.resources.cmd_workspace_prev

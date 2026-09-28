@@ -26,9 +26,9 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.Selection
-import org.umamo.ui.kit.SectionHeader
 import org.umamo.ui.kit.VerticalScrollbarOverlay
 import org.umamo.ui.kit.button.IconButton
+import org.umamo.ui.kit.container.SectionHeader
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.model.LocalSelection

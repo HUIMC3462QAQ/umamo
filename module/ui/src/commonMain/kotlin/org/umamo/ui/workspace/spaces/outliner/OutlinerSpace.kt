@@ -76,13 +76,13 @@ import org.umamo.edit.toggleVisibility
 import org.umamo.edit.toggleVisibilitySubtree
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.ui.action.LocalCommands
-import org.umamo.ui.kit.ContextMenuArea
-import org.umamo.ui.kit.InlineRenameField
-import org.umamo.ui.kit.MenuItem
 import org.umamo.ui.kit.Text
 import org.umamo.ui.kit.VerticalScrollbarOverlay
 import org.umamo.ui.kit.button.IconSlot
+import org.umamo.ui.kit.menu.ContextMenuArea
+import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.kit.singleOrDoubleClick
+import org.umamo.ui.kit.textentry.InlineRenameField
 import org.umamo.ui.model.LocalDrawableThumbnails
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
@@ -897,7 +897,7 @@ private fun OutlinerRowBody(
  *
  * The accessible name is the action a click performs, because the row's own name never says whether the
  * node is open - the chevron is the only place that state is exposed. It carries no tooltip for the
- * matching reason [org.umamo.ui.kit.DisclosureChevron] carries none: the row label sits right beside it.
+ * matching reason [org.umamo.ui.kit.button.DisclosureChevron] carries none: the row label sits right beside it.
  *
  * @param Boolean visible Whether to draw the chevron (false for a childless node).
  * @param Boolean expanded Whether the node is expanded.

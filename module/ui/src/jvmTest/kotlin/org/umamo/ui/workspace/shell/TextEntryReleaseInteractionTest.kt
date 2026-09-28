@@ -35,11 +35,11 @@ import org.umamo.ui.action.Command
 import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.action.Keymap
 import org.umamo.ui.action.parseKeyChord
-import org.umamo.ui.kit.InlineEditController
-import org.umamo.ui.kit.InlineRenameField
-import org.umamo.ui.kit.LocalInlineEditController
-import org.umamo.ui.kit.NumberField
-import org.umamo.ui.kit.SearchField
+import org.umamo.ui.kit.field.NumberField
+import org.umamo.ui.kit.field.SearchField
+import org.umamo.ui.kit.textentry.InlineEditController
+import org.umamo.ui.kit.textentry.InlineRenameField
+import org.umamo.ui.kit.textentry.LocalInlineEditController
 import org.umamo.ui.theme.UmamoTheme
 import org.umamo.ui.workspace.ShellOverlayState
 import org.umamo.ui.workspace.commands.registerAll

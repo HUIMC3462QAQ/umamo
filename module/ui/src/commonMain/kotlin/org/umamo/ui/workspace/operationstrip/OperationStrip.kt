@@ -30,9 +30,9 @@ import org.umamo.edit.AdjustableOperation
 import org.umamo.edit.EditorSession
 import org.umamo.edit.OperatorParameter
 import org.umamo.edit.withParameter
-import org.umamo.ui.kit.NumberField
-import org.umamo.ui.kit.SectionHeader
-import org.umamo.ui.kit.SelectField
+import org.umamo.ui.kit.container.SectionHeader
+import org.umamo.ui.kit.field.NumberField
+import org.umamo.ui.kit.field.SelectField
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.properties.PropertyCheckboxRow
 import org.umamo.ui.properties.PropertyFieldRow
