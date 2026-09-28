@@ -113,6 +113,50 @@ internal fun parameterDropAnchor(
 	}
 }
 
+/**
+ * Where a drop lands, as the move the document takes.
+ *
+ * @property ParameterGroupId? newParentGroupId The group the row ends up in, or null for the root.
+ * @property ParameterNodeRef? before The sibling the row is put ahead of, or null to put it last.
+ * @property ParameterGroupId? expandsGroupId The group to open so the dropped row can be seen, which is
+ *   the target of a drop that nests; null for a drop that reorders.
+ */
+internal data class ParameterDrop(
+	val newParentGroupId: ParameterGroupId?,
+	val before: ParameterNodeRef?,
+	val expandsGroupId: ParameterGroupId?,
+)
+
+/**
+ * Resolves a release over the row keyed [targetKey] into the move it asks for, or null when the release
+ * asks for none: the row is not in the list any more, or the dragged row may not land there.
+ *
+ * @param PuppetModel          puppet    The open model, whose tree resolves the anchor.
+ * @param List                 rows      The current render rows.
+ * @param ParameterMoveSubject subject   What is being dragged.
+ * @param String               targetKey The key of the row the pointer was released over.
+ * @param Float                fraction  How far down that row the pointer was, 0 at its top edge.
+ * @return ParameterDrop? The move, or null for a release that drops nothing.
+ */
+internal fun resolveParameterDrop(
+	puppet: PuppetModel,
+	rows: List<ParameterRow>,
+	subject: ParameterMoveSubject,
+	targetKey: String,
+	fraction: Float,
+): ParameterDrop? {
+	val targetRow = rows.firstOrNull { candidate -> rowKey(candidate) == targetKey } ?: return null
+	val band = parameterDropBandFor(subject, targetRow, targetRow.depth == 0, fraction) ?: return null
+	val (newParentGroupId, before) = parameterDropAnchor(puppet, targetRow, band)
+	val expandsGroupId =
+		if (band == RowDropBand.Into && targetRow is ParameterRow.GroupHeader) {
+			targetRow.groupId
+		} else {
+			null
+		}
+	return ParameterDrop(newParentGroupId, before, expandsGroupId)
+}
+
 /** The node ref that anchors [targetRow]: a group by its id, a slider / pad by its leading leaf. */
 private fun primaryRefOf(targetRow: ParameterRow): ParameterNodeRef =
 	when (targetRow) {

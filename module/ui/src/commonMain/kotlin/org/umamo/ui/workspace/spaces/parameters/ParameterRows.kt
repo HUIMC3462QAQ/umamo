@@ -1,5 +1,7 @@
 package org.umamo.ui.workspace.spaces.parameters
 
+import org.umamo.edit.ParameterSelection
+import org.umamo.edit.Selection
 import org.umamo.runtime.model.Parameter
 import org.umamo.runtime.model.ParameterGroupId
 import org.umamo.runtime.model.ParameterId
@@ -103,6 +105,58 @@ internal fun parameterIdsMatching(puppet: PuppetModel, query: String): Set<Param
 			parameter.name.contains(query, ignoreCase = true) || parameter.id.raw.contains(query, ignoreCase = true)
 		}
 		.mapTo(HashSet()) { parameter -> parameter.id }
+
+/**
+ * The parameters the panel's two filters leave, shaped to feed [buildParameterRows]'s visibleParamIds:
+ * the ones that drive the selection when that filter is on and something is selected, the ones the search
+ * matches when there is a search, and the ones in both sets when both apply.  Both filters restrict, so
+ * with both on a parameter must satisfy each of them.
+ *
+ * The selection filter is inert with nothing selected, so the panel is never mysteriously blank.
+ *
+ * @param PuppetModel puppet           The loaded rig.
+ * @param Selection   selection        The current object selection.
+ * @param Boolean     showOnlySelected Whether the selection filter is on.
+ * @param String      searchQuery      The search text, trimmed; empty means no search.
+ * @return Set<ParameterId>? The parameters to show, or null when neither filter applies.
+ */
+internal fun visibleParameterIds(
+	puppet: PuppetModel,
+	selection: Selection,
+	showOnlySelected: Boolean,
+	searchQuery: String,
+): Set<ParameterId>? {
+	val selectedFilter =
+		if (showOnlySelected && !selection.isEmpty) {
+			effectiveParameterIds(puppet, selection)
+		} else {
+			null
+		}
+	val queryFilter = if (searchQuery.isEmpty()) null else parameterIdsMatching(puppet, searchQuery)
+	return when {
+		selectedFilter == null -> queryFilter
+		queryFilter == null -> selectedFilter
+		else -> selectedFilter intersect queryFilter
+	}
+}
+
+/**
+ * Where the row being renamed sits in [rows], or -1 while no row shows it.  A pad answers for either of
+ * its axes.  At most one of the two ids is set at a time.
+ *
+ * @param List              rows                The current render rows.
+ * @param ParameterGroupId? renamingGroupId     The group being renamed, or null.
+ * @param ParameterId?      renamingParameterId The parameter being renamed, or null.
+ * @return Int The row's index, or -1.
+ */
+internal fun indexOfRenamedRow(rows: List<ParameterRow>, renamingGroupId: ParameterGroupId?, renamingParameterId: ParameterId?): Int =
+	rows.indexOfFirst { row ->
+		when (row) {
+			is ParameterRow.GroupHeader -> row.groupId == renamingGroupId
+			is ParameterRow.Single -> row.parameter.id == renamingParameterId
+			is ParameterRow.Pair2D -> row.horizontal.id == renamingParameterId || row.vertical.id == renamingParameterId
+		}
+	}
 
 /**
  * Flattens the parameter-panel group tree into an ordered list of render rows.  Each group emits a
@@ -292,3 +346,38 @@ private fun pairRun(
 			}
 		}
 	}
+
+/**
+ * What clicking [row]'s grab handle should target, or null when the row owns no parameter.
+ *
+ * A pad selects BOTH its axes with the horizontal one active, matching what clicking the pad itself does -
+ * the keyform sheet then shows a section per axis, which is the point of targeting a pad at all.
+ *
+ * @param ParameterRow row The row whose handle was clicked.
+ * @return ParameterSelection? The selection to apply, or null for a group header.
+ */
+internal fun parameterSelectionOf(row: ParameterRow): ParameterSelection? =
+	when (row) {
+		is ParameterRow.Single -> ParameterSelection.of(row.parameter.id)
+		is ParameterRow.Pair2D ->
+			ParameterSelection(setOf(row.horizontal.id, row.vertical.id), row.horizontal.id)
+
+		is ParameterRow.GroupHeader -> null
+	}
+
+/**
+ * The display name of the row currently being dragged (a parameter name, a pad's horizontal axis name,
+ * or a group name), for the floating drag ghost.
+ *
+ * @param List rows The current render rows.
+ * @param String? draggingKey The dragged row's key, or null.
+ * @return String The dragged row's display name, or empty when none.
+ */
+internal fun draggedRowLabel(rows: List<ParameterRow>, draggingKey: String?): String {
+	val row = rows.firstOrNull { candidate -> rowKey(candidate) == draggingKey } ?: return ""
+	return when (row) {
+		is ParameterRow.Single -> row.parameter.name
+		is ParameterRow.Pair2D -> row.horizontal.name
+		is ParameterRow.GroupHeader -> row.name
+	}
+}

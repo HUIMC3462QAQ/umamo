@@ -1,18 +1,11 @@
 package org.umamo.ui.workspace.spaces.parameters
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.compose.resources.stringResource
-import org.umamo.edit.EditorMode
-import org.umamo.edit.createParameter
-import org.umamo.edit.createParameterGroup
-import org.umamo.runtime.model.ParameterKind
-import org.umamo.runtime.model.RuntimeFeature
 import org.umamo.ui.kit.BelowAnchorPositionProvider
 import org.umamo.ui.kit.button.IconButton
 import org.umamo.ui.kit.button.IconButtonAppearance
@@ -24,7 +17,6 @@ import org.umamo.ui.kit.field.Checkbox
 import org.umamo.ui.kit.field.SEARCH_FIELD_MIN_WIDTH
 import org.umamo.ui.kit.field.SearchField
 import org.umamo.ui.kit.menu.Menu
-import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalLiveParams
 import org.umamo.ui.model.LocalPuppet
@@ -87,16 +79,17 @@ internal fun OverflowRowScope.parametersHeaderControls(scope: AreaScope) {
  * (square) parameter.  Either creates a document edit and opens the new row for inline rename.  The full
  * add-ticks / keyform-capture workflow is not built yet.
  *
+ * Its entries are the ones every parameter menu in the panel body ends with, from the same builder, so
+ * what the runtime target hides here it hides there.
+ *
  * @param ParametersViewState viewState The panel's shared view state, which parks the id to rename.
  */
 @Composable
 private fun AddParameterChip(viewState: ParametersViewState) {
 	val puppet = LocalPuppet.current ?: return
 	val session = LocalEditorSession.current
-	val defaultParameterName = stringResource(Res.string.parameter_default_name)
+	val labels = parameterLabels()
 	var addMenuExpanded by remember { mutableStateOf(false) }
-	val addKeyFormLabel = stringResource(Res.string.parameter_menu_add_keyform)
-	val addBlendShapeLabel = stringResource(Res.string.parameter_menu_add_blendshape)
 	DropdownChip(
 		expanded = addMenuExpanded,
 		onExpandRequest = { addMenuExpanded = true },
@@ -105,33 +98,7 @@ private fun AddParameterChip(viewState: ParametersViewState) {
 		enabled = session != null,
 	) {
 		Menu(
-			items =
-				listOfNotNull(
-					MenuItem.Action(
-						label = addKeyFormLabel,
-						onSelect = {
-							session?.let {
-								viewState.renamingParameterId = it.createParameter(defaultParameterName, ParameterKind.NORMAL)
-							}
-						},
-						enabled = session != null,
-					),
-					// Blend-shape parameters are a 4.2 feature; under an older runtime target the creation
-					// entry disappears (existing blend-shape parameters keep working and rendering).
-					if (!puppet.runtimeTarget.supports(RuntimeFeature.BlendShapeParameters)) {
-						null
-					} else {
-						MenuItem.Action(
-							label = addBlendShapeLabel,
-							onSelect = {
-								session?.let {
-									viewState.renamingParameterId = it.createParameter(defaultParameterName, ParameterKind.BLEND_SHAPE)
-								}
-							},
-							enabled = session != null,
-						)
-					},
-				),
+			items = createParameterMenuItems(labels, puppet.runtimeTarget, session, viewState),
 			onDismissRequest = { addMenuExpanded = false },
 			positionProvider = BelowAnchorPositionProvider,
 		)
@@ -146,11 +113,11 @@ private fun AddParameterChip(viewState: ParametersViewState) {
 @Composable
 private fun NewParameterGroupButton(viewState: ParametersViewState) {
 	val session = LocalEditorSession.current
-	val defaultGroupName = stringResource(Res.string.parameter_group_default_name)
+	val labels = parameterLabels()
 	IconButton(
 		icon = LocalUmamoIcons.groupAdd,
-		onClick = { session?.let { viewState.renamingGroupId = it.createParameterGroup(defaultGroupName) } },
-		contentDescription = stringResource(Res.string.parameter_new_group),
+		onClick = { createParameterGroupForRename(session, viewState, labels.defaultGroupName) },
+		contentDescription = labels.newGroup,
 		appearance = IconButtonAppearance.Filled(LocalUmamoShapes.current.small),
 	)
 }
@@ -158,26 +125,20 @@ private fun NewParameterGroupButton(viewState: ParametersViewState) {
 /**
  * Reset All: returns every parameter to its default in one undo step.
  *
- * The panel body gates every pose write on Edit mode (Edit mode is pinned to the neutral pose), and this
- * must replicate that lock or a locked panel becomes writable from the header.  Group create / delete /
- * rename are document edits rather than pose writes, so they are NOT gated.
+ * A pose write, so it goes through the writer the panel body's sliders go through and is refused in Edit
+ * mode with them; a locked panel is not writable from the header.  Group create / delete / rename are
+ * document edits rather than pose writes, so they are NOT gated.
+ *
+ * The header and the body are sibling subtrees, so this holds a writer of its own: the same class under
+ * the same lock, echoing into no displayed values.  The body's sliders follow the reset through the pose.
  */
 @Composable
 private fun ResetAllParametersButton() {
 	val puppet = LocalPuppet.current ?: return
-	val liveParams = LocalLiveParams.current
-	val session = LocalEditorSession.current
-	val editorMode by remember(session) { session?.mode ?: MutableStateFlow(EditorMode.Object) }.collectAsState()
+	val poseWriter = rememberParameterPoseWriter(LocalLiveParams.current, LocalEditorSession.current)
 	IconButton(
 		icon = LocalUmamoIcons.resetAll,
-		onClick = {
-			if (editorMode != EditorMode.Edit) {
-				// The same two-phase shape as the panel's sliders: preview every default, then one
-				// commit so the whole reset is a single undo step.
-				puppet.parameters.forEach { parameter -> liveParams?.preview(parameter.id, parameter.default) }
-				liveParams?.commit(puppet.parameters.map { it.id }.toSet())
-			}
-		},
+		onClick = { poseWriter.resetAll(puppet.parameters) },
 		contentDescription = stringResource(Res.string.parameter_reset_all),
 		appearance = IconButtonAppearance.Filled(LocalUmamoShapes.current.small),
 	)
