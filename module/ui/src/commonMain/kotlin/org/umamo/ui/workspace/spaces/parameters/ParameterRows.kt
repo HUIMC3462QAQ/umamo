@@ -114,10 +114,15 @@ internal fun parameterIdsMatching(puppet: PuppetModel, query: String): Set<Param
  *
  * The selection filter is inert with nothing selected, so the panel is never mysteriously blank.
  *
- * @param PuppetModel puppet           The loaded rig.
- * @param Selection   selection        The current object selection.
- * @param Boolean     showOnlySelected Whether the selection filter is on.
- * @param String      searchQuery      The search text, trimmed; empty means no search.
+ * The parameter being named is kept whatever the filters say.  A parameter created under a filter has a
+ * name the search does not match and drives nothing the selection holds, so without this its row, and
+ * the field to name it in, would never show.  Once named it is filtered like any other.
+ *
+ * @param PuppetModel  puppet            The loaded rig.
+ * @param Selection    selection         The current object selection.
+ * @param Boolean      showOnlySelected  Whether the selection filter is on.
+ * @param String       searchQuery       The search text, trimmed; empty means no search.
+ * @param ParameterId? namingParameterId The parameter whose name is open for editing, or null.
  * @return Set<ParameterId>? The parameters to show, or null when neither filter applies.
  */
 internal fun visibleParameterIds(
@@ -125,6 +130,7 @@ internal fun visibleParameterIds(
 	selection: Selection,
 	showOnlySelected: Boolean,
 	searchQuery: String,
+	namingParameterId: ParameterId? = null,
 ): Set<ParameterId>? {
 	val selectedFilter =
 		if (showOnlySelected && !selection.isEmpty) {
@@ -133,10 +139,16 @@ internal fun visibleParameterIds(
 			null
 		}
 	val queryFilter = if (searchQuery.isEmpty()) null else parameterIdsMatching(puppet, searchQuery)
-	return when {
-		selectedFilter == null -> queryFilter
-		queryFilter == null -> selectedFilter
-		else -> selectedFilter intersect queryFilter
+	val filtered =
+		when {
+			selectedFilter == null -> queryFilter
+			queryFilter == null -> selectedFilter
+			else -> selectedFilter intersect queryFilter
+		}
+	return if (filtered == null || namingParameterId == null) {
+		filtered
+	} else {
+		filtered + namingParameterId
 	}
 }
 
@@ -150,12 +162,22 @@ internal fun visibleParameterIds(
  * @return Int The row's index, or -1.
  */
 internal fun indexOfRenamedRow(rows: List<ParameterRow>, renamingGroupId: ParameterGroupId?, renamingParameterId: ParameterId?): Int =
-	rows.indexOfFirst { row ->
-		when (row) {
-			is ParameterRow.GroupHeader -> row.groupId == renamingGroupId
-			is ParameterRow.Single -> row.parameter.id == renamingParameterId
-			is ParameterRow.Pair2D -> row.horizontal.id == renamingParameterId || row.vertical.id == renamingParameterId
-		}
+	rows.indexOfFirst { row -> isBeingNamed(row, renamingGroupId, renamingParameterId) }
+
+/**
+ * Whether [row] holds the name that is open for editing.  A pad answers for either of its axes.
+ *
+ * @param ParameterRow      row                 The row to test.
+ * @param ParameterGroupId? renamingGroupId     The group being renamed, or null.
+ * @param ParameterId?      renamingParameterId The parameter being renamed, or null.
+ * @return Boolean True when the row shows the rename field.
+ */
+internal fun isBeingNamed(row: ParameterRow, renamingGroupId: ParameterGroupId?, renamingParameterId: ParameterId?): Boolean =
+	when (row) {
+		is ParameterRow.GroupHeader -> renamingGroupId != null && row.groupId == renamingGroupId
+		is ParameterRow.Single -> renamingParameterId != null && row.parameter.id == renamingParameterId
+		is ParameterRow.Pair2D ->
+			renamingParameterId != null && (row.horizontal.id == renamingParameterId || row.vertical.id == renamingParameterId)
 	}
 
 /**
@@ -175,6 +197,9 @@ internal fun indexOfRenamedRow(rows: List<ParameterRow>, renamingGroupId: Parame
  * @param Boolean     forceExpanded When true every group renders open whatever [expanded] says - what a
  *                                  search does, so a match cannot hide inside a collapsed group.  The
  *                                  rigger's own fold state is read again the moment it is false.
+ * @param ParameterGroupId? namingGroupId The group whose name is open for editing, or null.  Its header
+ *                                  is kept, with every group it sits inside, although a filter leaves it
+ *                                  nothing to show: a group created under a filter is empty.
  * @return List<ParameterRow> The rows in panel order.
  */
 internal fun buildParameterRows(
@@ -184,6 +209,7 @@ internal fun buildParameterRows(
 	expanded: Map<ParameterGroupId, Boolean>,
 	visibleParamIds: Set<ParameterId>? = null,
 	forceExpanded: Boolean = false,
+	namingGroupId: ParameterGroupId? = null,
 ): List<ParameterRow> {
 	val rows = ArrayList<ParameterRow>()
 	if (puppet.parameterTree.isEmpty()) {
@@ -198,6 +224,7 @@ internal fun buildParameterRows(
 		expanded = expanded,
 		visibleParamIds = visibleParamIds,
 		forceExpanded = forceExpanded,
+		namingGroupId = namingGroupId,
 		out = rows,
 	)
 	return rows
@@ -215,6 +242,7 @@ internal fun buildParameterRows(
  * @param Map          expanded      Live group expand state.
  * @param Set?         visibleParamIds The filter set, or null for no filter (see [buildParameterRows]).
  * @param Boolean      forceExpanded Whether every group renders open (see [buildParameterRows]).
+ * @param ParameterGroupId? namingGroupId The group kept for its name (see [buildParameterRows]).
  * @param MutableList  out           The accumulating row list.
  */
 private fun walkParameterNodes(
@@ -225,6 +253,7 @@ private fun walkParameterNodes(
 	expanded: Map<ParameterGroupId, Boolean>,
 	visibleParamIds: Set<ParameterId>?,
 	forceExpanded: Boolean,
+	namingGroupId: ParameterGroupId?,
 	out: MutableList<ParameterRow>,
 ) {
 	val run = ArrayList<Parameter>()
@@ -241,13 +270,28 @@ private fun walkParameterNodes(
 				}
 				// While filtering, drop a group whose subtree holds no visible parameter (no empty headers) -
 				// checked independent of expansion, since a collapsed group must still vanish when it is empty.
-				if (visibleParamIds != null && !groupHasVisibleParam(node, linkInfo, visibleParamIds)) {
+				// The group being named stays, and so does every group on the way down to it.
+				if (
+					visibleParamIds != null &&
+					!groupHasVisibleParam(node, linkInfo, visibleParamIds) &&
+					!groupHoldsGroup(node, namingGroupId)
+				) {
 					continue
 				}
 				val isExpanded = forceExpanded || (expanded[node.id] ?: node.initiallyOpen)
 				out += ParameterRow.GroupHeader(node.id, node.name, depth, isExpanded)
 				if (isExpanded) {
-					walkParameterNodes(node.children, depth + 1, linkInfo, parameterById, expanded, visibleParamIds, forceExpanded, out)
+					walkParameterNodes(
+						node.children,
+						depth + 1,
+						linkInfo,
+						parameterById,
+						expanded,
+						visibleParamIds,
+						forceExpanded,
+						namingGroupId,
+						out,
+					)
 				}
 			}
 		}
@@ -282,6 +326,23 @@ private fun groupHasVisibleParam(group: ParameterNode.Group, linkInfo: LinkInfo,
 		}
 	}
 	return false
+}
+
+/**
+ * Whether [group] is the group [groupId] names, or holds it at any depth.
+ *
+ * @param ParameterNode.Group group   The group to test.
+ * @param ParameterGroupId?   groupId The group looked for, or null for none, which nothing holds.
+ * @return Boolean True when [groupId] names [group] or a group under it.
+ */
+private fun groupHoldsGroup(group: ParameterNode.Group, groupId: ParameterGroupId?): Boolean {
+	if (groupId == null) {
+		return false
+	}
+	if (group.id == groupId) {
+		return true
+	}
+	return group.children.any { child -> child is ParameterNode.Group && groupHoldsGroup(child, groupId) }
 }
 
 /**

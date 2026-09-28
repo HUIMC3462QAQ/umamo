@@ -164,6 +164,53 @@ class ParametersEditLockTest {
 			assertEquals(10f, harness.committed(PanelIds.bodyX), "and entering it again has to lock it again")
 		}
 
+	/** A drag still held when the lock engages is dropped: the row shows the committed pose again at once. */
+	@Test
+	fun aScrubHeldWhenTheLockEngagesIsDiscarded() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			val slider = sliderBox(harness, PanelRows.BODY_X, PanelValues.BODY_X)
+			pressAndMove(slider.at(0.5f), listOf(slider.at(0.7f), slider.at(0.8f)))
+			assertFalse(showsText(PanelValues.BODY_X), "the drag must really have moved the row off its value")
+
+			runOnIdle { harness.enterEditMode() }
+			waitForIdle()
+			val cursorLocked = harness.historyCursor
+			assertTrue(showsText(PanelValues.BODY_X), "the row must go back to the committed pose the moment it locks")
+
+			moveOn(listOf(slider.at(0.9f)))
+			releasePress()
+			assertTrue(showsText(PanelValues.BODY_X), "and the rest of the drag must move nothing")
+			assertEquals(2f, harness.committed(PanelIds.bodyX))
+			assertEquals(cursorLocked, harness.historyCursor, "a dropped drag records no step")
+
+			runOnIdle { harness.leaveEditMode() }
+			waitForIdle()
+			assertTrue(showsText(PanelValues.BODY_X))
+			assertEquals(2f, harness.live(PanelIds.bodyX), "the renderer is handed the committed pose back")
+		}
+
+	/** A pad drag held across the lock is dropped the same way, on both its axes. */
+	@Test
+	fun aPadDragHeldWhenTheLockEngagesIsDiscarded() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			val pad = padBox(harness, PanelRows.ANGLE_PAD, PanelValues.ANGLE_X, PanelValues.ANGLE_Y)
+			pressAndMove(pad.center, listOf(pad.at(0.7f, 0.3f)))
+			assertFalse(showsText(PanelValues.ANGLE_X))
+
+			runOnIdle { harness.enterEditMode() }
+			waitForIdle()
+
+			assertTrue(showsText(PanelValues.ANGLE_X))
+			assertTrue(showsText(PanelValues.ANGLE_Y))
+			releasePress()
+			assertEquals(3f, harness.committed(PanelIds.angleX))
+			assertEquals(-4f, harness.committed(PanelIds.angleY))
+		}
+
 	/** A range is the document's, not the pose's, so Edit mode leaves it editable. */
 	@Test
 	fun editModeLeavesTheRangeEditable() =
@@ -200,9 +247,8 @@ class ParametersEditLockTest {
 	fun editModeLeavesRenameAvailable() =
 		runComposeUiTest {
 			val harness = lockedPanel(this)
-			doubleClickAt(panelBoundsOfText(PanelNames.BREATH).center)
-			// Taken after the double click: a press on a name also targets the row, which is a step of its own.
 			val cursorBefore = harness.historyCursor
+			doubleClickAt(panelBoundsOfText(PanelNames.BREATH).center)
 
 			typeIntoRenameField("Air")
 			pressKey(Key.Enter)

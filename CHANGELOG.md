@@ -54,6 +54,7 @@ Umamo is early alpha.
 * Packaging: The application now defaults to a maximum of 50% of system RAM instead.
 * Packaging: The app starts Java with the options that keep newer Java versions from warning about native libraries and memory access.
 * Import/Export: CMO3 and MOC3 no longer block the application process while processing.  New, save, and open document will be blocked while waiting for an export to finish.
+* Parameters: Clicking a parameter's name now only opens or closes its range editor; it no longer selects the parameter.
 
 ### Fixed
 * UI: Modal key ladder issue with escape closing the preferences window first instead of the confirmation dialog.
@@ -80,6 +81,10 @@ Umamo is early alpha.
 * Export: A CMO3 export of a CMO3 model now includes artwork reloaded with new pixels at the same size and position, instead of keeping the old pixels without a notice.
 * Packaging: JAR releases no longer print native access warnings on Java 24 and newer, and runs the Java 25 code paths of its libraries on Java 25 and newer.
 * Packaging: The Linux tarball's desktop entry now names Umamo's window class, so the desktop matches the running window to its menu entry and icon.
+* Parameters: A parameter or group created while searching or filtering now shows so it can be named.
+* Parameters: Clicking a group during a search no longer changes its saved fold.
+* Parameters: Switching to Edit Mode during a slider drag now discards the drag.
+* Parameters: A new, restored, or moved row at the top of the list is now fully visible.
 
 
 ## 0.3.0-dev - 2026-09-15

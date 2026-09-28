@@ -234,6 +234,83 @@ class ParameterRowsTest {
 		assertTrue(rows.none { row -> row is ParameterRow.GroupHeader })
 	}
 
+	/** The group being named keeps its header through a filter that leaves it nothing to show. */
+	@Test
+	fun filterKeepsTheGroupBeingNamed() {
+		val groupId = ParameterGroupId("group1")
+		val puppet =
+			model(
+				parameters = listOf(parameter(angleX), parameter(angleY)),
+				tree =
+					listOf(
+						ParameterNode.Group(groupId, "Group", initiallyOpen = true, children = listOf(ParameterNode.Param(angleY))),
+						ParameterNode.Param(angleX),
+					),
+			)
+		val rows =
+			buildParameterRows(
+				puppet,
+				buildLinkInfo(puppet),
+				puppet.parameters.associateBy { it.id },
+				expanded = emptyMap(),
+				visibleParamIds = setOf(angleX),
+				namingGroupId = groupId,
+			)
+		assertEquals(2, rows.size)
+		assertEquals(groupId, (rows[0] as ParameterRow.GroupHeader).groupId)
+		assertEquals(angleX, (rows[1] as ParameterRow.Single).parameter.id, "the filter still holds for the group's own rows")
+	}
+
+	/** A group being named inside another brings the outer header with it, or it would have nowhere to show. */
+	@Test
+	fun filterKeepsTheGroupsAroundTheOneBeingNamed() {
+		val outerId = ParameterGroupId("outer")
+		val innerId = ParameterGroupId("inner")
+		val besideId = ParameterGroupId("beside")
+		val puppet =
+			model(
+				parameters = listOf(parameter(angleX)),
+				tree =
+					listOf(
+						ParameterNode.Group(
+							outerId,
+							"Outer",
+							initiallyOpen = true,
+							children = listOf(ParameterNode.Group(innerId, "Inner", initiallyOpen = true, children = emptyList())),
+						),
+						ParameterNode.Group(besideId, "Beside", initiallyOpen = true, children = emptyList()),
+						ParameterNode.Param(angleX),
+					),
+			)
+		val rows =
+			buildParameterRows(
+				puppet,
+				buildLinkInfo(puppet),
+				puppet.parameters.associateBy { it.id },
+				expanded = emptyMap(),
+				visibleParamIds = setOf(angleX),
+				namingGroupId = innerId,
+			)
+		assertEquals(listOf(outerId, innerId), rows.filterIsInstance<ParameterRow.GroupHeader>().map { header -> header.groupId })
+		assertEquals(1, (rows[1] as ParameterRow.GroupHeader).depth)
+	}
+
+	/** With no filter on, the group being named changes nothing: every group shows already. */
+	@Test
+	fun theGroupBeingNamedChangesNothingUnfiltered() {
+		val groupId = ParameterGroupId("group1")
+		val puppet =
+			model(
+				parameters = listOf(parameter(angleX)),
+				tree = listOf(ParameterNode.Group(groupId, "Group", initiallyOpen = true, children = emptyList()), ParameterNode.Param(angleX)),
+			)
+		val parameterById = puppet.parameters.associateBy { it.id }
+		assertEquals(
+			buildParameterRows(puppet, buildLinkInfo(puppet), parameterById, expanded = emptyMap()),
+			buildParameterRows(puppet, buildLinkInfo(puppet), parameterById, expanded = emptyMap(), namingGroupId = groupId),
+		)
+	}
+
 	/** The header search matches a parameter's display name, case-insensitively. */
 	@Test
 	fun searchMatchesDisplayName() {

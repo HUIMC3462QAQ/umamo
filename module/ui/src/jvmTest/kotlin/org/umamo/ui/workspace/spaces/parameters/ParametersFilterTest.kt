@@ -1,5 +1,6 @@
 package org.umamo.ui.workspace.spaces.parameters
 
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
 import org.umamo.edit.Selection
@@ -153,6 +154,152 @@ class ParametersFilterTest {
 			assertTrue(showsText(PanelNames.ANGLE_X), "the pad shows both its axes or neither")
 			assertTrue(showsText(PanelNames.ANGLE_Y))
 			assertEquals(1, countOfDescription(harness.text.reorderHandle))
+		}
+
+	/** A row being named is listed whatever the search says, or a create would have nowhere to open its field. */
+	@Test
+	fun aParameterCreatedDuringASearchIsShownForNaming() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "breath" }
+			waitForIdle()
+
+			secondaryClickAt(panelBoundsOfText(PanelNames.BREATH).center)
+			clickMenuEntry(harness.text.addKeyFormParameter)
+
+			assertTrue(renameFieldOpen(), "the new row must show although its name does not match")
+			assertTrue(showsText(PanelNames.BREATH), "and the search still holds for every other row")
+			assertFalse(showsText(PanelNames.BODY_X))
+		}
+
+	/** Once named, the row is held to the search like any other. */
+	@Test
+	fun aNamedRowIsFilteredLikeAnyOther() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "breath" }
+			waitForIdle()
+			secondaryClickAt(panelBoundsOfText(PanelNames.BREATH).center)
+			clickMenuEntry(harness.text.addKeyFormParameter)
+
+			typeIntoRenameField("Elbow")
+			pressKey(Key.Enter)
+			assertFalse(showsText("Elbow"), "a name the search does not match leaves the list")
+
+			runOnIdle { harness.viewState.query = "" }
+			waitForIdle()
+			assertTrue(showsText("Elbow"), "and is there once the search is over")
+		}
+
+	/** A name the search matches keeps its row in the list. */
+	@Test
+	fun aRowNamedToMatchTheSearchStays() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "breath" }
+			waitForIdle()
+			secondaryClickAt(panelBoundsOfText(PanelNames.BREATH).center)
+			clickMenuEntry(harness.text.addKeyFormParameter)
+
+			typeIntoRenameField("Deep Breath")
+			pressKey(Key.Enter)
+
+			assertTrue(showsText("Deep Breath"))
+		}
+
+	/** A new group holds nothing, which any filter drops; while it is being named it shows all the same. */
+	@Test
+	fun aGroupCreatedDuringASearchIsShownForNaming() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "breath" }
+			waitForIdle()
+
+			secondaryClickAt(panelBoundsOfText(PanelNames.BREATH).center)
+			clickMenuEntry(harness.text.newGroup)
+			assertTrue(renameFieldOpen())
+
+			typeIntoRenameField("Lungs")
+			pressKey(Key.Enter)
+			assertFalse(showsText("Lungs"), "an empty group leaves a filtered list once it is named")
+
+			runOnIdle { harness.viewState.query = "" }
+			waitForIdle()
+			assertTrue(showsText("Lungs"))
+		}
+
+	/** The selection filter hides a new parameter too, since it drives nothing yet. */
+	@Test
+	fun aParameterCreatedUnderTheSelectionFilterIsShownForNaming() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle {
+				selectTheDrawable(harness)
+				harness.viewState.showOnlySelected = true
+			}
+			waitForIdle()
+
+			secondaryClickAt(panelBoundsOfText(PanelNames.BODY_X).center)
+			clickMenuEntry(harness.text.addKeyFormParameter)
+
+			assertTrue(renameFieldOpen())
+			assertEquals(2, countOfDescription(harness.text.reorderHandle), "Body X, and the row being named")
+		}
+
+	/** An existing row opened for naming from outside the list shows through the search as well. */
+	@Test
+	fun aRowMarkedForNamingShowsThroughTheSearch() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "breath" }
+			waitForIdle()
+
+			runOnIdle { harness.viewState.renamingGroupId = PanelIds.face }
+			waitForIdle()
+
+			assertTrue(renameFieldOpen())
+			assertFalse(showsText(PanelNames.EYE_OPEN), "the group shows for its name, not for rows the search left out")
+		}
+
+	/** During a search every group is open, so a press on a header has nothing to fold and changes no fold. */
+	@Test
+	fun aGroupClickDuringASearchFoldsNothing() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "arm" }
+			waitForIdle()
+			assertTrue(showsText(PanelNames.ARM))
+
+			clickAt(panelBoundsOfText(PanelNames.BODY).center)
+			assertTrue(showsText(PanelNames.ARM))
+			assertTrue(harness.viewState.expandedGroups.isEmpty(), "a press during a search must not write the fold")
+
+			runOnIdle { harness.viewState.query = "" }
+			waitForIdle()
+			assertFalse(showsText(PanelNames.ARM), "the group is folded as it was before the search")
+		}
+
+	/** A double click during a search renames, and has no first toggle to undo. */
+	@Test
+	fun aDoubleClickOnAGroupDuringASearchRenamesAndFoldsNothing() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			runOnIdle { harness.viewState.query = "arm" }
+			waitForIdle()
+
+			doubleClickAt(panelBoundsOfText(PanelNames.BODY).center)
+
+			assertEquals(PanelIds.body, harness.viewState.renamingGroupId)
+			assertTrue(renameFieldOpen())
+			assertTrue(harness.viewState.expandedGroups.isEmpty())
 		}
 
 	/** A filter is a view of the document, never an edit to it. */
