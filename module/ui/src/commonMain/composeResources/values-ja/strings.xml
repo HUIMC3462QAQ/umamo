@@ -262,6 +262,14 @@
 	<string name="menu_about">Umamoについて…</string>
 	<string name="menu_open_log_folder">ログフォルダーを開く…</string>
 	<string name="alert_log_folder_failed">ログフォルダーを開けませんでした。セッションログの場所：\n%1$s</string>
+	<string name="menu_check_for_updates">アップデートを確認…</string>
+	<string name="confirm_update_available">Umamo %1$s が利用可能です。現在のバージョンは %2$s です。</string>
+	<string name="dialog_open_download_page">ダウンロードページを開く</string>
+	<string name="dialog_later">後で</string>
+	<string name="dialog_skip_this_version">このバージョンをスキップ</string>
+	<string name="alert_up_to_date">お使いの Umamo は最新バージョン（%1$s）です。</string>
+	<string name="alert_no_release_published">Umamo のリリースはまだ公開されていません。</string>
+	<string name="alert_update_check_failed">アップデートを確認できませんでした：%1$s</string>
 	<!-- ヘルプダイアログ（クレジットは同梱の CREDITS.md、バージョン情報は名称・バージョン・ライセンス・リンク）。 -->
 	<string name="about_title">Umamoについて</string>
 	<!-- %1$s はアプリケーションのバージョン。 -->
@@ -917,6 +925,7 @@
 	<string name="settings_interface_language">言語</string>
 	<!-- 取り消し履歴の上限（interface.historyLimit）。履歴パネルが保持するステップ数。 -->
 	<string name="settings_interface_history_steps">履歴のステップ数</string>
+	<string name="settings_check_for_updates">起動時にアップデートを確認する</string>
 	<!-- キーバインド設定：プリセット選択とコマンドごとの再割り当て編集。 -->
 	<string name="settings_keybindings_preset">プリセット</string>
 	<string name="settings_keybindings_preset_quick">キーバインドのプリセット</string>

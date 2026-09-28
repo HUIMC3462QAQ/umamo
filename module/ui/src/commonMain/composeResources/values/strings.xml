@@ -295,6 +295,17 @@
 	<string name="menu_about">About Umamo…</string>
 	<string name="menu_open_log_folder">Open Log Folder…</string>
 	<string name="alert_log_folder_failed">Could not open the log folder.  The session logs are in:\n%1$s</string>
+	<!-- Help > Check for Updates and the check at launch.  %1$s is the newer version, %2$s the running one. -->
+	<string name="menu_check_for_updates">Check for Updates…</string>
+	<string name="confirm_update_available">Umamo %1$s is available.  You have %2$s.</string>
+	<string name="dialog_open_download_page">Open Download Page</string>
+	<string name="dialog_later">Later</string>
+	<string name="dialog_skip_this_version">Skip This Version</string>
+	<!-- %1$s is the running version. -->
+	<string name="alert_up_to_date">You have the latest version of Umamo, %1$s.</string>
+	<string name="alert_no_release_published">No release of Umamo has been published yet.</string>
+	<!-- %1$s is why: a network error or GitHub's answer, in English. -->
+	<string name="alert_update_check_failed">Could not check for updates: %1$s</string>
 	<!-- Help dialogs (Credits shows the bundled CREDITS.md; About shows name/version/license/links). -->
 	<string name="about_title">About Umamo</string>
 	<!-- %1$s is the application version. -->
@@ -990,6 +1001,8 @@
 	<string name="settings_interface_language">Language</string>
 	<!-- The undo-history cap (interface.historyLimit): how many steps the History panel retains. -->
 	<string name="settings_interface_history_steps">History Steps</string>
+	<!-- app.checkForUpdates, in Preferences and Quick Setup. -->
+	<string name="settings_check_for_updates">Check for updates when Umamo starts</string>
 	<!-- Keybindings section: preset selection + the per-command rebinding editor. -->
 	<string name="settings_keybindings_preset">Preset</string>
 	<string name="settings_keybindings_preset_quick">Keybindings Preset</string>

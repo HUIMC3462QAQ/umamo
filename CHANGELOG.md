@@ -20,6 +20,7 @@ Umamo is early alpha.
 * UI: Add hover tooltips to the Properties area and Operation Strip.
 * UI: At startup, if the memory configuration option is not set or if there is not enough system RAM, a notification will appear with instructions on how to fix it.  This appplies to JAR based distributions.
 * UI: The text of an alert can now be selected and copied.
+* UI: Update checking: Help -> Check for Updates - Also an opt-out update check on start up.
 * Parameters: The parameters are now searchable.
 * Source Artwork: The operation strip now offers to adjust the canvas placement of imported artwork to an existing document.  The alignment and offset can be changed.
 * Source Artwork: Hovering a layer, art, or drawable row in the Sources panel previews its art.
