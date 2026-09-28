@@ -13,12 +13,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.seed.ParameterTemplate
 import org.umamo.interop.art.ArtworkAnchor
 import org.umamo.reimport.WatchMode
+import org.umamo.ui.app.CHECK_FOR_UPDATES_KEY
 import org.umamo.ui.kit.Checkbox
 import org.umamo.ui.kit.HexColorField
 import org.umamo.ui.kit.NumberField
@@ -33,6 +35,7 @@ import org.umamo.ui.rememberDoubleSetting
 import org.umamo.ui.rememberIntSetting
 import org.umamo.ui.rememberStringSetting
 import org.umamo.ui.resources.Res
+import org.umamo.ui.resources.settings_check_for_updates
 import org.umamo.ui.resources.settings_colors_active_selection_highlight
 import org.umamo.ui.resources.settings_colors_group_edge
 import org.umamo.ui.resources.settings_colors_group_face
@@ -102,7 +105,31 @@ internal fun InterfaceSection() {
 				modifier = Modifier.width(80.dp),
 			)
 		}
+		UpdateCheckSettingRow()
 	}
+}
+
+/**
+ * Whether the host can check for updates: the app provides true where it passed an update transport, so the
+ * setting's row shows only where the setting does something.
+ */
+internal val LocalUpdateChecks = staticCompositionLocalOf { false }
+
+/**
+ * The check-for-updates row, bound write-through to app.checkForUpdates: Preferences and Quick Setup share it.  It is
+ * checked unless the rigger turned the check off, and left out where the host cannot check ([LocalUpdateChecks]).
+ */
+@Composable
+internal fun UpdateCheckSettingRow() {
+	if (!LocalUpdateChecks.current) {
+		return
+	}
+	var checkForUpdates by rememberBooleanSetting(CHECK_FOR_UPDATES_KEY, true)
+	Checkbox(
+		checked = checkForUpdates,
+		onCheckedChange = { checked -> checkForUpdates = checked },
+		label = stringResource(Res.string.settings_check_for_updates),
+	)
 }
 
 /**

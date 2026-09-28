@@ -169,6 +169,12 @@ fun main(args: Array<String>) {
 	val hostHeap = detectHostHeap(jarLaunch)
 	logLaunchFacts(hostHeap, sessionLog)
 	relaunchNote?.let { note -> UmamoLog.warn(note) }
+	// The update check's one request goes through the operating system's proxy settings, as a browser's would, so a
+	// studio behind a proxy is not left without it.  Read once, when the first connection is made; a value given on
+	// the command line stands.
+	if (System.getProperty("java.net.useSystemProxies") == null) {
+		System.setProperty("java.net.useSystemProxies", "true")
+	}
 	// FileKit's native dialogs need a one-time init; `appId` names the per-OS data/cache dirs it uses.
 	FileKit.init(appId = "umamo")
 	// Pick the first document argument; loadDocument then does the real magic-byte detection once the file
@@ -294,6 +300,7 @@ fun main(args: Array<String>) {
 							openRequests = openRequests,
 							hostHeap = hostHeap,
 							openLogFolder = { openLogFolder(storage) },
+							updateTransport = HttpUpdateTransport(System.getProperty(UPDATE_CHECK_URL_PROPERTY)),
 						)
 					}
 				}

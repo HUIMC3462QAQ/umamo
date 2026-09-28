@@ -56,7 +56,7 @@ internal class AppControllerFixture(
 		val configDirectory = "/config".toPath()
 		fileSystem.createDirectories(configDirectory)
 		settings = Settings.load(OkioAppStorage(fileSystem, configDirectory, "/data".toPath()), "{}")
-		for (commandId in listOf("document.confirmReplace", "document.confirmExit", "document.openFailed", "document.alert")) {
+		for (commandId in listOf("document.confirmReplace", "document.confirmExit", "document.openFailed", "document.alert", "document.confirm")) {
 			registry.register(Command(commandId, title = null) { argument -> invocations.add(commandId to argument) })
 		}
 		services =

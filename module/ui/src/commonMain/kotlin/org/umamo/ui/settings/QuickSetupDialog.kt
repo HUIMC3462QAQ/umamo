@@ -104,6 +104,7 @@ fun QuickSetupDialog(onDismiss: () -> Unit) {
 					LanguageSettingRow()
 					KeymapPresetSettingRow(quick = true)
 					ThemeSettingRow()
+					UpdateCheckSettingRow()
 				}
 				Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
 					// Importing the settings of a previous version belongs at the start of this row, where Blender

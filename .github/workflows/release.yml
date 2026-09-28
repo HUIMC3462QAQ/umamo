@@ -442,8 +442,8 @@ jobs:
       # The launcher's JVM options come from :desktop's application.jvmArgs, which jpackage copies into
       # the cfg. Check the ones riggers depend on - the heap option README and the release notes promise
       # (LauncherHeapOptionTest holds the build script to it) and the two that keep a JDK 24 or later
-      # runtime quiet (LauncherJvmOptionsTest) - and that the corpus-preview override, a developer path,
-      # never ships. Each is checked as a whole line, never the exact set: the plugin adds its own. The
+      # runtime quiet (LauncherJvmOptionsTest) - and that the developer overrides (the corpus preview, the
+      # update check's test server) never ship. Each is checked as a whole line, never the exact set: the plugin adds its own. The
       # cfg's depth differs per OS, and on macOS and Windows it takes the capitalized package name
       # (Umamo.cfg), so find it without regard to case.
       - name: Assert the launcher carries its JVM options and no developer override
@@ -469,10 +469,13 @@ jobs:
               exit 1
             fi
           done
-          if grep -q 'umamo.testCmo3' "${cfg}"; then
-            echo "::error file=app/desktop/build.gradle.kts::umamo.cfg carries the -Dumamo.testCmo3 developer override, which belongs on the run task alone"
-            exit 1
-          fi
+          # The developer overrides: the corpus preview, and the update check pointed at a test server.
+          for override in umamo.testCmo3 umamo.updateCheckUrl; do
+            if grep -q "${override}" "${cfg}"; then
+              echo "::error file=app/desktop/build.gradle.kts::umamo.cfg carries the -D${override} developer override, which belongs on a developer's command line alone"
+              exit 1
+            fi
+          done
 
       # The installers' identity, read back out of what was built: the Linux package name, version,
       # maintainer, license, and dependencies (the DEB's curated list from packaging/linux/control, the

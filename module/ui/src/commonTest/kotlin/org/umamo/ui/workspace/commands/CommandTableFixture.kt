@@ -154,5 +154,6 @@ internal fun everyCommandTable(session: EditorSession? = null): List<Command> {
 		logCommands {} +
 		fileCommands({}, {}, {}, {}, { true }, {}, {}, {}, {}) +
 		logFolderCommands {} +
+		updateCommands {} +
 		fileExportCommands({ true }, {}, {})
 }
