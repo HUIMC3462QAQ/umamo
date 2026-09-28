@@ -85,7 +85,7 @@ Umamo is early alpha.
 * Parameters: Clicking a group during a search no longer changes its saved fold.
 * Parameters: Switching to Edit Mode during a slider drag now discards the drag.
 * Parameters: A new, restored, or moved row at the top of the list is now fully visible.
-
+* Keyform Sheet: Scrubbing a track or clicking a key in Edit Mode no longer changes the pose.
 
 ## 0.3.0-dev - 2026-09-15
 
