@@ -15,7 +15,7 @@ import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.document.Document
 import org.umamo.ui.document.DocumentFile
 import org.umamo.ui.document.PuppetDocument
-import org.umamo.ui.workspace.AreaViewStates
+import org.umamo.ui.workspace.editorstate.AreaViewStates
 
 /**
  * The app controllers' collaborators for a test, with no composition and no dialogs: in-memory settings,

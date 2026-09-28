@@ -15,7 +15,7 @@ import org.umamo.runtime.model.DrawableId
 import org.umamo.runtime.model.Part
 import org.umamo.runtime.model.PartComposite
 import org.umamo.runtime.model.PartId
-import org.umamo.ui.kit.RelationListField
+import org.umamo.ui.kit.field.RelationListField
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.UmamoIcon

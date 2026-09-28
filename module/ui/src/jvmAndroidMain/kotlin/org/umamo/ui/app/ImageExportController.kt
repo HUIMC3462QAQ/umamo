@@ -31,7 +31,7 @@ import org.umamo.ui.viewport.MAX_IMAGE_EDGE
 import org.umamo.ui.viewport.frameBackdrop
 import org.umamo.ui.viewport.resolveImageFrame
 import org.umamo.ui.workspace.AlertRequest
-import org.umamo.ui.workspace.ExportOptionsRequest
+import org.umamo.ui.workspace.export.ExportOptionsRequest
 
 /**
  * Export Image for ONE open document: the options dialog, the destination, a capture straight from the viewport

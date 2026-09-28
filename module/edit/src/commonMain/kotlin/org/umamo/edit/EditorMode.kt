@@ -15,3 +15,12 @@ enum class EditorMode {
 	/** Interior editing of the active entity (stubbed in v1). */
 	Edit,
 }
+
+/**
+ * Whether this mode pins the pose.
+ *
+ * Edit mode edits the neutral state of the base mesh, so for its duration the rig is shown at rest and
+ * the pose Object mode left is held as it is: nothing may move it, and it returns to the viewport when
+ * Edit mode is left.  The one rule every part of the editor that shows or writes the pose reads.
+ */
+val EditorMode.pinsPose: Boolean get() = this == EditorMode.Edit

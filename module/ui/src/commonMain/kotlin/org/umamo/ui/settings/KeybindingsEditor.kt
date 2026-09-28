@@ -56,13 +56,13 @@ import org.umamo.ui.action.keyName
 import org.umamo.ui.action.rebindCommand
 import org.umamo.ui.action.resetKeymapOverrides
 import org.umamo.ui.action.unbindCommand
-import org.umamo.ui.kit.LocalKeyCapture
 import org.umamo.ui.kit.SCROLLBAR_THICKNESS
-import org.umamo.ui.kit.SelectField
 import org.umamo.ui.kit.Text
 import org.umamo.ui.kit.Tooltip
 import org.umamo.ui.kit.VerticalScrollbarOverlay
 import org.umamo.ui.kit.button.Button
+import org.umamo.ui.kit.field.SelectField
+import org.umamo.ui.kit.textentry.LocalKeyCapture
 import org.umamo.ui.rememberStringSetting
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.settings_keybindings_clear

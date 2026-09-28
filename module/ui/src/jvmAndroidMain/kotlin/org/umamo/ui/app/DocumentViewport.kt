@@ -14,8 +14,7 @@ import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.document.Document
 import org.umamo.ui.document.PuppetDocument
 import org.umamo.ui.document.systemSourceFilePresence
-import org.umamo.ui.kit.TopLevelMenu
-import org.umamo.ui.model.DrawableThumbnailer
+import org.umamo.ui.kit.menu.TopLevelMenu
 import org.umamo.ui.model.LocalDrawableThumbnails
 import org.umamo.ui.model.LocalEditorMode
 import org.umamo.ui.model.LocalEditorSession
@@ -27,22 +26,23 @@ import org.umamo.ui.model.LocalPuppetViewportService
 import org.umamo.ui.model.LocalSelection
 import org.umamo.ui.model.LocalSessionAtlasPages
 import org.umamo.ui.model.LocalSourceArtRasters
-import org.umamo.ui.model.LocalSourceFilePresence
-import org.umamo.ui.model.LocalSourceSuggestions
-import org.umamo.ui.model.LocalSourceWatch
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.SourceSuggestionState
-import org.umamo.ui.model.SourceWatchState
+import org.umamo.ui.model.artwork.LocalSourceFilePresence
+import org.umamo.ui.model.artwork.LocalSourceSuggestions
+import org.umamo.ui.model.artwork.LocalSourceWatch
+import org.umamo.ui.model.artwork.SourceSuggestionState
+import org.umamo.ui.model.artwork.SourceWatchState
 import org.umamo.ui.model.rememberSessionEditorState
+import org.umamo.ui.model.thumbnails.DrawableThumbnailer
 import org.umamo.ui.rememberIntSetting
 import org.umamo.ui.settings.HistorySettings
 import org.umamo.ui.viewport.AtlasPageBinding
 import org.umamo.ui.viewport.LiveParamsAdapter
 import org.umamo.ui.viewport.PuppetViewportServiceFactory
-import org.umamo.ui.viewport.rememberPuppetViewportHost
-import org.umamo.ui.workspace.LocalAreaViewStates
-import org.umamo.ui.workspace.PersistentEditorShell
+import org.umamo.ui.viewport.viewport2d.rememberPuppetViewportHost
 import org.umamo.ui.workspace.commands.ArtworkOperations
+import org.umamo.ui.workspace.editorstate.LocalAreaViewStates
+import org.umamo.ui.workspace.shell.PersistentEditorShell
 
 /**
  * Renders the open document inside the editor shell. For a puppet document, a per-area viewport host

@@ -355,7 +355,7 @@ fun keymapPresetSpecs(presetId: String): Map<String, String> =
 
 /**
  * The built-in "default" keymap preset as a resolved [Keymap].  Used directly by tests, and as
- * [org.umamo.ui.workspace.EditorShell]'s default parameter when no settings-backed keymap
+ * [org.umamo.ui.workspace.shell.EditorShell]'s default parameter when no settings-backed keymap
  * ([org.umamo.ui.action.loadKeymap]) is supplied by the caller.
  *
  * @return Keymap the default preset.

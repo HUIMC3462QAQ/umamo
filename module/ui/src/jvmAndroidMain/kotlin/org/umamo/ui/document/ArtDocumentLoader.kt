@@ -23,11 +23,11 @@ import org.umamo.render.PuppetTextures
 import org.umamo.render.SourceArtRasters
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.storage.UmamoLog
-import org.umamo.ui.model.AtlasRepackRefusalReason
-import org.umamo.ui.model.LoggedSourceFilePresence
-import org.umamo.ui.model.SourceFilePresence
-import org.umamo.ui.model.describeImportNotice
-import org.umamo.ui.model.packModelAtOpen
+import org.umamo.ui.model.artwork.LoggedSourceFilePresence
+import org.umamo.ui.model.artwork.SourceFilePresence
+import org.umamo.ui.model.artwork.describeImportNotice
+import org.umamo.ui.model.repack.AtlasRepackRefusalReason
+import org.umamo.ui.model.repack.packModelAtOpen
 import org.umamo.ui.viewport.LiveParams
 import org.umamo.ui.viewport.initialLiveParams
 

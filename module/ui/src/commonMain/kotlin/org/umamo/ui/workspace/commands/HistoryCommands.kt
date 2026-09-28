@@ -3,7 +3,7 @@ package org.umamo.ui.workspace.commands
 import org.umamo.edit.EditorSession
 import org.umamo.ui.action.Command
 import org.umamo.ui.resources.*
-import org.umamo.ui.workspace.OperationStripState
+import org.umamo.ui.workspace.operationstrip.OperationStripState
 
 /**
  * The undo-history commands.  All three walk the session's snapshot stack or its adjustable record,

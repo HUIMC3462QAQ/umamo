@@ -3,10 +3,10 @@ package org.umamo.ui.workspace.commands
 import org.umamo.ui.action.Command
 import org.umamo.ui.help.ProjectInfo
 import org.umamo.ui.resources.*
-import org.umamo.ui.workspace.AreaDragController
 import org.umamo.ui.workspace.ShellOverlayState
-import org.umamo.ui.workspace.SplitterDragCancelController
-import org.umamo.ui.workspace.WorkspaceLayoutController
+import org.umamo.ui.workspace.area.AreaDragController
+import org.umamo.ui.workspace.area.SplitterDragCancelController
+import org.umamo.ui.workspace.layout.WorkspaceLayoutController
 import org.umamo.ui.workspace.rowdrag.RowDragCancelController
 
 /**

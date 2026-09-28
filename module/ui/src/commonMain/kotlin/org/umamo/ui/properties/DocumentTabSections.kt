@@ -20,9 +20,9 @@ import org.umamo.runtime.model.originFromCanvasLeft
 import org.umamo.runtime.model.unsupportedFeaturesInUse
 import org.umamo.runtime.model.worldOriginXFromCanvasLeft
 import org.umamo.runtime.model.worldOriginZFromCanvasBottom
-import org.umamo.ui.kit.FieldStack
-import org.umamo.ui.kit.NumberField
-import org.umamo.ui.kit.SelectField
+import org.umamo.ui.kit.field.FieldStack
+import org.umamo.ui.kit.field.NumberField
+import org.umamo.ui.kit.field.SelectField
 import org.umamo.ui.resources.*
 
 /*

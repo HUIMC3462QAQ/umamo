@@ -27,12 +27,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import org.umamo.ui.kit.FIELD_ROW_LABEL_WIDTH
-import org.umamo.ui.kit.FIELD_ROW_SPACING
-import org.umamo.ui.kit.FieldRow
 import org.umamo.ui.kit.Surface
 import org.umamo.ui.kit.Text
 import org.umamo.ui.kit.button.CloseButton
+import org.umamo.ui.kit.field.FIELD_ROW_LABEL_WIDTH
+import org.umamo.ui.kit.field.FIELD_ROW_SPACING
+import org.umamo.ui.kit.field.FieldRow
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.settings_category_colors
 import org.umamo.ui.resources.settings_category_import

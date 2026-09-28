@@ -74,6 +74,16 @@ enum class SpaceKind(val key: String) {
 }
 
 /**
+ * Whether a space hosts the operation settings strip: the 2D viewport and the UV editor, the two work
+ * surfaces, and nothing else.  A panel never shows the strip - Blender's redo panel is a region of the
+ * editors that have one - so a command fired over a panel places its strip in the last work surface the
+ * pointer touched instead (CommandRouting.operationStripArea), and a work surface switched to a panel
+ * after the operation stops showing it until it is switched back.
+ */
+internal val SpaceKind.hostsOperationStrip: Boolean
+	get() = this == SpaceKind.Viewport2D || this == SpaceKind.UvEditor
+
+/**
  * Serializes [SpaceKind] as its stable [SpaceKind.key] string. An unknown key (a layout written by a
  * newer build that has a space this build lacks) decodes to a neutral [SpaceKind.Outliner] rather
  * than failing the whole layout - a forward-compatible, non-destructive fallback that also avoids

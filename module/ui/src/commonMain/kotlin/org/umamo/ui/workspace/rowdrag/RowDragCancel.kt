@@ -9,7 +9,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
  * A coordination seam between an in-flight panel row drag and the editor shell's Escape precedence,
- * mirroring [org.umamo.ui.kit.InlineEditController].  A panel's drag state is remembered per panel
+ * mirroring [org.umamo.ui.kit.textentry.InlineEditController].  A panel's drag state is remembered per panel
  * instance and invisible to the shell, yet Escape must reach it: a row drag almost always coexists
  * with a non-empty selection (the press that starts the drag already selected the row), so without
  * this seam the shell's clear-selection Escape branch fires instead of cancelling the drag.  While a

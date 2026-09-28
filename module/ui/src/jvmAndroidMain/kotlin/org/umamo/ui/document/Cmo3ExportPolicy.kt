@@ -9,7 +9,7 @@ import org.umamo.render.DecodedImage
 import org.umamo.render.PuppetTextures
 import org.umamo.render.encodeAtlasPng
 import org.umamo.runtime.model.PuppetModel
-import org.umamo.ui.model.DrawableThumbnailer
+import org.umamo.ui.model.thumbnails.DrawableThumbnailer
 
 /*
  * Decides WHAT a CMO3 export writes; the app layer picks the destination and writes the bytes.

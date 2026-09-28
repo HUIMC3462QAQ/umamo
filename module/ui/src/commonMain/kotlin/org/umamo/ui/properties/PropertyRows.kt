@@ -15,10 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.umamo.ui.kit.Checkbox
 import org.umamo.ui.kit.Text
 import org.umamo.ui.kit.Tooltip
-import org.umamo.ui.model.KeyedFieldState
+import org.umamo.ui.kit.field.Checkbox
+import org.umamo.ui.kit.field.KeyedFieldState
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.theme.LocalUmamoTypography

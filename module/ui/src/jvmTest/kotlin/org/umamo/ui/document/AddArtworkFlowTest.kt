@@ -11,11 +11,11 @@ import org.umamo.interop.art.ArtSourceDescriptor
 import org.umamo.interop.art.SourceArtImportOptions
 import org.umamo.render.deriveAtlasTextures
 import org.umamo.runtime.model.ParameterNode
-import org.umamo.ui.model.AddArtworkRequest
-import org.umamo.ui.model.AtlasRepackHost
-import org.umamo.ui.model.ImportParameterKeys
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.runAddArtwork
+import org.umamo.ui.model.artwork.AddArtworkRequest
+import org.umamo.ui.model.artwork.ImportParameterKeys
+import org.umamo.ui.model.artwork.runAddArtwork
+import org.umamo.ui.model.repack.AtlasRepackHost
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

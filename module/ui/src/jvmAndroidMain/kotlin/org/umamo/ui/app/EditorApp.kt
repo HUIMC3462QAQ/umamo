@@ -36,17 +36,17 @@ import org.umamo.ui.settings.LocalUpdateChecks
 import org.umamo.ui.settings.QuickSetupState
 import org.umamo.ui.viewport.PuppetViewportServiceFactory
 import org.umamo.ui.workspace.AppAlertQueues
-import org.umamo.ui.workspace.AreaViewStates
-import org.umamo.ui.workspace.EDITOR_STATE_AREAS
-import org.umamo.ui.workspace.EDITOR_STATE_SESSION
 import org.umamo.ui.workspace.LocalAppAlerts
-import org.umamo.ui.workspace.LocalAreaViewStates
 import org.umamo.ui.workspace.commands.fileCommands
 import org.umamo.ui.workspace.commands.fileExportCommands
 import org.umamo.ui.workspace.commands.logFolderCommands
 import org.umamo.ui.workspace.commands.registerAll
 import org.umamo.ui.workspace.commands.updateCommands
-import org.umamo.ui.workspace.sessionViewStateOf
+import org.umamo.ui.workspace.editorstate.AreaViewStates
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_AREAS
+import org.umamo.ui.workspace.editorstate.EDITOR_STATE_SESSION
+import org.umamo.ui.workspace.editorstate.LocalAreaViewStates
+import org.umamo.ui.workspace.editorstate.sessionViewStateOf
 
 /**
  * The one editing session per open puppet document (the undo history + dirty state live here),

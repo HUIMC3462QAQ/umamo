@@ -31,7 +31,7 @@ import org.umamo.ui.resources.dialog_overwrite
 import org.umamo.ui.resources.export_failed_unexpected
 import org.umamo.ui.workspace.AlertRequest
 import org.umamo.ui.workspace.ConfirmRequest
-import org.umamo.ui.workspace.ExportOptionsRequest
+import org.umamo.ui.workspace.export.ExportOptionsRequest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.time.Clock

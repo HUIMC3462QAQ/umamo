@@ -35,8 +35,8 @@ import org.umamo.runtime.model.AtlasPlacement
 import org.umamo.runtime.model.AtlasTileId
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.runtime.model.atlasPixelOf
-import org.umamo.ui.model.buildRepackPackInput
-import org.umamo.ui.model.repackRefusals
+import org.umamo.ui.model.repack.buildRepackPackInput
+import org.umamo.ui.model.repack.repackRefusals
 import org.umamo.ui.viewport.initialLiveParams
 import java.io.File
 import kotlin.math.abs

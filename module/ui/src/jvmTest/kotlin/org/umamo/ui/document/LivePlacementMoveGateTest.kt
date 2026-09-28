@@ -18,11 +18,11 @@ import org.umamo.render.placementFootprint
 import org.umamo.runtime.model.AtlasPlacement
 import org.umamo.runtime.model.applyUvAffine
 import org.umamo.runtime.model.storedToArtAffineForTile
-import org.umamo.ui.model.AtlasRepackHost
-import org.umamo.ui.model.AtlasRepackReport
 import org.umamo.ui.model.SessionAtlasPages
-import org.umamo.ui.model.repackPageSizeOf
-import org.umamo.ui.model.runAtlasRepack
+import org.umamo.ui.model.repack.AtlasRepackHost
+import org.umamo.ui.model.repack.AtlasRepackReport
+import org.umamo.ui.model.repack.repackPageSizeOf
+import org.umamo.ui.model.repack.runAtlasRepack
 import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test

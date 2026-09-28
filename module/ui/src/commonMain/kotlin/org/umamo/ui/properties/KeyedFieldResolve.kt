@@ -7,17 +7,19 @@ import androidx.compose.runtime.remember
 import org.umamo.edit.EditorSession
 import org.umamo.edit.Pose
 import org.umamo.edit.channelValueAt
+import org.umamo.runtime.keyform.keyIndexAt
 import org.umamo.runtime.model.ChannelValue
 import org.umamo.runtime.model.ColorRgb
 import org.umamo.runtime.model.Drawable
 import org.umamo.runtime.model.FormChannel
 import org.umamo.runtime.model.KeyableTarget
 import org.umamo.runtime.model.KeyformOwner
-import org.umamo.ui.model.KeyedFieldState
+import org.umamo.runtime.model.PuppetModel
+import org.umamo.runtime.model.channelGridsOf
+import org.umamo.ui.kit.field.KeyedFieldState
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalLiveParams
 import org.umamo.ui.model.LocalPuppet
-import org.umamo.ui.model.keyedFieldStateOf
 
 /*
  * Resolving a properties-panel row's keyed state from the session.
@@ -135,3 +137,57 @@ internal fun displayedChannelScalar(owner: KeyformOwner, channel: FormChannel, s
 @Composable
 internal fun displayedChannelColor(owner: KeyformOwner, channel: FormChannel, stored: ColorRgb): ColorRgb =
 	(displayedChannelValue(owner, channel, ChannelValue.Color(stored)) as? ChannelValue.Color)?.color ?: stored
+
+/**
+ * The keyed state of [target] at [pose].
+ *
+ * The TRACK gates everything: a channel with no track stores an edit in its owner's static, which is a
+ * plain undoable write with nothing uncommitted about it, so such a field is never tinted.  It reads the
+ * pending map on every channel while a field is being scrubbed (see previewChannelEdit), so testing that
+ * map before the track gate would paint the orange uncommitted warning across every ordinary drag.
+ *
+ * Past that gate ModifiedUnkeyed wins over the others: a pending edit is the most recent thing the user
+ * did, and it is the state that carries a warning.
+ *
+ * On-key is resolved against the track's OWN axes rather than against whatever parameter is targeted, and
+ * that distinction is the whole difference between the tint answering "is the value under this field
+ * stored" and answering "is it stored on the axis you happen to have clicked".  Only the first is what a
+ * rigger reads it as; the second would paint a keyed opacity as unstored whenever the target was the other
+ * half of a linked pad - or nothing at all.  A multi-axis track is on-key only when the pose sits on a key
+ * of EVERY axis, because that is exactly when a capture overwrites a cell instead of inserting one.  The
+ * comparison uses the evaluator's own EPS_KEY snap tolerance rather than an exact compare, so the tint
+ * agrees with the key the pose actually resolved to instead of flickering a hair either side of one.
+ *
+ * @param PuppetModel puppet The rig.
+ * @param KeyableTarget target The entity and channel the field edits.
+ * @param Pose pose The current pose.
+ * @param Map pendingEdits The session's unkeyed edits.
+ * @return KeyedFieldState The state to tint with.
+ */
+fun keyedFieldStateOf(
+	puppet: PuppetModel,
+	target: KeyableTarget,
+	pose: Pose,
+	pendingEdits: Map<KeyableTarget, ChannelValue>,
+): KeyedFieldState {
+	val track = puppet.channelGridsOf(target.owner)?.get(target.channel) ?: return KeyedFieldState.None
+	if (target in pendingEdits) {
+		return KeyedFieldState.ModifiedUnkeyed
+	}
+	// A zero-axis track holds one value everywhere and keys nothing, so there is no key to be sitting on -
+	// but it still shadows the static, so an edit still needs keying.  That is BetweenKeys, not OnKey.
+	if (track.axes.isEmpty()) {
+		return KeyedFieldState.BetweenKeys
+	}
+	val onEveryAxis =
+		track.axes.all { axis ->
+			// A direct lookup, not a defaults map over every parameter: this runs per keyable row per
+			// recomposition, and only this track's own parameters can ever be read.
+			val poseValue =
+				pose[axis.parameterId]
+					?: puppet.parameters.firstOrNull { parameter -> parameter.id == axis.parameterId }?.default
+					?: 0f
+			track.keyIndexAt(axis.parameterId, poseValue) >= 0
+		}
+	return if (onEveryAxis) KeyedFieldState.OnKey else KeyedFieldState.BetweenKeys
+}

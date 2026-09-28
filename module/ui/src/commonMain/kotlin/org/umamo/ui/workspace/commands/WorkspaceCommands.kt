@@ -3,10 +3,10 @@ package org.umamo.ui.workspace.commands
 import org.umamo.ui.action.Command
 import org.umamo.ui.resources.*
 import org.umamo.ui.workspace.ConfirmRequest
-import org.umamo.ui.workspace.InterfaceLayout
 import org.umamo.ui.workspace.ShellOverlayState
-import org.umamo.ui.workspace.Workspace
-import org.umamo.ui.workspace.WorkspaceLayoutController
+import org.umamo.ui.workspace.layout.InterfaceLayout
+import org.umamo.ui.workspace.layout.Workspace
+import org.umamo.ui.workspace.layout.WorkspaceLayoutController
 
 /**
  * The workspace-management commands.  New mirrors the "+" create path; Reset and Apply-Layout are

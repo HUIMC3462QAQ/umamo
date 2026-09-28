@@ -83,10 +83,16 @@ class DoubleClickTracker(private val windowMillis: Long = DOUBLE_CLICK_MILLIS) {
  * which never requests focus, so keyboard dispatch stays on the shell root.  While [enabled] is false no
  * pointer handling is installed at all, and a press pending from before is forgotten.
  *
+ * A press this handles is left unconsumed unless [consumePress] says otherwise, so whatever else listens
+ * on the way up still sees it: a long-press drag on the same row needs the press it shares.  That also
+ * lets a clickable ancestor take the press for a click of its own, so a control sitting inside one claims
+ * its presses with [consumePress].
+ *
  * @param Function onSingle          Called on a primary press that is not the second half of a double click.
  * @param Function onDouble          Called on a second unmodified primary press within [doubleClickMillis].
  * @param Boolean  enabled           Whether presses are handled at all.
  * @param Long     doubleClickMillis The double-click window in milliseconds.
+ * @param Boolean  consumePress      Whether a press this handles is consumed, keeping it from every ancestor.
  * @return Modifier The modifier with the press-timing detector attached.
  */
 @Composable
@@ -95,6 +101,7 @@ fun Modifier.singleOrDoubleClick(
 	onDouble: () -> Unit,
 	enabled: Boolean = true,
 	doubleClickMillis: Long = DOUBLE_CLICK_MILLIS,
+	consumePress: Boolean = false,
 ): Modifier {
 	// The pointer loop restarts only when the window changes, so it would otherwise keep the lambdas of the
 	// composition it started in; read the latest through these (matching the kit Slider).
@@ -103,7 +110,7 @@ fun Modifier.singleOrDoubleClick(
 	if (!enabled) {
 		return this
 	}
-	return this.pointerInput(doubleClickMillis) {
+	return this.pointerInput(doubleClickMillis, consumePress) {
 		val tracker = DoubleClickTracker(doubleClickMillis)
 		awaitPointerEventScope {
 			while (true) {
@@ -121,6 +128,9 @@ fun Modifier.singleOrDoubleClick(
 					currentOnDouble()
 				} else {
 					currentOnSingle(modifiers)
+				}
+				if (consumePress) {
+					event.changes.forEach { change -> change.consume() }
 				}
 			}
 		}

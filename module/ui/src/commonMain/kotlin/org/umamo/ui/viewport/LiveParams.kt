@@ -80,6 +80,10 @@ fun initialLiveParams(puppet: PuppetModel, savedPose: Map<ParameterId, Float> = 
  * undo step, so a whole drag is undoable in a single Ctrl+Z; the session's pose StateFlow is then mirrored
  * back into this same volatile by the host, so an undo / redo re-poses the viewport.
  *
+ * Both are refused while the session's pose is pinned (Edit mode).  This is the one way a pose write
+ * reaches the renderer, so refusing here holds for every control that scrubs - the Parameters panel,
+ * its header, the keyform sheet, and whatever is built next - with none of them having to remember to.
+ *
  * @property LiveParams liveParams The underlying render-thread hand-off (the live pose mirror).
  * @property EditorSession session The session that records the committed pose as an undo step.
  */
@@ -99,10 +103,16 @@ class LiveParamsAdapter(private val liveParams: LiveParams, private val session:
 	 * commit already clears them on a pose move - this is the same rule applied to the preview path, which
 	 * does not go through commit.
 	 *
+	 * Refused while the pose is pinned: the hand-off then holds the rest pose Edit mode shows, and a
+	 * preview written into it would pose the rig under an edit of its neutral state.
+	 *
 	 * @param ParameterId id The parameter to set.
 	 * @param Float value The new value.
 	 */
 	override fun preview(id: ParameterId, value: Float) {
+		if (session.posePinned) {
+			return
+		}
 		val current = liveParams.values
 		if (current[id] == value) {
 			return
@@ -114,9 +124,15 @@ class LiveParamsAdapter(private val liveParams: LiveParams, private val session:
 	/**
 	 * Records the current live pose as one undo step, ending a scrub gesture.
 	 *
+	 * Refused while the pose is pinned.  The session would refuse it as well; it stops here because what
+	 * this hands over is the hand-off's pose, and while pinned that is not the rig's.
+	 *
 	 * @param Set<ParameterId> changedIds The parameters this gesture moved (for the history-panel label).
 	 */
 	override fun commit(changedIds: Set<ParameterId>) {
+		if (session.posePinned) {
+			return
+		}
 		session.commitPose(ParameterChange.SetValue(changedIds.toList()), liveParams.values)
 	}
 }

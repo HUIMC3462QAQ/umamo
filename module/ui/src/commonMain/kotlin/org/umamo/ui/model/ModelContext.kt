@@ -14,6 +14,13 @@ import org.umamo.runtime.model.PartId
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.ui.viewport.PuppetViewportService
 
+/*
+ * The open document as the panels see it: the composition locals and handle interfaces the host
+ * provides (this file), the session-backed selection and mode handles (SessionEditorState.kt), and the
+ * resolver from the session's atlas to page pixels (SessionAtlasPages.kt).  This package root imports
+ * none of its subpackages: repack and thumbnails build on it, and artwork builds on repack.
+ */
+
 /**
  * The open document's runtime [PuppetModel] for the composition, or null when nothing is open. Panels
  * (Outliner, Properties, Parameters) read `LocalPuppet.current` to display parts/parameters; the host
@@ -156,6 +163,10 @@ val LocalDrawableThumbnails = staticCompositionLocalOf<DrawableThumbnailProvider
  * records one undo step at the gesture boundary (drag release, a typed value, a reset). So a whole slider
  * drag is a single undo step. The desktop implementation writes its volatile LiveParams hand-off on
  * preview and routes commit through the EditorSession; Android will wrap its own.
+ *
+ * Both writes are refused while Edit mode pins the pose, so a control that scrubs needs no lock of its
+ * own to be safe.  A control that also SHOWS the value it writes still has to know, or it would show a
+ * value the write never took.
  */
 interface LiveParamsHandle {
 	/** The current parameter values (parameter id → value). */

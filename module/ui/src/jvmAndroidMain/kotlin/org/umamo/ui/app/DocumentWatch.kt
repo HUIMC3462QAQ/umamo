@@ -26,7 +26,7 @@ import org.umamo.ui.document.PuppetDocument
 import org.umamo.ui.document.fileModifiedAtMillis
 import org.umamo.ui.document.isFileSystemPath
 import org.umamo.ui.document.systemSourceFilePresence
-import org.umamo.ui.model.SourceWatchState
+import org.umamo.ui.model.artwork.SourceWatchState
 import org.umamo.ui.settings.IMPORT_WATCH_MODE_KEY
 import org.umamo.ui.workspace.commands.ReloadScope
 

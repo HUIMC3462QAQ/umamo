@@ -8,11 +8,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import org.jetbrains.compose.resources.StringResource
 import org.umamo.interop.ExportReport
 import org.umamo.ui.document.DocumentOpenFailure
-import org.umamo.ui.model.AtlasRepackReport
+import org.umamo.ui.model.repack.AtlasRepackReport
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.dialog_cancel
 import org.umamo.ui.resources.dialog_confirm
 import org.umamo.ui.settings.QuickSetupState
+import org.umamo.ui.workspace.export.ExportOptionsRequest
 
 /**
  * A dialog's extra choice beside its own buttons - "Don't Save" beside a confirmation's "Save", "Don't Show
