@@ -36,6 +36,7 @@ import org.umamo.edit.GridConfig
 import org.umamo.edit.NoticePlacement
 import org.umamo.edit.SelectionOps
 import org.umamo.edit.SelectionTarget
+import org.umamo.edit.pinsPose
 import org.umamo.render.DecodedImage
 import org.umamo.render.GridColors
 import org.umamo.render.LayerDrawPlan
@@ -340,11 +341,11 @@ fun rememberPuppetViewportHost(
 	// Edit mode overrides the DISPLAYED pose to neutral (an empty map — the renderer falls back to every
 	// parameter's default): Edit mode edits the neutral state of the base mesh, so the whole puppet snaps
 	// to rest for its duration. Display-only by construction — session.pose is never touched, so leaving
-	// Edit mode restores the Object-mode pose with no stash. The parameter panel is locked while in Edit
-	// mode, so no preview write can bypass this override.
+	// Edit mode restores the Object-mode pose with no stash. Every preview goes through LiveParamsAdapter,
+	// which refuses it while the pose is pinned, so none can bypass this override.
 	LaunchedEffect(service, session) {
 		combine(session.pose, session.mode) { pose, mode ->
-			if (mode == EditorMode.Edit) emptyMap() else pose
+			if (mode.pinsPose) emptyMap() else pose
 		}.collect { effectivePose -> liveParams.values = effectivePose }
 	}
 	// Pending unkeyed channel edits mirror the same way, and are suppressed in Edit mode for the same
@@ -353,7 +354,7 @@ fun rememberPuppetViewportHost(
 	// viewport at all - it is session state, so it can never reach the renderer inside the model.
 	LaunchedEffect(service, session) {
 		combine(session.pendingChannelEdits, session.mode) { pending, mode ->
-			if (mode == EditorMode.Edit) emptyMap() else pending
+			if (mode.pinsPose) emptyMap() else pending
 		}.collect { effectiveOverrides -> liveParams.channelOverrides = effectiveOverrides }
 	}
 	// Feed the zoom-increment settings into the service and keep them live as settings change; the keys,

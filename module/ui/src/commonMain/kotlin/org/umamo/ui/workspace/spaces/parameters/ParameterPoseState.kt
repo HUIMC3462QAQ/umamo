@@ -12,6 +12,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.umamo.edit.EditorMode
 import org.umamo.edit.EditorSession
+import org.umamo.edit.pinsPose
 import org.umamo.runtime.model.Parameter
 import org.umamo.runtime.model.ParameterId
 import org.umamo.runtime.model.PuppetModel
@@ -71,8 +72,8 @@ internal class ParameterPoseState(
 }
 
 /**
- * Whether the parameters are locked, which they are for as long as the session is in Edit mode.  With no
- * session there is no mode to be in, and nothing is locked.
+ * Whether the parameters are locked, which they are for as long as the session's mode pins the pose.
+ * With no session there is no mode to be in, and nothing is locked.
  *
  * @param EditorSession? session The editing session, or null with none.
  * @return Boolean True while every pose write is to be refused.
@@ -80,7 +81,7 @@ internal class ParameterPoseState(
 @Composable
 internal fun rememberParametersLocked(session: EditorSession?): Boolean {
 	val editorMode by remember(session) { session?.mode ?: MutableStateFlow(EditorMode.Object) }.collectAsState()
-	return editorMode == EditorMode.Edit
+	return editorMode.pinsPose
 }
 
 /**
