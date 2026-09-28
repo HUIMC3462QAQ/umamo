@@ -46,8 +46,6 @@ private val SEGMENT_GAP = 1.dp
  * a data model rather than a slot DSL (same reasoning as [org.umamo.ui.kit.menu.MenuItem]) - the group must know each
  * segment's position to shape its corners, so callers hand over a list and one renderer draws it.
  *
- * ButtonGroup の 1 セグメント。selected の間アクセント色で点灯するアイコントグル。
- *
  * @property UmamoIcon icon The segment's glyph.
  * @property Boolean selected Whether the segment is lit (the caller owns the toggle state).
  * @property Function onClick Invoked on tap; the caller flips its own state.
@@ -68,8 +66,6 @@ data class ButtonGroupItem(
  * control rather than a row of isolated chips.  Each segment carries its own selected state, so the
  * group serves both independent toggles (the outliner's restriction columns) and radio-style sets (the
  * viewport's mesh select modes) - the caller decides the semantics in its onClick handlers.
- *
- * Blender 式の連結トグル列。両端だけ角丸で、隣接辺は直角。各セグメントが自分の選択状態を持つ。
  *
  * @param List items The segments, in display order.
  * @param Modifier modifier The layout modifier.
