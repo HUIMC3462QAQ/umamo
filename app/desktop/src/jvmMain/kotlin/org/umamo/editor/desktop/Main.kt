@@ -49,6 +49,7 @@ import org.umamo.ui.theme.UmamoTheme
 import org.umamo.ui.viewport.LiveParams
 import java.awt.Desktop
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.system.exitProcess
 
 /**
  * Applies the `UMAMO_DUMP_PARAMS` environment override (e.g. `ParamAngleX=30,ParamAngleY=-10`) to the
@@ -140,9 +141,40 @@ internal fun isOpenableDocumentPath(path: String): Boolean = FormatRegistry.kind
  * so the window state is ready before the window opens and the window is unconditional - `application {}`
  * exits if it ever has zero windows, which an async settings gate would briefly cause.
  *
- * @param Array<String> args Optional: a `.uma`, `.cmo3`, or `.moc3` path.
+ * A jar started with too little memory first relaunches itself with enough (JarRelaunch.kt).  Then the session
+ * log file and the uncaught-exception handler are set up before anything else, so every line the launch logs -
+ * and the reason for a crash - lands in the file a bug report attaches.
+ *
+ * @param Array<String> args Optional: a `.uma`, `.cmo3`, or `.moc3` path; or `--self-check` and an optional report
+ *   file, which runs the headless checks an installer test asks for instead of the editor.
  */
 fun main(args: Array<String>) {
+	// The headless self-check an installer test runs (SelfCheck.kt), ahead of everything else: it opens no window,
+	// reads and writes no setting, writes no session log, and never needs the jar's relaunch.
+	if (args.firstOrNull() == SELF_CHECK_FLAG) {
+		prepareSelfCheckProcess()
+		exitProcess(runSelfCheck(args.getOrNull(1)))
+	}
+	// Before anything else the editor does, a jar started with too little memory starts itself again with enough
+	// and does not return (JarRelaunch.kt): ahead of AWT, so macOS shows one Dock icon, and ahead of the session
+	// log, so the short-lived first launch does not spend one of the ten kept.  The launch's facts are gathered
+	// once, here, and the heap detection below reads the same ones.
+	val jarLaunch = gatherJarLaunchFacts()
+	val relaunchNote = relaunchForHeapIfDue(jarLaunch, args)
+	// Then, so the initial document load and everything after it reach the log file.  Building the storage
+	// does no IO; the log opens its own file under the data directory.
+	val storage = desktopAppStorage("umamo")
+	val sessionLog = attachSessionLog(storage)
+	installUncaughtExceptionLogging()
+	val hostHeap = detectHostHeap(jarLaunch)
+	logLaunchFacts(hostHeap, sessionLog)
+	relaunchNote?.let { note -> UmamoLog.warn(note) }
+	// The update check's one request goes through the operating system's proxy settings, as a browser's would, so a
+	// studio behind a proxy is not left without it.  Read once, when the first connection is made; a value given on
+	// the command line stands.
+	if (System.getProperty("java.net.useSystemProxies") == null) {
+		System.setProperty("java.net.useSystemProxies", "true")
+	}
 	// FileKit's native dialogs need a one-time init; `appId` names the per-OS data/cache dirs it uses.
 	FileKit.init(appId = "umamo")
 	// Pick the first document argument; loadDocument then does the real magic-byte detection once the file
@@ -166,7 +198,6 @@ fun main(args: Array<String>) {
 	// A failed or absent argv load still opens a document - the new, empty one the editor starts in.
 	val initialDocumentHolder = AtomicReference(loadInitialDocument(initialPath) ?: newBlankDocument())
 	val initialDocumentPath = initialDocumentHolder.get()?.path
-	val storage = desktopAppStorage("umamo")
 	// A first run also seeds the system's language here, so the window - and the Quick Setup modal it opens
 	// with - is already in that language.
 	val settings = runBlocking { loadAppSettings(storage) }
@@ -190,6 +221,8 @@ fun main(args: Array<String>) {
 
 		fun closeApp() {
 			settings.saveWindowState(windowState)
+			// A session log that ends here was a clean quit; one that ends anywhere else was not.
+			UmamoLog.info("quit")
 			exitApplication()
 		}
 		// Every way out passes through the shell's unsaved-changes guard: the window's close button here, File >
@@ -265,6 +298,9 @@ fun main(args: Array<String>) {
 								OffscreenPuppetService(puppet, textures, liveParams).also { it.start() }
 							},
 							openRequests = openRequests,
+							hostHeap = hostHeap,
+							openLogFolder = { openLogFolder(storage) },
+							updateTransport = HttpUpdateTransport(System.getProperty(UPDATE_CHECK_URL_PROPERTY)),
 						)
 					}
 				}

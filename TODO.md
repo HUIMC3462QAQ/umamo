@@ -66,6 +66,13 @@
 	* Mirror along X/Z axis, mirror with 2D cursor as the axis.  Note: This is a small divergence to Blender's style.  In Blender there is an origin for each object that can be moved to different places.  Umamo still has the centroid origin calculated, but no way to move it or even if it was moved, a way to store it.
 	* Extrude(E) - Extrude an edge creates triangle cut quad automatically.
 
+## Long Running Task Indicator
+* Atlas Repack, Import, Export, Save, Open
+* Place it right aligned of the workspace tabs.
+* Right now the status bar notice can get nuked when clicking around or potentially be cut off.
+* It's a third notice area essentially.
+* Before building, research if it would be better to have blocking notices in the status bar.
+
 ## Texture Authoring/UV Editor
 * Follow Selection Header Control - Split it into options and images.
 	* New custom image selection control.  This will also be an entry point for adding artwork.
@@ -111,6 +118,9 @@ https://hollisbrown.github.io/blendershortcuts/ - I should make a page like this
 ## Parameters
 * Parameter templates:
 	* Need a way to apply these without having to do a fresh import.
+* Parameters Area Improvements
+	* Snap to key on the parameter scrubber, either by the context menu or a snapping option.  The keyform sheet can do this right by clicking on a parameter pip.
+		* I'm leaning towards a snapping option in the area header, but the header is a bit crowded right now.
 
 ## Menus
 * Clicking again should close instead of reopen the menu.
@@ -163,6 +173,8 @@ See format planning document: docs/plan/uma-format.md
 
 ## Refactor
 * module/render/src/commonMain/kotlin/org/umamo/render/puppet/PuppetRenderer.kt
+* module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/EditorShell.kt
+	* Also reorganize the workspace folder.
 
 ## DRY/Standardization
 * Fields like PropertyFieldRow need to take a key use use that to get the correct resource key automatically instead of passing it.
@@ -191,12 +203,15 @@ See format planning document: docs/plan/uma-format.md
 * History playback for proof of work.  The history system is there, but that is a lot of track over a long session.  So capture a snapshot every time period or number of snapshots.
 * A proper bone skeleton system with bendy bones.
 
+## Rights Management
+* One time, permanently dismissable message dialog informing users to not edit MOC3 files without permission from the author.
+
 ## Build and Distribute
 * Eventually get installers, signing, and automatic updates setup.
 
 ## MacOS
 * Zoom with the touchpad on my 2014 Macbook Pro is glitchy.  It will jump around and even go the wrong direction.
-* Need to add back a light native menu so it does not say "MainKt" all the time.
+* Can't quit from the native menu or CMD+Q.
 
 ## Input
 

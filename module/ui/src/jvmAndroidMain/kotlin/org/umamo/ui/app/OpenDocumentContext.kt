@@ -2,6 +2,7 @@ package org.umamo.ui.app
 
 import kotlinx.coroutines.CoroutineScope
 import org.umamo.edit.EditorSession
+import org.umamo.edit.NoticePlacement
 import org.umamo.edit.seed.ParameterTemplate
 import org.umamo.interop.art.ArtworkAnchor
 import org.umamo.interop.art.SourceArtImportOptions
@@ -99,6 +100,8 @@ internal class DocumentViewportSlot {
  *   launch from asking about whichever document was open then - none at all, on a normal launch.
  * @property Function        onOpen          Swaps a newly opened document in.
  * @property Function        untitledName    The localized name a never-saved document's Save As suggests.
+ * @property HostHeap?       hostHeap        The memory limit the host started the editor with, which an export
+ *   that runs out of memory names; null for a host that has no say in it.
  */
 internal class EditorAppServices(
 	val settings: Settings,
@@ -108,7 +111,27 @@ internal class EditorAppServices(
 	val current: () -> OpenDocumentContext,
 	val onOpen: (Document) -> Unit,
 	val untitledName: () -> String,
+	val hostHeap: HostHeap? = null,
 ) {
+	/** The model export running now, which a second export, a quit, and a document replace all defer to. */
+	val modelExports: ModelExportGate = ModelExportGate()
+
+	/**
+	 * Runs [action] once no model export is running, telling the rigger on the status bar when it has to wait.
+	 * Every point that ends the process or swaps the document in calls this at the moment it acts: an export can
+	 * start at any time before that - during the unsaved-changes prompt, a save, or a document's load - since
+	 * nothing disables the export commands meanwhile.
+	 *
+	 * @param Function action What to do once no export is running.
+	 */
+	fun afterRunningExport(action: () -> Unit) {
+		modelExports.afterPendingExport(
+			scope,
+			onWaiting = { current().session?.emitNotice("notice.document.waitingForExport", NoticePlacement.StatusBar) },
+			action = action,
+		)
+	}
+
 	/**
 	 * What an artwork import seeds with and where it places a later file, read at the moment the import
 	 * runs so the preferences rows apply to the next import without a restart.

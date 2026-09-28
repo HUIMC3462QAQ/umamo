@@ -137,7 +137,7 @@ internal val BlendSection =
 				val session = context.session
 				val target = context.puppet.runtimeTarget
 				listOfNotNull(
-					// Opacity and draw order are keyable channels like the colours below, each with its own
+					// Opacity and draw order are keyable channels like the colors below, each with its own
 					// static and its own optional track.  Draw order is a FLOAT here, unlike a part's int:
 					// it blends per pose, so a fractional value between two keys is meaningful.
 					PropertyRow(terms = listOf(Res.string.properties_field_draw_order)) { _ ->

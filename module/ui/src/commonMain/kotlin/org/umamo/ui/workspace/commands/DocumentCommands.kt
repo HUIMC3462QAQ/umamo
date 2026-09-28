@@ -6,8 +6,8 @@ import org.umamo.ui.document.DocumentOpenFailure
 import org.umamo.ui.model.AtlasRepackReport
 import org.umamo.ui.resources.*
 import org.umamo.ui.workspace.AlertRequest
-import org.umamo.ui.workspace.ConfirmAlternative
 import org.umamo.ui.workspace.ConfirmRequest
+import org.umamo.ui.workspace.DialogAlternative
 import org.umamo.ui.workspace.ExportOptionsRequest
 import org.umamo.ui.workspace.ShellOverlayState
 
@@ -38,7 +38,7 @@ private fun dirtyDocumentRequest(prompt: DirtyDocumentPrompt, quitting: Boolean)
 		ConfirmRequest(
 			message = if (quitting) Res.string.confirm_save_before_quit else Res.string.confirm_save_before_replace,
 			confirmLabel = Res.string.dialog_save,
-			alternative = ConfirmAlternative(Res.string.dialog_dont_save) { prompt.discard() },
+			alternative = DialogAlternative(Res.string.dialog_dont_save) { prompt.discard() },
 			onConfirm = save,
 		)
 	} else {
@@ -74,9 +74,15 @@ internal fun documentCommands(overlays: ShellOverlayState): List<Command> =
 			(argument as? DirtyDocumentPrompt)?.let { prompt -> overlays.pendingConfirm = dirtyDocumentRequest(prompt, quitting = false) }
 		},
 		// The app asks before quitting over a dirty document - from File > Exit, the window's close button, the
-		// OS's quit, or Android's back gesture - with the same Save / Don't Save / Cancel shape.
+		// OS's quit, or Android's back gesture - with the same Save / Don't Save / Cancel shape.  A second request
+		// to quit while the quit prompt is up or waiting asks nothing new: every way out quits the same app, so one
+		// answer covers them all, and a queued twin would reappear after Cancel.
 		Command("document.confirmExit", title = null) { argument ->
-			(argument as? DirtyDocumentPrompt)?.let { prompt -> overlays.pendingConfirm = dirtyDocumentRequest(prompt, quitting = true) }
+			(argument as? DirtyDocumentPrompt)?.let { prompt ->
+				if (!overlays.confirmQueued { queued -> queued.message == Res.string.confirm_save_before_quit || queued.message == Res.string.confirm_quit_unsaved }) {
+					overlays.pendingConfirm = dirtyDocumentRequest(prompt, quitting = true)
+				}
+			}
 		},
 		// A CMO3 or MOC3 export finished with advisory notices; the shell shows them in a modal alert.
 		Command("document.exportReport", title = null) { argument ->
@@ -95,7 +101,7 @@ internal fun documentCommands(overlays: ShellOverlayState): List<Command> =
 		},
 		// A ready-built confirm from the app layer (the export-overwrite warning).  Unlike
 		// document.confirmReplace, whose prompt is fixed here, the caller owns the prompt and its
-		// arguments - the command only routes it into the shell's one pending-confirm slot.
+		// arguments - the command only routes it into the shell's confirm queue.
 		Command("document.confirm", title = null) { argument ->
 			(argument as? ConfirmRequest)?.let { request -> overlays.pendingConfirm = request }
 		},

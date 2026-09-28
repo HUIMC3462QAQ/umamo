@@ -37,6 +37,7 @@ import org.umamo.ui.kit.button.Button
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.app_icon
 import org.umamo.ui.resources.app_name
+import org.umamo.ui.resources.quick_setup_artist_credit
 import org.umamo.ui.resources.quick_setup_continue
 import org.umamo.ui.resources.quick_setup_title
 import org.umamo.ui.resources.splash_banner
@@ -103,6 +104,7 @@ fun QuickSetupDialog(onDismiss: () -> Unit) {
 					LanguageSettingRow()
 					KeymapPresetSettingRow(quick = true)
 					ThemeSettingRow()
+					UpdateCheckSettingRow()
 				}
 				Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
 					// Importing the settings of a previous version belongs at the start of this row, where Blender
@@ -119,15 +121,15 @@ fun QuickSetupDialog(onDismiss: () -> Unit) {
 }
 
 /**
- * The splash's banner: the splash artwork, with the app's name and icon in the bottom-left corner and the
- * version in the top-right.
+ * The splash's banner: the splash artwork, with the app's name and icon in the bottom-left corner, the
+ * version in the top-right, and the artist credit in the bottom-right.
  *
  * The art is drawable/splash_banner.png: 2:1 at 1680x840 pixels, three times the banner's largest size
  * ([QUICK_SETUP_MAX_WIDTH] wide) so it stays sharp on high-density screens.  It is cropped to fill the
- * banner, so art at any other ratio loses its edges rather than stretching.  The name and the version are
- * overlays rather than part of the art, so a version bump never means new art; the art keeps those two
- * corners free of detail.  They sit on the viewport's badge pill, the palette's pair for text over content
- * the theme does not color, so they read on any art in either theme.
+ * banner, so art at any other ratio loses its edges rather than stretching.  The name, the version, and the
+ * artist credit are overlays rather than part of the art, so a version bump never means new art; the art keeps
+ * those three corners free of detail.  They sit on the viewport's badge pill, the palette's pair for text over
+ * content the theme does not color, so they read on any art in either theme.
  */
 @Composable
 private fun SplashBanner() {
@@ -152,12 +154,10 @@ private fun SplashBanner() {
 					.padding(horizontal = 8.dp, vertical = 6.dp),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
-			// Decorative: the name beside it says what it is.
 			Image(painter = painterResource(Res.drawable.app_icon), contentDescription = null, modifier = Modifier.size(36.dp))
 			Spacer(modifier = Modifier.width(8.dp))
 			Text(text = stringResource(Res.string.app_name), style = typography.titleLarge, color = colors.viewportBadgeText)
 		}
-		// The version is data, not chrome, so it shows bare rather than through a localized "Version %s".
 		Text(
 			text = ProjectInfo.VERSION,
 			style = typography.bodySmall,
@@ -165,6 +165,17 @@ private fun SplashBanner() {
 			modifier =
 				Modifier
 					.align(Alignment.TopEnd)
+					.padding(10.dp)
+					.background(colors.viewportBadgeBackground, badgeShape)
+					.padding(horizontal = 6.dp, vertical = 2.dp),
+		)
+		Text(
+			text = stringResource(Res.string.quick_setup_artist_credit),
+			style = typography.bodySmall,
+			color = colors.viewportBadgeText,
+			modifier =
+				Modifier
+					.align(Alignment.BottomEnd)
 					.padding(10.dp)
 					.background(colors.viewportBadgeBackground, badgeShape)
 					.padding(horizontal = 6.dp, vertical = 2.dp),

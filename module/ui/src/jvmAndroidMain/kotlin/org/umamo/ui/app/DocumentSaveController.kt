@@ -86,7 +86,7 @@ internal class DocumentSaveController(
 			return
 		}
 		// Kept on the holder as the save in flight, so a quit or a document replace asked for meanwhile waits
-		// for it instead of racing it (afterPendingSave below); it completes true only when the file landed.
+		// for it instead of racing it (afterPendingWrites below); it completes true only when the file landed.
 		file.saveJob =
 			services.scope.async {
 				val knownPath = file.umaPath
@@ -179,26 +179,34 @@ internal class DocumentSaveController(
 	}
 
 	/**
-	 * Runs [action] once no save is being written.  A save still in flight settles before anything that
-	 * would end the process or replace the document: the write runs on a thread the process does not wait
-	 * for, so a quit that went ahead mid-save would kill it - and a clean document (an import never edited)
-	 * has nothing unsaved to stop the quit with.  Waiting also keeps the unsaved-changes prompt from
-	 * appearing over a running save, where its Save button could only answer that one is in progress.
+	 * Runs [action] once no save or model export is being written.  Either one still in flight settles before
+	 * anything that would end the process or replace the document: the write runs on a thread the process does
+	 * not wait for, so a quit that went ahead mid-write would kill it - and a clean document (an import never
+	 * edited) has nothing unsaved to stop the quit with.  A replace that went ahead mid-export would also keep
+	 * the old document resident under the export while the new one loads beside it.  Waiting also keeps the
+	 * unsaved-changes prompt from appearing over a running save, where its Save button could only answer that
+	 * one is in progress.
+	 *
+	 * This is the early wait, before the prompt.  An export started after it - while the prompt is up, a save is
+	 * written, or a document loads - is waited for again where the exit or the swap actually happens
+	 * ([EditorAppServices.afterRunningExport]).
 	 *
 	 * @param Function action What to do once nothing is being written.
 	 */
-	private fun afterPendingSave(action: () -> Unit) {
-		val context = services.current()
-		val file = context.file
-		if (file == null) {
-			action()
-			return
+	private fun afterPendingWrites(action: () -> Unit) {
+		services.afterRunningExport {
+			val context = services.current()
+			val file = context.file
+			if (file == null) {
+				action()
+				return@afterRunningExport
+			}
+			file.afterPendingSave(
+				services.scope,
+				onWaiting = { context.session?.emitNotice("notice.document.waitingForSave", NoticePlacement.StatusBar) },
+				action = action,
+			)
 		}
-		file.afterPendingSave(
-			services.scope,
-			onWaiting = { context.session?.emitNotice("notice.document.waitingForSave", NoticePlacement.StatusBar) },
-			action = action,
-		)
 	}
 
 	/**
@@ -223,7 +231,7 @@ internal class DocumentSaveController(
 	 * @param Function proceed Replaces the document.
 	 */
 	fun confirmIfDirty(proceed: () -> Unit) {
-		afterPendingSave {
+		afterPendingWrites {
 			if (services.current().session?.dirty?.value == true) {
 				services.commandRegistry.invoke("document.confirmReplace", dirtyDocumentPrompt(proceed))
 			} else {
@@ -235,16 +243,19 @@ internal class DocumentSaveController(
 	/**
 	 * Runs [exit], asking first when the document is dirty (document.confirmExit): quitting discards the
 	 * session the same way a replace does.  File > Exit calls this directly; the host's window close, OS
-	 * quit, and back gesture reach it through the exit guard.
+	 * quit, and back gesture reach it through the exit guard.  Whichever way the exit comes - at once, after
+	 * Don't Save, or after a save lands - it waits for a model export started meanwhile, so the process never
+	 * ends with an export half written.
 	 *
 	 * @param Function exit Closes the application.
 	 */
 	fun confirmExit(exit: () -> Unit) {
-		afterPendingSave {
+		val exitWhenIdle = { services.afterRunningExport(exit) }
+		afterPendingWrites {
 			if (services.current().session?.dirty?.value == true) {
-				services.commandRegistry.invoke("document.confirmExit", dirtyDocumentPrompt(exit))
+				services.commandRegistry.invoke("document.confirmExit", dirtyDocumentPrompt(exitWhenIdle))
 			} else {
-				exit()
+				exitWhenIdle()
 			}
 		}
 	}

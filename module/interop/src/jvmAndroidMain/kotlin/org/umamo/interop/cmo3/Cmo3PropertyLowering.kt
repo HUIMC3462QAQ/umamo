@@ -637,7 +637,11 @@ internal class Cmo3PropertyLowering(
 					unsupported(ExportEntityCategory.Document, null, ExportNoticeReason.AtlasTileMetadataNotReconcilable)
 
 				is EntityDiff.Changed -> {
-					if (AtlasTileField.METADATA in diff.fields && diff.id.raw !in reconciledTileIds) {
+					// The tile's own art - its pixels, name, size, or source - reaches the file only through the
+					// atlas-web reconcile's layer rewrite.  A tile it did not reconcile keeps the retained art,
+					// which is reported rather than passed over: a repaint alone changes nothing else in the model.
+					val artChanged = AtlasTileField.METADATA in diff.fields || AtlasTileField.PIXELS in diff.fields
+					if (artChanged && diff.id.raw !in reconciledTileIds) {
 						unsupported(ExportEntityCategory.Document, null, ExportNoticeReason.AtlasTileMetadataNotReconcilable)
 					}
 					if (AtlasTileField.PLACEMENT !in diff.fields) {

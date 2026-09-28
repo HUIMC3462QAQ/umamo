@@ -17,11 +17,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Holds every operating-system registration of the `.uma` type to the codec.  The type is declared in four places
- * no compiler connects - the freedesktop MIME entry, the desktop entry, the desktop package's build script, and the
- * Android manifest - and a registration that names another string, or a magic rule that reads another offset,
- * fails silently: the file manager just stops recognising the file.  The magic is not compared to a table here,
- * it is EVALUATED against the bytes the writer really produces (docs/format/UMA.md § 2).
+ * Holds every operating-system registration of the `.uma` type to the codec.  The type is declared in places no
+ * compiler connects - the tarball's freedesktop MIME entry and desktop entry (which the Linux installers install too,
+ * rewritten by the build), the desktop package's build script, and the Android manifest - and a registration that
+ * names another string, or a magic rule that reads another offset, fails silently: the file manager just stops
+ * recognising the file.  The magic is not compared to a table here, it is EVALUATED against the bytes the writer
+ * really produces (docs/format/UMA.md § 2).
  */
 class OsAssociationFilesTest {
 	/** Gradle runs a module's tests from the module directory, which is what these paths are relative to. */
@@ -161,11 +162,32 @@ class OsAssociationFilesTest {
 		val script = buildScript.readText()
 		assertTrue("val umaMimeType = \"${Uma.MIME_TYPE}\"" in script, "the package's file association names the type")
 		assertTrue("val umaExtension = \"${Uma.kind.extension}\"" in script, "and the extension")
-		assertEquals(3, Regex("fileAssociation\\(umaMimeType, umaExtension,").findAll(script).count(), "declared for Windows, macOS, and Linux")
+		assertEquals(1, Regex("fileAssociation\\(umaMimeType, umaExtension,").findAll(script).count(), "declared to the plugin for macOS")
+		assertEquals(2, Regex("property\\(\"mime-type\", umaMimeType\\)").findAll(script).count(), "and to the Windows and Linux installers' jpackage")
+		assertEquals(2, Regex("property\\(\"extension\", umaExtension\\)").findAll(script).count(), "with the extension")
 
 		val manifest = androidManifest.readText()
 		assertTrue("android:mimeType=\"${Uma.MIME_TYPE}\"" in manifest, "the Android intent filter names the type")
 		assertTrue("android:pathSuffix=\".${Uma.kind.extension}\"" in manifest, "and the extension, for providers that report a generic type")
+	}
+
+	/**
+	 * The Linux installers install the tarball's own desktop entry, rewritten by the build (linuxInstallerResources):
+	 * Exec and Icon become jpackage's placeholders for the installed launcher and icon, and TryExec and the comments go.
+	 * The tarball's entry keeps the exact lines those rewrites match - the launcher taking the file as a path (%f),
+	 * never a URI (%U), which Main would take for a path and fail to load.  The build fails too if they stop matching.
+	 */
+	@Test
+	fun theInstallersDesktopEntryIsTheTarballsRewritten() {
+		val tarballLines = desktopEntry.readLines()
+		assertTrue("Exec=umamo %f" in tarballLines, "the launcher line the installers' Exec is rewritten from")
+		assertTrue("Icon=umamo" in tarballLines, "and the icon line")
+
+		val script = buildScript.readText()
+		assertTrue("from(\"resources/linux/umamo.desktop\")" in script, "the installers' resource directory takes the tarball's entry")
+		assertTrue("line.startsWith(\"Exec=umamo \") -> \"Exec=APPLICATION_LAUNCHER \"" in script, "with jpackage's launcher")
+		assertTrue("line == \"Icon=umamo\" -> \"Icon=APPLICATION_ICON\"" in script, "and jpackage's icon")
+		assertFalse(File("packaging/linux/umamo.desktop").exists(), "and no second copy beside the templates")
 	}
 
 	/** A path the OS hands over is accepted by extension alone, however it is cased; the loader checks the content. */

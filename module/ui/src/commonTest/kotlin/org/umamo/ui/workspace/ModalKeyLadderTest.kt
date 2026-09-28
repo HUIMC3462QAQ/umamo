@@ -29,6 +29,7 @@ import org.umamo.ui.document.DocumentOpenFailure
 import org.umamo.ui.kit.InlineEditController
 import org.umamo.ui.kit.KeyCaptureController
 import org.umamo.ui.kit.MenuBarController
+import org.umamo.ui.model.AtlasRepackReport
 import org.umamo.ui.model.SelectionHandle
 import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_mesh_grab
@@ -40,6 +41,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -213,7 +215,8 @@ class ModalKeyLadderTest {
 	private fun enter(state: ShellModalState): Boolean = press(Key.Enter, state)
 
 	// ---------------------------------------------------------------------------------------------
-	// Arm 1-3: the modal alerts, which swallow every key so nothing fires behind them.
+	// Arm 1-3: the modal alerts, which swallow every key so nothing fires behind them - except the
+	// copy chord, which every alert but the confirm passes on to its selectable text.
 	// ---------------------------------------------------------------------------------------------
 
 	@Test
@@ -251,7 +254,7 @@ class ModalKeyLadderTest {
 
 		assertTrue(enter(state))
 
-		assertEquals(followUp, overlays.pendingConfirm, "the slot clears before the action runs, so the follow-up survives")
+		assertEquals(followUp, overlays.pendingConfirm, "the confirm leaves its queue before the action runs, so the follow-up survives")
 	}
 
 	/**
@@ -311,6 +314,143 @@ class ModalKeyLadderTest {
 		assertEquals(0, confirmCount)
 	}
 
+	/**
+	 * The Enter that acknowledges one alert is still down when the next queued alert shows, and its auto-repeat
+	 * must not acknowledge that one unseen.  A release followed by a fresh press does.
+	 */
+	@Test
+	fun enterAutoRepeatNeverDismissesAQueuedAlert() {
+		val overlays = ShellOverlayState()
+		val second = AlertRequest(Res.string.cmd_mesh_grab, listOf("second"))
+		overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab, listOf("first"))
+		overlays.pendingAlert = second
+		val state = ShellModalState(overlays = overlays)
+
+		assertTrue(enter(state))
+		assertSame(second, overlays.pendingAlert, "the press acknowledges the first")
+		assertTrue(enter(state), "its auto-repeat is swallowed")
+		assertSame(second, overlays.pendingAlert, "and leaves the second up")
+
+		assertTrue(press(Key.Enter, state, isDown = false))
+		assertSame(second, overlays.pendingAlert, "the release acknowledges nothing")
+		assertTrue(enter(state))
+		assertNull(overlays.pendingAlert, "a fresh press does")
+	}
+
+	/**
+	 * The Enter that confirms one confirmation must not confirm the one queued behind it through its auto-repeat:
+	 * the second runs only on a fresh press.
+	 */
+	@Test
+	fun enterAutoRepeatNeverConfirmsAQueuedConfirm() {
+		val runs = ArrayList<String>()
+		val overlays = ShellOverlayState()
+		overlays.pendingConfirm = ConfirmRequest(Res.string.cmd_mesh_grab) { runs.add("first") }
+		overlays.pendingConfirm = ConfirmRequest(Res.string.cmd_mesh_grab) { runs.add("second") }
+		val state = ShellModalState(overlays = overlays)
+
+		assertTrue(enter(state))
+		assertEquals(listOf("first"), runs, "the press confirms the first")
+		assertTrue(enter(state), "its auto-repeat is swallowed")
+		assertEquals(listOf("first"), runs, "and confirms nothing")
+		assertNotNull(overlays.pendingConfirm, "the second stays up")
+
+		press(Key.Enter, state, isDown = false)
+		assertTrue(enter(state))
+		assertEquals(listOf("first", "second"), runs, "a fresh press confirms the second")
+		assertNull(overlays.pendingConfirm)
+	}
+
+	/**
+	 * A confirm over an alert takes Enter, and the repeat of that Enter leaves the alert beneath it up: the alert
+	 * takes the top under a held key, so it waits for a fresh press like a queued confirm does.
+	 */
+	@Test
+	fun aConfirmOverAnAlertTakesEnterAndItsRepeatLeavesTheAlertUp() {
+		var confirmCount = 0
+		val alert = AlertRequest(Res.string.cmd_mesh_grab)
+		val overlays =
+			ShellOverlayState().apply {
+				pendingAlert = alert
+				pendingConfirm = ConfirmRequest(Res.string.cmd_mesh_grab) { confirmCount++ }
+			}
+		val state = ShellModalState(overlays = overlays)
+
+		assertTrue(enter(state))
+		assertEquals(1, confirmCount, "Enter confirms the confirm")
+		assertNull(overlays.pendingConfirm)
+		assertTrue(enter(state))
+		assertSame(alert, overlays.pendingAlert, "the repeat leaves the alert up")
+
+		press(Key.Enter, state, isDown = false)
+		assertTrue(enter(state))
+		assertNull(overlays.pendingAlert, "a fresh press acknowledges it")
+	}
+
+	/**
+	 * Every alert kind's queue waits out a held Enter the same way, so none of the five arms can skip the gate.
+	 */
+	@Test
+	fun enterAutoRepeatNeverDismissesTheNextOfAnyAlertKind() {
+		val kinds =
+			listOf<Triple<String, (ShellOverlayState) -> Unit, (ShellOverlayState) -> Boolean>>(
+				Triple("open failure", { overlays -> overlays.openFailure = DocumentOpenFailure(DocumentOpenError.ReadFailed, "model.cmo3") }, { overlays -> overlays.openFailure != null }),
+				Triple("app alert", { overlays -> overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab) }, { overlays -> overlays.pendingAlert != null }),
+				Triple("export report", { overlays -> overlays.exportReport = ExportReport(ExportFormat.Cmo3, emptyList()) }, { overlays -> overlays.exportReport != null }),
+				Triple("repack report", { overlays -> overlays.repackReport = AtlasRepackReport(emptyList()) }, { overlays -> overlays.repackReport != null }),
+			)
+		for ((label, raise, isUp) in kinds) {
+			val overlays = ShellOverlayState()
+			raise(overlays)
+			raise(overlays)
+			val state = ShellModalState(overlays = overlays)
+
+			assertTrue(enter(state))
+			assertTrue(enter(state))
+			assertTrue(isUp(overlays), "$label: the repeat leaves the second up")
+
+			press(Key.Enter, state, isDown = false)
+			assertTrue(enter(state))
+			assertFalse(isUp(overlays), "$label: a fresh press acknowledges it")
+		}
+	}
+
+	/**
+	 * An alert raised under a held Enter - the palette ran a command that failed at once - waits for that Enter's
+	 * release, as a confirm raised the same way does.
+	 */
+	@Test
+	fun anAlertRaisedUnderAHeldEnterWaitsForItsRelease() {
+		val overlays = ShellOverlayState()
+		val state = ShellModalState(overlays = overlays)
+		press(Key.Enter, state)
+		overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab)
+
+		assertTrue(enter(state))
+		assertNotNull(overlays.pendingAlert, "the auto-repeat acknowledges nothing")
+
+		press(Key.Enter, state, isDown = false)
+		assertTrue(enter(state))
+		assertNull(overlays.pendingAlert)
+	}
+
+	/**
+	 * The gate holds Enter alone: Escape acknowledges a queued alert even while the Enter that answered the one
+	 * before it is still held.
+	 */
+	@Test
+	fun escapeStillDismissesAQueuedAlertUnderAHeldEnter() {
+		val overlays = ShellOverlayState()
+		overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab, listOf("first"))
+		overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab, listOf("second"))
+		val state = ShellModalState(overlays = overlays)
+
+		assertTrue(enter(state))
+		assertTrue(escape(state))
+
+		assertNull(overlays.pendingAlert)
+	}
+
 	@Test
 	fun anAppAlertTakesEscapeOrEnterAndSwallowsEverythingElse() {
 		val overlays = ShellOverlayState().apply { pendingAlert = AlertRequest(Res.string.cmd_mesh_grab) }
@@ -324,6 +464,52 @@ class ModalKeyLadderTest {
 		overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab)
 		assertTrue(escape(state))
 		assertNull(overlays.pendingAlert, "and so does Escape")
+	}
+
+	@Test
+	fun theCopyChordPassesThroughEveryAlertToItsText() {
+		val alerts =
+			listOf<Pair<String, (ShellOverlayState) -> Unit>>(
+				"open failure" to { overlays -> overlays.openFailure = DocumentOpenFailure(DocumentOpenError.ReadFailed, "model.cmo3") },
+				"app alert" to { overlays -> overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab) },
+				"export report" to { overlays -> overlays.exportReport = ExportReport(ExportFormat.Cmo3, emptyList()) },
+			)
+		for ((label, raise) in alerts) {
+			val overlays = ShellOverlayState().apply(raise)
+			val state = ShellModalState(overlays = overlays)
+
+			// Not consumed: the event goes on to the alert's selectable text, which copies it.
+			assertFalse(press(Key.C, state, primaryModifier = true), "$label: Ctrl/Cmd+C reaches the text")
+			assertFalse(press(Key.Copy, state), "$label: a Copy key reaches the text")
+			assertTrue(overlays.modalAlertOpen, "$label: copying leaves the alert up")
+			// Everything else is still swallowed, a plain C and the other primary chords included.
+			assertTrue(press(Key.C, state), "$label: a plain C is swallowed")
+			assertTrue(press(Key.V, state, primaryModifier = true), "$label: Ctrl/Cmd+V is swallowed")
+		}
+	}
+
+	@Test
+	fun aConfirmDialogStillSwallowsTheCopyChord() {
+		val overlays = ShellOverlayState().apply { pendingConfirm = ConfirmRequest(Res.string.cmd_mesh_grab) {} }
+
+		assertTrue(press(Key.C, ShellModalState(overlays = overlays), primaryModifier = true))
+	}
+
+	@Test
+	fun enterAndEscapeNeverPickAnAlertsAlternative() {
+		var alternativeCount = 0
+		val overlays = ShellOverlayState()
+		val state = ShellModalState(overlays = overlays)
+
+		// "Don't Show Again" is a deliberate click: the keys that acknowledge an alert mean OK.
+		for (acknowledge in listOf<(ShellModalState) -> Boolean>({ modalState -> enter(modalState) }, { modalState -> escape(modalState) })) {
+			overlays.pendingAlert = AlertRequest(Res.string.cmd_mesh_grab, alternative = DialogAlternative(Res.string.cmd_mesh_grab) { alternativeCount++ })
+			assertTrue(acknowledge(state))
+			assertNull(overlays.pendingAlert)
+			press(Key.Enter, state, isDown = false)
+		}
+
+		assertEquals(0, alternativeCount)
 	}
 
 	@Test

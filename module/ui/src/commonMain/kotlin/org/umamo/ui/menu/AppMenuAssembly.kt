@@ -32,6 +32,8 @@ import org.umamo.ui.l10n.rememberLocaleTag
  * @param Boolean        canExportImage Whether the open document can be rendered to an image (gates Export Image).
  * @param MenuDispatch   dispatch  Runs a command by id; every row of the bar stands for a command, so this is
  *   all the bar needs from its host, and a rebind reaches the menu, the keyboard, and the palette alike.
+ * @param Boolean        canOpenLogFolder Whether the host registered Open Log Folder (shows its Help row).
+ * @param Boolean        canCheckForUpdates Whether the host registered Check for Updates (shows its Help row).
  * @return List The top-level menus.
  */
 @Composable
@@ -42,6 +44,8 @@ internal fun buildAppMenu(
 	canExport: Boolean,
 	canExportImage: Boolean,
 	dispatch: MenuDispatch,
+	canOpenLogFolder: Boolean = false,
+	canCheckForUpdates: Boolean = false,
 ): List<TopLevelMenu> {
 	// produceState runs unconditionally (the session may be null with no document) and re-collects when
 	// the session swaps.
@@ -73,7 +77,7 @@ internal fun buildAppMenu(
 			fileMenu(keymap = keymap, recentFiles = recentFiles, canExport = canExport, canExportImage = canExportImage, canSave = canSave, dispatch = dispatch),
 			editMenu(keymap = keymap, canUndo = canUndo, canRedo = canRedo, dispatch = dispatch),
 			workspaceMenu(keymap = keymap, dispatch = dispatch),
-			helpMenu(keymap = keymap, dispatch = dispatch),
+			helpMenu(keymap = keymap, dispatch = dispatch, canOpenLogFolder = canOpenLogFolder, canCheckForUpdates = canCheckForUpdates),
 		)
 	}
 }

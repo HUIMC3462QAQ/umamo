@@ -31,6 +31,7 @@ import org.umamo.ui.model.SessionAtlasPages
 import org.umamo.ui.model.runRelinkArtwork
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -97,6 +98,7 @@ class ReloadedCmo3ExportGateTest {
 			}
 			val effective = sessionAtlasPages.binding.value.textures
 			assertNotSame(document.textures, effective, "the resolver published the reload's pages")
+			val importedPng = assertNotNull(document.tilePng(tile.id), "the imported tile has an embedded PNG").copyOf()
 
 			val prepared =
 				prepareCmo3Export(
@@ -109,6 +111,10 @@ class ReloadedCmo3ExportGateTest {
 				)
 			follower.cancel()
 			println("export report: ${prepared.report}")
+			// The export rewrote the root's layer in a working copy, never in the document: the superseded
+			// tile still shows the imported art to undo and to a UMA save.
+			assertNotSame(document.cmo3, prepared.model, "the export lowers onto a working copy")
+			assertContentEquals(importedPng, document.tilePng(tile.id), "the imported tile's PNG is still the imported bytes")
 			assertTrue(
 				prepared.report.notices.none { notice -> notice is ExportNotice.UnsupportedChange && notice.reason == ExportNoticeReason.AtlasPageNotRecomposed },
 				"the atlas web reconciled the reloaded tile rather than declining",

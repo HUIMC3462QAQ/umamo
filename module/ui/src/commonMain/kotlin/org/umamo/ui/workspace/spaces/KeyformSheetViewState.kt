@@ -99,7 +99,7 @@ internal class KeyformSheetViewState : PersistentSpaceState {
 	/** Whether GEOMETRY tracks are listed. */
 	var showGeometry: Boolean by mutableStateOf(true)
 
-	/** Whether CHANNEL tracks (opacity, draw order, the colours, the flips) are listed. */
+	/** Whether CHANNEL tracks (opacity, draw order, the colors, the flips) are listed. */
 	var showChannels: Boolean by mutableStateOf(true)
 
 	/** Whether BLEND-SHAPE tracks are listed. */

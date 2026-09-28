@@ -11,6 +11,7 @@ import org.umamo.ui.resources.Res
 import org.umamo.ui.resources.cmd_workspace_next
 import org.umamo.ui.resources.cmd_workspace_prev
 import org.umamo.ui.resources.menu_about
+import org.umamo.ui.resources.menu_check_for_updates
 import org.umamo.ui.resources.menu_credits
 import org.umamo.ui.resources.menu_documentation
 import org.umamo.ui.resources.menu_edit
@@ -29,6 +30,7 @@ import org.umamo.ui.resources.menu_import
 import org.umamo.ui.resources.menu_import_artwork
 import org.umamo.ui.resources.menu_import_cmo3
 import org.umamo.ui.resources.menu_import_moc3
+import org.umamo.ui.resources.menu_open_log_folder
 import org.umamo.ui.resources.menu_open_recent
 import org.umamo.ui.resources.menu_preferences
 import org.umamo.ui.resources.menu_quick_setup
@@ -205,30 +207,40 @@ fun workspaceMenu(
 	)
 
 /**
- * Builds the Help menu shared by every platform's menu bar: the project links, then Quick Setup, then
- * Credits and About.  Every row dispatches its help.* command - the links open through the shell's handler
- * and the three dialogs through the overlay state the shell owns - so the palette reaches all six as well.
+ * Builds the Help menu shared by every platform's menu bar: the project links, then Quick Setup, and where the host
+ * supports them Check for Updates and Open Log Folder, then Credits and About.  Every row dispatches its help.*
+ * command - the links open through the shell's handler, the update check and the log folder through the host's, and
+ * the three dialogs through the overlay state the shell owns - so the palette reaches every one of them as well.
  *
- * @param Keymap       keymap   The keymap the accelerator hints are resolved against.
- * @param MenuDispatch dispatch Runs a command by id.
+ * @param Keymap       keymap             The keymap the accelerator hints are resolved against.
+ * @param MenuDispatch dispatch           Runs a command by id.
+ * @param Boolean      canOpenLogFolder   Whether the host registered Open Log Folder; its row is left out otherwise.
+ * @param Boolean      canCheckForUpdates Whether the host registered Check for Updates; its row is left out otherwise.
  * @return TopLevelMenu The Help menu.
  */
 @Composable
 fun helpMenu(
 	keymap: Keymap,
 	dispatch: MenuDispatch,
-): TopLevelMenu =
-	TopLevelMenu(
+	canOpenLogFolder: Boolean = false,
+	canCheckForUpdates: Boolean = false,
+): TopLevelMenu {
+	val logFolderRow = commandRow(stringResource(Res.string.menu_open_log_folder), "help.openLogFolder", keymap, dispatch)
+	val updateRow = commandRow(stringResource(Res.string.menu_check_for_updates), "help.checkForUpdates", keymap, dispatch)
+	return TopLevelMenu(
 		label = stringResource(Res.string.menu_help),
 		items =
-			listOf(
+			listOfNotNull(
 				commandRow(stringResource(Res.string.menu_source_code), "help.sourceCode", keymap, dispatch),
 				commandRow(stringResource(Res.string.menu_web_site), "help.webSite", keymap, dispatch),
 				commandRow(stringResource(Res.string.menu_documentation), "help.documentation", keymap, dispatch),
 				MenuItem.Separator,
 				commandRow(stringResource(Res.string.menu_quick_setup), "help.quickSetup", keymap, dispatch),
+				updateRow.takeIf { canCheckForUpdates },
+				logFolderRow.takeIf { canOpenLogFolder },
 				MenuItem.Separator,
 				commandRow(stringResource(Res.string.menu_credits), "help.credits", keymap, dispatch),
 				commandRow(stringResource(Res.string.menu_about), "help.about", keymap, dispatch),
 			),
 	)
+}

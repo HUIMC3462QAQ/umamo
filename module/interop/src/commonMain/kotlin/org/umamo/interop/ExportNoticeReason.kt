@@ -267,7 +267,7 @@ sealed interface ExportNoticeReason {
 	 */
 	data object AtlasPageNotRecomposed : ExportNoticeReason
 
-	/** The tile's own art changed - its name, size, or source layer - which a repack cannot express. */
+	/** The tile's own art changed - its pixels, name, size, or source layer - which a repack cannot express. */
 	data object AtlasTileMetadataNotReconcilable : ExportNoticeReason
 
 	/** The drawable was rebound to different source art, which needs the art re-imported, not repacked. */

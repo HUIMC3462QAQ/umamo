@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
  *
  * That second half is what makes this more than a smoke test.  Dropping a section without stripping
  * the model produces a file that still loads: the drawables are all there, the geometry is right,
- * and only the colours or the offscreens quietly read from the wrong place.  The per-version
+ * and only the colors or the offscreens quietly read from the wrong place.  The per-version
  * invariants below fail on exactly that.
  *
  * Gated on `relive.dumpModel` + `relive.coreLib` + `moc3.samples`.

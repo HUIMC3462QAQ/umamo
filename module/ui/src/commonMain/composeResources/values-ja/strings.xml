@@ -98,6 +98,7 @@
 	<string name="dialog_quit_without_saving">保存せずに終了</string>
 	<string name="dialog_save">保存</string>
 	<string name="dialog_dont_save">保存しない</string>
+	<string name="dialog_dont_show_again">今後表示しない</string>
 	<string name="confirm_reset_workspace">このワークスペースを既定のレイアウトに戻しますか？</string>
 	<string name="confirm_import_replace">インポートしたファイルですべてのワークスペースを置き換えますか？</string>
 	<string name="confirm_discard_unsaved">現在のドキュメントには保存していない変更があります。破棄しますか？</string>
@@ -195,7 +196,7 @@
 	<string name="export_reason_no_texture_input_for_display">この描画オブジェクトには選択した表示モード用のテクスチャ入力がないため、元の入力を維持しました。</string>
 	<string name="export_reason_no_atlas_entry">この原画はどのアトラスページにも配置されていないため、更新する配置情報がありませんでした。</string>
 	<string name="export_reason_atlas_page_not_recomposed">この原画はアトラスページ上で移動しましたが、ページ画像には移動前の位置のまま残っています。再パックすると描き直されます。</string>
-	<string name="export_reason_atlas_tile_metadata">この原画の名前またはサイズが変更されました。アトラス配置では表現できないため、原画を再取り込みしてください。</string>
+	<string name="export_reason_atlas_tile_metadata">この原画のピクセル、名前、またはサイズが変更されました。アトラス配置では表現できないため、原画を再取り込みしてください。</string>
 	<string name="export_reason_atlas_tile_rebinding">この描画オブジェクトは別の原画に結び付けられました。再パックではなく原画の再取り込みが必要です。</string>
 	<string name="export_reason_fractional_canvas_size">CMO3 のキャンバスサイズは整数ピクセルのため、小数の値は書き出されませんでした。</string>
 	<!-- 書き出しの上書き警告（document.confirm コマンド。%1$d は上書きされる既存ファイル数、
@@ -244,9 +245,13 @@
 	<string name="open_failed_newer_format">%1$s はより新しいバージョンの Umamo で作成されたため、このバージョンでは開けません。</string>
 	<string name="alert_document_read_only">%1$s は読み取り専用で開きました。このバージョンの Umamo が解釈できないエントリを含むため、保存はできません: %2$s</string>
 	<string name="alert_save_failed">%1$s を保存できませんでした。 %2$s</string>
-	<string name="alert_export_image_failed">%1$s をエクスポートできませんでした。 %2$s</string>
+	<string name="alert_export_failed">%1$s をエクスポートできませんでした。 %2$s</string>
 	<string name="export_image_failed_renderer">ビューポートのレンダラーが画像を描画できませんでした。</string>
 	<string name="export_image_failed_memory">%1$d × %2$d px の画像を作るためのメモリが足りません。倍率を下げてください。</string>
+	<string name="export_failed_unexpected">予期しないエラーで中断しました。詳細はログに記録されています。開いているドキュメントには影響ありません。</string>
+	<string name="alert_export_out_of_memory">%1$s をエクスポートできませんでした。メモリが足りなくなりました。開いているドキュメントには影響ありません。</string>
+	<string name="alert_export_out_of_memory_jar">%1$s をエクスポートできませんでした。Umamo が使えるメモリ (%2$s) が足りなくなりました。開いているドキュメントには影響ありません。このコンピューターのメモリの半分まで使えるようにするには、保存して Umamo を終了し、ターミナルから次のコマンドで起動してください: %3$s</string>
+	<string name="alert_low_memory_jar">Umamo が使えるメモリは最大 %1$s で、大きなモデルのエクスポートでは足りなくなることがあります。jar から起動すると、この上限は Java が決めます。このコンピューターのメモリの半分まで使えるようにするには、Umamo を終了してターミナルから次のコマンドで起動してください: %2$s</string>
 
 	<string name="menu_help">ヘルプ</string>
 	<string name="menu_source_code">ソースコード…</string>
@@ -255,6 +260,16 @@
 	<string name="menu_credits">クレジット…</string>
 	<string name="menu_quick_setup">クイックセットアップ…</string>
 	<string name="menu_about">Umamoについて…</string>
+	<string name="menu_open_log_folder">ログフォルダーを開く…</string>
+	<string name="alert_log_folder_failed">ログフォルダーを開けませんでした。セッションログの場所：\n%1$s</string>
+	<string name="menu_check_for_updates">アップデートを確認…</string>
+	<string name="confirm_update_available">Umamo %1$s が利用可能です。現在のバージョンは %2$s です。</string>
+	<string name="dialog_open_download_page">ダウンロードページを開く</string>
+	<string name="dialog_later">後で</string>
+	<string name="dialog_skip_this_version">このバージョンをスキップ</string>
+	<string name="alert_up_to_date">お使いの Umamo は最新バージョン（%1$s）です。</string>
+	<string name="alert_no_release_published">Umamo のリリースはまだ公開されていません。</string>
+	<string name="alert_update_check_failed">アップデートを確認できませんでした：%1$s</string>
 	<!-- ヘルプダイアログ（クレジットは同梱の CREDITS.md、バージョン情報は名称・バージョン・ライセンス・リンク）。 -->
 	<string name="about_title">Umamoについて</string>
 	<!-- %1$s はアプリケーションのバージョン。 -->
@@ -566,6 +581,10 @@
 	<string name="notice_document_exported_image">%1$s をエクスポートしました。</string>
 	<string name="notice_document_save_busy">保存を実行中です。</string>
 	<string name="notice_document_waiting_for_save">先に保存を完了しています…</string>
+	<string name="notice_document_exporting_model">モデルをエクスポートしています…</string>
+	<string name="notice_document_exported_model">%1$s をエクスポートしました。</string>
+	<string name="notice_document_export_busy">エクスポートを実行中です。</string>
+	<string name="notice_document_waiting_for_export">先にエクスポートを完了しています…</string>
 	<string name="notice_document_cmo3_loss">UMA として保存しました。Umamo が扱わない CMO3 の構造はこのファイルには含まれません。このセッションのエクスポートは引き続き元の CMO3 に照合されます。</string>
 	<string name="notice_document_moc3_loss">UMA として保存しました。MOC3 ファミリーの物理演算、モーション、表情、ユーザーデータ、ポーズはこのファイルには含まれません。</string>
 	<string name="notice_import_artwork_superseded">アートワークの追加中にドキュメントが変更されたため、何も適用されませんでした。</string>
@@ -906,6 +925,7 @@
 	<string name="settings_interface_language">言語</string>
 	<!-- 取り消し履歴の上限（interface.historyLimit）。履歴パネルが保持するステップ数。 -->
 	<string name="settings_interface_history_steps">履歴のステップ数</string>
+	<string name="settings_check_for_updates">起動時にアップデートを確認する</string>
 	<!-- キーバインド設定：プリセット選択とコマンドごとの再割り当て編集。 -->
 	<string name="settings_keybindings_preset">プリセット</string>
 	<string name="settings_keybindings_preset_quick">キーバインドのプリセット</string>

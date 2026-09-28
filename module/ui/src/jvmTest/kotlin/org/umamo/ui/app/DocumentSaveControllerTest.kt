@@ -128,4 +128,45 @@ class DocumentSaveControllerTest {
 			runCurrent()
 			assertEquals(1, exited, "the file landed, so the quit goes on")
 		}
+
+	@Test
+	fun quittingWaitsForAnExportStartedWhileThePromptWasUp() =
+		runTest {
+			val fixture = AppControllerFixture(this)
+			val save = DocumentSaveController(fixture.services)
+			var exited = 0
+			openADirtyDocument(fixture)
+			save.confirmExit { exited++ }
+			val prompt = assertIs<DirtyDocumentPrompt>(fixture.argumentsOf("document.confirmExit").single())
+
+			// Nothing disables the export commands while the prompt is up.
+			val exportRelease = CompletableDeferred<Unit>()
+			assertTrue(fixture.services.modelExports.tryStart(this) { exportRelease.await() })
+			prompt.discard()
+			runCurrent()
+			assertEquals(0, exited, "Don't Save does not end the process under a running export")
+
+			exportRelease.complete(Unit)
+			runCurrent()
+			assertEquals(1, exited, "the export landed, so the quit goes on")
+		}
+
+	@Test
+	fun aCleanQuitWaitsForARunningExport() =
+		runTest {
+			val fixture = AppControllerFixture(this)
+			val save = DocumentSaveController(fixture.services)
+			fixture.context = AppControllerFixture.contextFor(newBlankDocument())
+			val exportRelease = CompletableDeferred<Unit>()
+			fixture.services.modelExports.tryStart(this) { exportRelease.await() }
+			var exited = 0
+
+			save.confirmExit { exited++ }
+			runCurrent()
+			assertEquals(0, exited)
+
+			exportRelease.complete(Unit)
+			runCurrent()
+			assertEquals(1, exited)
+		}
 }

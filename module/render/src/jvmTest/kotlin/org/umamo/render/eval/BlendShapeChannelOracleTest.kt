@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * A blend-shape record carries a delta row per key for every channel its object owns, not only for
  * geometry.  [BlendShapeOracleTest] compares vertex-position hashes and so cannot see these at all;
  * this gate poses the driving parameter at the key that actually carries a non-zero channel delta and
- * compares the runtime's exposed per-drawable opacity and colours.
+ * compares the runtime's exposed per-drawable opacity and colors.
  *
  * Poses are DERIVED like the deformer-channel gate's: the test reads the format layer for records
  * whose keyforms carry a non-zero channel delta and sweeps only those parameters, so a re-authored rig

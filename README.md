@@ -34,22 +34,61 @@ An open-source cross-platform modelling editor for 2D puppet animation, with fir
 
 Every tagged version publishes desktop builds on the [Releases page](https://github.com/umamoorg/umamo/releases).  There are two different releases per platform:
 
-| File                                      | Note                                                                                                                                     |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `umamo-<target>-<version>.zip`/`.tar.gz`  | Java SDK not required, just run it directly.                                                                                             |
-| `umamo-<target>-<version>.jar`            | You will need Java SDK 21 or higher to run.  Either open through the file browser or through the command line.  `java -jar umamo-...jar` |
+| File                                     | Note                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `umamo-windows-x64-<version>.msi`        | Windows installer.  Installs for your user alone, with no administrator rights needed.                                                                                                                                                                                                                |
+| `umamo-macos-arm64-<version>.dmg`        | Apple silicon Macs.  Open it and drag Umamo to Applications.                                                                                                                                                                                                                                          |
+| `umamo-linux-<arch>-<version>.deb`       | Debian 12+, Ubuntu 22.04+, Linux Mint 21+.                                                                                                                                                                                                                                                            |
+| `umamo-linux-<arch>-<version>.rpm`       | Fedora and other RPM distributions.                                                                                                                                                                                                                                                                   |
+| `umamo-<target>-<version>.zip`/`.tar.gz` | Java SDK not required, just unpack it and run it directly.                                                                                                                                                                                                                                            |
+| `umamo-<target>-<version>.jar`           | You will need Java SDK 21 or higher to run.  When Java's default would give Umamo less than 3 GB of memory, it restarts itself with room for up to half of your computer's memory.  To always allow half, start it from a terminal: `java -XX:MaxRAMPercentage=50 -jar umamo-<target>-<version>.jar`. |
 
-Targets: `linux-x64`, `linux-arm64`, `windows-x64`, `macos-arm64`, `macos-x64`.  Check your download against the release's `SHA256SUMS.txt`.
+Targets: `linux-x64`, `linux-arm64`, `windows-x64`, `macos-arm64`, `macos-x64`.  Check your download against the release's signed `SHA256SUMS.txt` (see [Verifying downloads](#verifying-downloads)).
 
-**These builds are not signed.**  Code signing and notarization cost a lot of money so I will be waiting to do that until getting to a release candidate stage.  Until then Windows and MacOS will complain about the applications being unsigned.
+**Signing.**  The MacOS downloads are signed and notarized by Apple, and the Linux RPM and the release's checksums are signed with the Umamo release key.  Windows builds are not signed yet due to the high cost.
 
-- **MacOS:** Gatekeeper will quarantine the application and report it as *damaged*.  It is not damaged.  After unzipping run this in the Terminal, `xattr -dr com.apple.quarantine /path/to/umamo.app`, or allow the application through the settings.
-- **Windows:** SmartScreen shows "Windows protected your PC".  Choose *More info* -> *Run anyway*.
-- **Linux:** Just run the application: `tar xzf umamo-*.tar.gz` and run `umamo/bin/umamo`.  Linux doesn't restrict you from running any application that you wish to run on your computer.
+- **Windows:** SmartScreen might show "Windows protected your PC" for the installer and the archive version's `Umamo.exe`.  Choose *More info* -> *Run anyway*.
+
+### Installing
+
+- **Windows:**
+	* Run `umamo-windows-x64-<version>.msi`.
+		* Umamo installs per user to: `%LOCALAPPDATA%\Programs\umamo`,
+			* A start menu entry will be added and `*.uma` files will be associated automatically.
+			* Note: There is no confirmation screen, when the installer finishes it will exit without confirming.
+		* Uninstall through Windows Settings -> Apps.
+		* The zip archive version is portable and can be run directly after extracting: `Umamo\Umamo.exe`.
+- **Debian, Ubuntu, Linux Mint:**
+	* `sudo apt install ./umamo-linux-<arch>-<version>.deb`.
+		* Uninstall: `sudo apt remove umamo`.
+- **Fedora:** Import the Umamo release key once:
+	* `sudo rpm --import https://umamo.org/keys/umamo-signing-key.asc`
+	* `sudo dnf install --setopt=localpkg_gpgcheck=1 ./umamo-linux-x64-<version>.rpm`.
+		* Uninstall: `sudo dnf remove umamo`.
+- **Other Linux:** `tar xzf umamo-linux-x64-<version>.tar.gz` and run `umamo/bin/umamo`.
+- **MacOS:** Open `umamo-macos-arm64-<version>.dmg` and drag Umamo to Applications, or unzip `Umamo.app` and move it there.
+
+The DEB and RPM install Umamo to `/opt/umamo`, add it to the application menu, and make it the app that opens `.uma` files.  If you registered the tarball's `umamo.desktop` by hand before, remove that first (below), or the menu will show Umamo twice.
+
+To upgrade, install the new version over the old one.  Your customized settings will be kept on upgrade and uninstall.
+If you need to reset your settings, then delete `settings.json` from:
+* Linux: `~/.config/umamo`
+* MacOS: `~/Library/Application Support/umamo`
+* Windows: `%APPDATA%\umamo`
+
+### Verifying downloads
+
+The Umamo release key signs the RPM and every release's `SHA256SUMS.txt`.  Its fingerprint is `67754C0DC58743270D574066F5499AE5C80A0F1C`; the key is on [umamo.org](https://umamo.org/keys/umamo-signing-key.asc) and in this repository at `app/desktop/packaging/umamo-signing-key.asc`.  Download `SHA256SUMS.txt` and `SHA256SUMS.txt.asc` beside your files, then:
+```bash
+gpg --fetch-keys https://umamo.org/keys/umamo-signing-key.asc
+gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
+sha256sum --check --ignore-missing SHA256SUMS.txt
+```
+`gpg --verify` names the key it checked; compare its fingerprint with the one above.  Every file also carries a build provenance attestation from GitHub: `gh attestation verify <file> --repo umamoorg/umamo` confirms it was built by this repository's release workflow.
 
 ### Opening .uma files from the file manager
 
-Since the builds are plain archives without installers the `.uma` mimetype won't be registered automatically by the operating system.  Linux has a manual mimetype registration option while Windows and MacOS will wait for their respective installers in the future.
+The installers register the `.uma` type, and on MacOS `Umamo.app` declares it itself, so Finder can open `.uma` files with it.  The portable zip and tarball register nothing on their own.
 
 - **Linux:** The archives come with freedesktop.org files to register the mimetype manually.  Put `umamo/bin/umamo` on your `PATH`(or edit the `Exec=` line in `umamo.desktop` to its full path), then register them for your user:
 ```bash
@@ -57,6 +96,15 @@ xdg-mime install --novendor umamo/lib/app/resources/umamo-uma.xml
 xdg-desktop-menu install --novendor umamo/lib/app/resources/umamo.desktop
 ```
 `xdg-mime uninstall` and `xdg-desktop-menu uninstall` with the same files to undo it.
+
+### Log files
+
+Go to Help -> Open Log Folder to open the log folder location.  When submitting bug reports, please attach the newest file.
+Log file locations:
+
+- **Linux:** `~/.local/share/umamo/logs` (or `$XDG_DATA_HOME/umamo/logs`)
+- **MacOS:** `~/Library/Application Support/umamo/logs`
+- **Windows:** `%LOCALAPPDATA%\umamo\logs`
 
 ## Building & Development
 

@@ -10,8 +10,8 @@ import org.umamo.ui.resources.dialog_dont_save
 import org.umamo.ui.resources.dialog_quit_without_saving
 import org.umamo.ui.resources.dialog_save
 import org.umamo.ui.workspace.AlertRequest
-import org.umamo.ui.workspace.ConfirmAlternative
 import org.umamo.ui.workspace.ConfirmRequest
+import org.umamo.ui.workspace.DialogAlternative
 import org.umamo.ui.workspace.ShellOverlayState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,6 +56,22 @@ class DocumentConfirmTest {
 
 		assertNull(overlays.pendingConfirm)
 		assertEquals(1, exitCount)
+	}
+
+	@Test
+	fun aSecondRequestToQuitJoinsThePromptAlreadyUp() {
+		// Two clicks on the window's close button: one prompt, so Cancel leaves the app running rather than
+		// showing a queued twin.
+		val overlays = ShellOverlayState()
+		val commands = registry(overlays)
+		var exitCount = 0
+		commands.invoke("document.confirmExit", DirtyDocumentPrompt(discard = { exitCount++ }, save = null))
+		commands.invoke("document.confirmExit", DirtyDocumentPrompt(discard = { exitCount++ }, save = null))
+
+		overlays.cancelPending()
+
+		assertNull(overlays.pendingConfirm, "one Cancel answers every request to quit")
+		assertEquals(0, exitCount)
 	}
 
 	@Test
@@ -120,8 +136,27 @@ class DocumentConfirmTest {
 		assertSame(alert, overlays.pendingAlert)
 	}
 
+	/**
+	 * A second document.alert, landing while the first is still unread - a background export failing while a save
+	 * failure shows - waits behind it instead of replacing it.
+	 */
 	@Test
-	fun aReadyBuiltConfirmRoutesIntoTheOneSlotUnchanged() {
+	fun aSecondAlertWaitsBehindTheFirst() {
+		val overlays = ShellOverlayState()
+		val commands = registry(overlays)
+		val first = AlertRequest(Res.string.confirm_quit_unsaved, listOf("first"))
+		val second = AlertRequest(Res.string.confirm_quit_unsaved, listOf("second"))
+
+		commands.invoke("document.alert", first)
+		commands.invoke("document.alert", second)
+
+		assertSame(first, overlays.pendingAlert, "the first stays up")
+		overlays.dismissAlert()
+		assertSame(second, overlays.pendingAlert, "and the second shows once it is acknowledged")
+	}
+
+	@Test
+	fun aReadyBuiltConfirmRoutesIntoTheQueueUnchanged() {
 		val overlays = ShellOverlayState()
 		val request = ConfirmRequest(Res.string.confirm_quit_unsaved) {}
 
@@ -138,7 +173,7 @@ class DocumentConfirmTest {
 		overlays.pendingConfirm =
 			ConfirmRequest(
 				message = Res.string.confirm_quit_unsaved,
-				alternative = ConfirmAlternative(Res.string.dialog_discard) { alternativeCount++ },
+				alternative = DialogAlternative(Res.string.dialog_discard) { alternativeCount++ },
 				onConfirm = { confirmCount++ },
 			)
 
@@ -147,5 +182,39 @@ class DocumentConfirmTest {
 		assertNull(overlays.pendingConfirm)
 		assertEquals(1, alternativeCount)
 		assertEquals(0, confirmCount, "the third choice is not the confirm")
+	}
+
+	@Test
+	fun anAlertsAlternativeClearsTheSlotBeforeItRuns() {
+		val overlays = ShellOverlayState()
+		var slotAtRun: AlertRequest? = null
+		var alternativeCount = 0
+		overlays.pendingAlert =
+			AlertRequest(
+				message = Res.string.confirm_quit_unsaved,
+				alternative =
+					DialogAlternative(Res.string.dialog_discard) {
+						slotAtRun = overlays.pendingAlert
+						alternativeCount++
+					},
+			)
+
+		overlays.chooseAlertAlternative()
+		overlays.chooseAlertAlternative()
+
+		assertNull(overlays.pendingAlert)
+		assertNull(slotAtRun, "an alternative that raises an alert of its own keeps it")
+		assertEquals(1, alternativeCount, "a second pick with nothing pending runs nothing")
+	}
+
+	@Test
+	fun anAppLayerAlertCountsAsAModalAlert() {
+		val overlays = ShellOverlayState()
+
+		overlays.pendingAlert = AlertRequest(Res.string.confirm_quit_unsaved)
+
+		// The focus-reclaim effect keys on the topmost arrival, so a clicked-away alert hands focus back to the shell.
+		assertTrue(overlays.modalAlertOpen)
+		assertNotNull(overlays.topmostModalAlert)
 	}
 }

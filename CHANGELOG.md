@@ -18,11 +18,22 @@ Umamo is early alpha.
 * UI: When a text entry box is active the mouse cursor now displays the text entry cursor everywhere to indicate that text entry is currently active.
 * UI: Previous Workspace and Next Workspace added to Workspace menu.
 * UI: Add hover tooltips to the Properties area and Operation Strip.
+* UI: At startup, if the memory configuration option is not set or if there is not enough system RAM, a notification will appear with instructions on how to fix it.  This appplies to JAR based distributions.
+* UI: The text of an alert can now be selected and copied.
+* UI: Update checking: Help -> Check for Updates - Also an opt-out update check on start up.
 * Parameters: The parameters are now searchable.
 * Source Artwork: The operation strip now offers to adjust the canvas placement of imported artwork to an existing document.  The alignment and offset can be changed.
 * Source Artwork: Hovering a layer, art, or drawable row in the Sources panel previews its art.
 * Source Artwork: A new Import preference shows the Sources panel's layer positions measured from the world axes instead of the art file's top-left corner.
 * Export: Image export of the current 2D Viewport with options for transparent, solid, and grid backgrounds.
+* Diagnostics: Desktop sessions now write out the log into the `umamo/logs` directory.
+* Diagnostics: Help -> Open Log Folder opens the folder holding the session logs.
+* Diagnostics: Starting the desktop app with `--self-check` runs a headless check of its Java runtime, native libraries, and file formats then prints the results, and exits.
+* Packaging: Apple silicon Macs get a `Umamo.app` download, bundling Java 27.  Intel Macs keep using the jar.
+* Packaging: A JAR started without a memory option restarts itself with room for up to half of the system RAM when Java's default would give Umamo less than 3 GB.
+* Packaging: Installers are now built: MSI for Windows, DEB and an RPM for Linux, and DMG for MacOS ARM64.
+* Packaging: MacOS ARM64 DMG/APP are now signed and notarized.
+* Packaging: The Linux RPM and each release's `SHA256SUMS.txt` are signed with the Umamo release key and every release is now attested.
 
 ### Changed
 * UI: The CTRL+O keybinding was changed to file open instead of import CMO3.
@@ -40,6 +51,9 @@ Umamo is early alpha.
 * UV Editor: Switching to another page or layer for the first time refits the camera then remembers the camera position from there on.
 * UV Editor: Fit View now also frames meshes that sit past the edge of the atlas page.
 * Texture Atlas: Repack Atlas is now available on CMO3 models saved with "Show source artwork" turned on.
+* Packaging: The application now defaults to a maximum of 50% of system RAM instead.
+* Packaging: The app starts Java with the options that keep newer Java versions from warning about native libraries and memory access.
+* Import/Export: CMO3 and MOC3 no longer block the application process while processing.  New, save, and open document will be blocked while waiting for an export to finish.
 
 ### Fixed
 * UI: Modal key ladder issue with escape closing the preferences window first instead of the confirmation dialog.
@@ -48,6 +62,7 @@ Umamo is early alpha.
 * UI: Pressing Escape while rebinding a key would close the preferences instead of just cancelling the rebind.
 * UI: The keybindings editor's clear button no longer sits underneath the scrollbar.
 * UI: Double-clicking a workspace tab after reordering the tabs now renames the tab that was clicked instead of the tab that used to be in that spot.
+* UI: Keyboard shortcuts no longer stop working after an alert is dismissed with mouse input.
 * Source Artwork: Removed the singleton that could be accidentally be shared across documents.
 * Format: An artwork file whose magic bytes are missing now routes to its reader by extension.
 * Format: Performance optimizations for the PNG CODEC resulting in up to 50% less memory usage and up to 50% faster loads.
@@ -59,6 +74,12 @@ Umamo is early alpha.
 * Texture Atlas: Rebuilding the atlas after a reload, Replace Artwork, added artwork, or a repack no longer smears stretched pixels around art that touches the edge of its layer.
 * Texture Atlas: CMO3 models saved in Cubism with "Show source artwork" turned on now load the texture atlas as the atlas pages instead of loading every individual layer as an atlas page.
 * Viewport: Meshes that reach past the edge of their texture no longer smear the edge pixels across the overhang in the atlas display and clicking that overhang no longer selects the drawable.
+* Export: A CMO3 or MOC3 export that runs out of memory or fails now shows an alert instead of a Java error that crashes the application.
+* Export: Exporting a CMO3 from a MOC3 model now uses up to 30% less memory by reusing textures from memory instead of decoding the textures again from the source.
+* Export: Exporting a CMO3 from a CMO3 model no longer changes the open document.
+* Export: A CMO3 export of a CMO3 model now includes artwork reloaded with new pixels at the same size and position, instead of keeping the old pixels without a notice.
+* Packaging: JAR releases no longer print native access warnings on Java 24 and newer, and runs the Java 25 code paths of its libraries on Java 25 and newer.
+* Packaging: The Linux tarball's desktop entry now names Umamo's window class, so the desktop matches the running window to its menu entry and icon.
 
 
 ## 0.3.0-dev - 2026-09-15

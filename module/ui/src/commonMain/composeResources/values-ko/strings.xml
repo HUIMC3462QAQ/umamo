@@ -138,7 +138,7 @@
 	<string name="export_reason_no_texture_input_for_display">이 드로어블에는 선택한 표시 모드에 사용할 텍스처 입력이 없어 기존 표시 모드를 유지합니다.</string>
 	<string name="export_reason_no_atlas_entry">이 아트워크는 어떤 아틀라스 페이지에도 패킹되어 있지 않아 업데이트할 배치가 없습니다.</string>
 	<string name="export_reason_atlas_page_not_recomposed">이 아트워크가 아틀라스 페이지에서 이동했지만 페이지 이미지에는 여전히 이전 위치에 표시됩니다. 다시 패킹하여 해당 위치를 갱신하세요.</string>
-	<string name="export_reason_atlas_tile_metadata">이 아트워크의 이름 또는 크기가 변경되어 아틀라스 배치에 반영할 수 없습니다. 대신 아트워크를 다시 가져오세요.</string>
+	<string name="export_reason_atlas_tile_metadata">이 아트워크의 픽셀, 이름 또는 크기가 변경되어 아틀라스 배치에 반영할 수 없습니다. 대신 아트워크를 다시 가져오세요.</string>
 	<string name="export_reason_atlas_tile_rebinding">이 드로어블이 다른 아트워크에 연결되어 있으므로 다시 패킹하는 대신 아트워크를 다시 가져와야 합니다.</string>
 	<string name="export_reason_fractional_canvas_size">CMO3는 캔버스 크기를 정수 픽셀 단위로 저장하므로 소수 값은 기록하지 않았습니다.</string>
 	<string name="confirm_export_overwrite">내보내기를 진행하면 기존 파일 %1$d개를 덮어씁니다: %2$s</string>
@@ -167,7 +167,6 @@
 	<string name="menu_web_site">웹사이트…</string>
 	<string name="menu_documentation">공식 문서…</string>
 	<string name="menu_credits">제작진…</string>
-	<string name="menu_quick_setup">빠른 설정…</string>
 	<string name="menu_about">Umamo에 대해서…</string>
 	<string name="about_title">Umamo에 대해서</string>
 	<string name="about_version">버전 %1$s</string>
@@ -325,6 +324,7 @@
 	<string name="status_parameters">파라미터: %1$d</string>
 	<string name="status_deformers">디포머: %1$d</string>
 	<string name="status_glues">글루: %1$d</string>
+	<string name="status_bind_palette">커맨드 팔레트</string>
 	<string name="status_bind_confirm">LMB / Enter: 확인</string>
 	<string name="status_bind_cancel">RMB / Esc: 취소</string>
 	<string name="status_bind_edit_mode">편집 모드</string>
@@ -332,9 +332,6 @@
 	<string name="status_bind_grab">그랩</string>
 	<string name="status_bind_scale">크기 조절</string>
 	<string name="status_bind_rotate">회전</string>
-	<string name="status_bind_insert_key">키 추가</string>
-	<string name="status_bind_delete_key">키 삭제</string>
-	<string name="status_bind_pin">고정</string>
 	<string name="status_select_mode">선택 모드</string>
 	<string name="status_mesh_vertices">%1$d/%2$d개 정점</string>
 	<string name="status_mesh_edges">%1$d/%2$d개 간선</string>
@@ -533,19 +530,6 @@
 	<string name="placement_options_angle">각도</string>
 	<string name="placement_options_scale_x">X 크기 조절</string>
 	<string name="placement_options_scale_y">Y 크기 조절</string>
-	<!-- The mesh / object / UV transform rows of the operation settings strip. -->
-	<string name="transform_options_move_z">Z 이동</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="transform_options_scale_z">Z 크기 조절</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="transform_options_proportional">비례 편집</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="transform_options_falloff">감쇠</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="transform_options_proportional_size">비례 편집 크기</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="transform_options_connected">연결된 것만</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="transform_options_slide_factor">계수</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<!-- The Merge row of the operation settings strip and its choices. -->
-	<string name="merge_options_target">병합 위치</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="merge_target_center">중심</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="merge_target_first">처음</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
-	<string name="merge_target_last">마지막</string> <!-- NEEDS HUMAN REVIEW: LLM Translated-->
 	<string name="blend_mode_normal">표준</string>
 	<string name="blend_mode_additive">가산</string>
 	<string name="blend_mode_multiply">곱하기</string>
@@ -594,8 +578,6 @@
 	<string name="cmd_preferences">설정</string>
 	<string name="settings_title">설정</string>
 	<string name="settings_close">설정 닫기</string>
-	<string name="quick_setup_title">빠른 설정</string>
-	<string name="quick_setup_continue">계속</string>
 	<string name="settings_category_interface">인터페이스</string>
 	<string name="settings_category_colors">색상</string>
 	<string name="settings_category_viewport">뷰포트</string>
@@ -608,7 +590,6 @@
 	<string name="settings_interface_language">언어</string>
 	<string name="settings_interface_history_steps">작업 내역 단계</string>
 	<string name="settings_keybindings_preset">프리셋</string>
-	<string name="settings_keybindings_preset_quick">단축키 프리셋</string>
 	<string name="settings_keymap_preset_default">기본</string>
 	<string name="settings_keymap_preset_cubism">Cubism</string>
 	<string name="settings_keymap_preset_blender">Blender</string>
@@ -649,6 +630,7 @@
 	<string name="keyform_sheet_filter_geometry">변형 트랙</string>
 	<string name="keyform_sheet_filter_channels">속성 트랙</string>
 	<string name="keyform_sheet_filter_blend_shapes">블렌드 셰이프 트랙</string>
+	<string name="keyform_sheet_no_parameter">트랙을 보려면 파라미터를 선택하세요.</string>
 	<string name="keyform_sheet_no_tracks">이 파라미터에는 아직 키가 지정되지 않았습니다.</string>
 	<string name="owner_kind_drawable">드로어블</string>
 	<string name="owner_kind_warp_deformer">워프 디포머</string>

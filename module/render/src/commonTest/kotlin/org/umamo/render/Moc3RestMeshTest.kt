@@ -24,7 +24,7 @@ import kotlin.test.assertEquals
  * Unit tests for [restMeshesToCanvasSpace] on a tiny synthetic model.  The rebase rewrites ONLY the
  * geometry (base positions and keyform/blend-shape deltas); every non-positional keyform channel must
  * ride along unchanged.  Pins the modelA hologram regression, where the rebase rebuilt each MeshForm
- * and silently dropped its multiply/screen colours, stripping the per-drawable tints off every
+ * and silently dropped its multiply/screen colors, stripping the per-drawable tints off every
  * MOC3-imported model (the hologram overlay quad lost the blue that its HardLight blend needed).
  */
 class Moc3RestMeshTest {
