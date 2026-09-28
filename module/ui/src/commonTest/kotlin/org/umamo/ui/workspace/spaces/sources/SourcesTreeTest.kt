@@ -306,22 +306,6 @@ class SourcesTreeTest {
 		assertTrue(!layerKeyLooksStable("Eye#4"))
 	}
 
-	@Test
-	fun aDropRebindsOnlyAcrossTheTwoKindsAndNeverOntoALostRow() {
-		val ref = SourceLayerRef(artA, "lyid:1", true)
-
-		fun node(kind: SourcesNodeKind, status: SourcesStatus = SourcesStatus.None): SourcesNode = SourcesNode("row", "Row", SourcesDetail.None, kind, status, emptyList())
-
-		assertEquals(AtlasTileId("t") to ref, relinkFor(SourcesDragPayload.Layer(ref), node(SourcesNodeKind.Tile(AtlasTileId("t")))))
-		assertEquals(AtlasTileId("t") to ref, relinkFor(SourcesDragPayload.Tile(AtlasTileId("t")), node(SourcesNodeKind.Layer(ref), SourcesStatus.Bound)))
-		assertEquals(null, relinkFor(SourcesDragPayload.Tile(AtlasTileId("t")), node(SourcesNodeKind.Tile(AtlasTileId("u")))))
-		assertEquals(null, relinkFor(SourcesDragPayload.Layer(ref), node(SourcesNodeKind.Source(artA))))
-		assertEquals(null, relinkFor(SourcesDragPayload.Tile(AtlasTileId("t")), node(SourcesNodeKind.Layer(ref), SourcesStatus.NeedsReview)), "a lost row is no target")
-		assertEquals(null, relinkFor(SourcesDragPayload.Tile(AtlasTileId("t")), node(SourcesNodeKind.Layer(ref), SourcesStatus.Emptied)), "nor an erased one")
-		assertEquals(null, relinkFor(SourcesDragPayload.Tile(AtlasTileId("t")), node(SourcesNodeKind.Layer(ref), SourcesStatus.SourceReplaced)), "nor one a replacement lost")
-		assertEquals(null, relinkFor(SourcesDragPayload.Tile(AtlasTileId("t")), node(SourcesNodeKind.Layer(ref), SourcesStatus.Ignored)), "nor an ignored one")
-	}
-
 	/**
 	 * A repeated inventory key (a foreign or broken file) still yields unique row ids - the list keys
 	 * on them - and the bound tile lists once, under the first row.

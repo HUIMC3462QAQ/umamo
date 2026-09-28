@@ -56,7 +56,7 @@ private const val PERSIST_DEBOUNCE_MS = 400L
  * Kept separate from [EditorShell] so the shell itself stays Settings-free and unit-testable; this is
  * the thin wrapper apps mount.
  *
- * @param ViewportHost? viewportHost The platform GL viewport injector, or null for placeholders.
+ * @param ViewportHost? viewportHost What draws a 2D viewport area, or null with no render service to draw with.
  * @param Map spaceOverrides Per-kind space descriptors layered over the base registry.
  * @param CommandRegistry commandRegistry The action registry (the app may pre-register commands).
  * @param List appMenu The application menu-bar contents, forwarded to the shell (empty renders no bar).

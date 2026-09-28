@@ -109,8 +109,8 @@ internal fun UvEditorSpace(scope: AreaScope) {
 	val service = LocalPuppetViewportService.current
 
 	// STRICT PARITY: the UV editor renders its surface through the GL engine, exactly like the 2D viewport.
-	// With no service (Android until the GLES engine lands) show the grid placeholder - no underlay, no
-	// editing camera - mirroring Viewport2DBody's null-host branch.
+	// With no service (Android until the GLES engine lands) show a bare panel - no underlay, no
+	// editing camera - as Viewport2DBody shows a plain backdrop with no host.
 	if (model == null || session == null || service == null) {
 		PlaceholderSpace("")
 		return

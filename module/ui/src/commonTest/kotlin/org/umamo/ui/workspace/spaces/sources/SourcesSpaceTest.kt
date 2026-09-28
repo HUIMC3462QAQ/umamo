@@ -19,8 +19,8 @@ import kotlin.test.assertTrue
 
 /**
  * Unit-tests the Sources space's pure pieces: the row visual (which glyph and traffic-light tint a
- * status reads as, and which word rides the tooltip) and the relink list's grouping by file.  Neither
- * needs a composition.
+ * status reads as, and which word rides the tooltip), the relink list's grouping by file, what a row
+ * previews, and what a dropped row rebinds.  None needs a composition.
  */
 class SourcesSpaceTest {
 	private val icons = LocalUmamoIcons
@@ -151,6 +151,22 @@ class SourcesSpaceTest {
 		assertEquals(listOf("Hair"), relinkGroups(sources, "").single().layers.map { layer -> layer.name }, "neither a lost row, an erased one, nor an ignored one is a target")
 		assertTrue(relinkGroups(sources, "old").isEmpty())
 		assertTrue(relinkGroups(sources, "sketch").isEmpty())
+	}
+
+	/** A dragged row rebinds only between a layer and a tile, and a row the file no longer offers is no target. */
+	@Test
+	fun aDropRebindsOnlyAcrossTheTwoKindsAndNeverOntoALostRow() {
+		val ref = SourceLayerRef(artA, "lyid:1", true)
+		val tile = SourcesDragPayload.Tile(AtlasTileId("t"))
+
+		assertEquals(AtlasTileId("t") to ref, relinkFor(SourcesDragPayload.Layer(ref), node(SourcesNodeKind.Tile(AtlasTileId("t")), SourcesStatus.None)))
+		assertEquals(AtlasTileId("t") to ref, relinkFor(tile, node(SourcesNodeKind.Layer(ref), SourcesStatus.Bound)))
+		assertEquals(null, relinkFor(tile, node(SourcesNodeKind.Tile(AtlasTileId("u")), SourcesStatus.None)))
+		assertEquals(null, relinkFor(SourcesDragPayload.Layer(ref), node(SourcesNodeKind.Source(artA), SourcesStatus.None)))
+		assertEquals(null, relinkFor(tile, node(SourcesNodeKind.Layer(ref), SourcesStatus.NeedsReview)), "a lost row is no target")
+		assertEquals(null, relinkFor(tile, node(SourcesNodeKind.Layer(ref), SourcesStatus.Emptied)), "nor an erased one")
+		assertEquals(null, relinkFor(tile, node(SourcesNodeKind.Layer(ref), SourcesStatus.SourceReplaced)), "nor one a replacement lost")
+		assertEquals(null, relinkFor(tile, node(SourcesNodeKind.Layer(ref), SourcesStatus.Ignored)), "nor an ignored one")
 	}
 
 	/** The chip's confidence is a whole percentage, rounded, never past the ends. */

@@ -22,8 +22,8 @@ import org.umamo.render.ViewportCamera
  * recomposition-gated cancel backstop each overlay runs (`LaunchedEffect(selectToolKind) { marquee.cancel() }`).
  *
  * Keyed on the tool KIND, not the whole tool value: resizing a circle brush makes a new Circle(radius),
- * which must NOT re-fire and wipe the in-flight stroke mid-paint.  The three overlays derived this
- * identically before it moved here.
+ * which must NOT re-fire and wipe the in-flight stroke mid-paint.  Derived here once for the three
+ * overlays that run the backstop, so they cannot come to key on different things.
  *
  * @param ActiveSelectTool? ownedSelectTool The select tool this area owns, or null.
  * @return Int A kind ordinal: 0 none, 1 armed box, 2 circle.

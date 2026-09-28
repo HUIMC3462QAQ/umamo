@@ -181,7 +181,7 @@ import org.umamo.ui.workspace.statusbar.StatusBar
  * registry - the input spine.
  *
  * @param InterfaceLayout initialLayout The starting layout (defaults to the seeded two-workspace layout).
- * @param ViewportHost? viewportHost The platform GL viewport injector, or null for placeholders.
+ * @param ViewportHost? viewportHost What draws a 2D viewport area, or null with no render service to draw with.
  * @param Map spaceOverrides Per-kind space descriptors layered over the base registry.
  * @param List propertyTabOverrides Property tabs layered over the base tab set (a vendor extension seam).
  * @param CommandRegistry commandRegistry The action registry (the app may pre-register commands).

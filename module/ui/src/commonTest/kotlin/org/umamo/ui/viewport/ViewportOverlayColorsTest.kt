@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
  * older user setting may hold #RRGGBB while the preferences HexColorField commits canonical
  * #AARRGGBB - a 6-digit-only parser would silently ignore every edit made in the window.
  */
-class ViewportSettingsTest {
+class ViewportOverlayColorsTest {
 	private val defaultComponents = parseSelectionHighlightColor(ViewportColorSettings.SELECTION_HIGHLIGHT_DEFAULT)
 
 	@Test
