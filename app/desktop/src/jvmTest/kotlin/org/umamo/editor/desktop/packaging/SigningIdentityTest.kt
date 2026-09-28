@@ -33,6 +33,31 @@ class SigningIdentityTest {
 		assertFalse(Regex("""signing\s*\{""").containsMatchIn(buildScript.readText()), "the release workflow switches signing on, from its command line")
 	}
 
+	/**
+	 * The plugin copies the file-association icons into the app bundle after signing it, so a signed build re-signs the
+	 * bundle when the plugin is done: with the same entitlements file the plugin signed with, which holds the three
+	 * hardened-runtime exceptions a JVM needs and nothing more.
+	 */
+	@Test
+	fun aSignedBundleIsResealedWithThePluginsEntitlements() {
+		val script = buildScript.readText()
+		val entitlements = File("packaging/macos/entitlements.plist").readText()
+
+		assertTrue("entitlementsFile.set(project.file(\"packaging/macos/entitlements.plist\"))" in script, "the plugin signs with the project's file")
+		assertTrue("runtimeEntitlementsFile.set(project.file(\"packaging/macos/entitlements.plist\"))" in script, "the runtime too")
+		assertTrue("\"--entitlements\", entitlements.absolutePath" in script, "and so does the bundle's re-signing")
+		assertTrue("tasks.matching { task -> task.name == \"createDistributable\" }" in script, "after the plugin's app image task")
+		val keys = Regex("<key>([^<]+)</key>").findAll(entitlements).map { match -> match.groupValues[1] }.toSet()
+		assertEquals(
+			setOf(
+				"com.apple.security.cs.allow-jit",
+				"com.apple.security.cs.allow-unsigned-executable-memory",
+				"com.apple.security.cs.disable-library-validation",
+			),
+			keys,
+		)
+	}
+
 	@Test
 	fun aPacketLengthIsReadInEitherHeaderFormat() {
 		assertEquals(2 to 51, packetBody(byteArrayOf(0x98.toByte(), 51)), "old format, one-octet length")

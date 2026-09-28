@@ -44,6 +44,10 @@ printf '%s' "${MACOS_DEVELOPER_ID_P12}" | base64 --decode > "${certificate}"
 curl --fail --silent --show-error --location --output "${intermediate}" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
 
 keychain_password="$(openssl rand -hex 24)"
+# Masked in case an error message ever quotes a command line that carries it.
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+	echo "::add-mask::${keychain_password}"
+fi
 security create-keychain -p "${keychain_password}" "${keychain}"
 keychain_state="created"
 # No auto-lock for the length of a job, so a slow notarization cannot leave codesign facing a locked keychain.
@@ -52,6 +56,7 @@ security unlock-keychain -p "${keychain_password}" "${keychain}"
 security import "${intermediate}" -k "${keychain}"
 # -x: the private key cannot be exported from the keychain again.
 security import "${certificate}" -k "${keychain}" -f pkcs12 -x -P "${MACOS_DEVELOPER_ID_P12_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
+
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychain_password}" "${keychain}" > /dev/null
 
 # Put the keychain first in the user search list, keeping the ones already there.
@@ -66,7 +71,6 @@ done < <(security list-keychains -d user)
 security list-keychains -d user -s "${search_list[@]}"
 
 identities="$(security find-identity -v -p codesigning "${keychain}")"
-echo "${identities}"
 developer_ids="$(printf '%s\n' "${identities}" | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p')"
 count="$(printf '%s\n' "${developer_ids}" | grep -c . || true)"
 if [ "${count}" -ne 1 ]; then
