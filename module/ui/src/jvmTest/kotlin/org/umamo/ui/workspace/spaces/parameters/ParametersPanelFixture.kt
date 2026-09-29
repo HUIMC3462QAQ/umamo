@@ -78,6 +78,8 @@ import org.umamo.ui.action.parseKeyChord
 import org.umamo.ui.kit.container.OverflowRow
 import org.umamo.ui.kit.textentry.InlineEditController
 import org.umamo.ui.kit.textentry.LocalInlineEditController
+import org.umamo.ui.model.DrawableThumbnailProvider
+import org.umamo.ui.model.LocalDrawableThumbnails
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalLiveParams
 import org.umamo.ui.model.LocalPuppet
@@ -94,6 +96,8 @@ import org.umamo.ui.workspace.KeyableHover
 import org.umamo.ui.workspace.KeyformSheetViews
 import org.umamo.ui.workspace.LocalKeyableHover
 import org.umamo.ui.workspace.LocalKeyformSheetViews
+import org.umamo.ui.workspace.LocalRelationPick
+import org.umamo.ui.workspace.RelationPickController
 import org.umamo.ui.workspace.ShellOverlayState
 import org.umamo.ui.workspace.SpaceKind
 import org.umamo.ui.workspace.area.AreaDragController
@@ -102,6 +106,7 @@ import org.umamo.ui.workspace.commands.CommandRouting
 import org.umamo.ui.workspace.commands.SessionAvailability
 import org.umamo.ui.workspace.commands.chromeCommands
 import org.umamo.ui.workspace.commands.keyformCommands
+import org.umamo.ui.workspace.commands.objectCommands
 import org.umamo.ui.workspace.commands.registerAll
 import org.umamo.ui.workspace.commands.selectCommands
 import org.umamo.ui.workspace.layout.WorkspaceLayoutController
@@ -114,6 +119,7 @@ import org.umamo.ui.workspace.shell.observeTextEntryPresses
 import org.umamo.ui.workspace.shell.shouldReleaseTextEntry
 import org.umamo.ui.workspace.shell.toShellKeyStroke
 import org.umamo.ui.workspace.spaces.keyformsheet.KeyformSheetSpace
+import org.umamo.ui.workspace.spaces.outliner.OutlinerSpace
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -308,6 +314,16 @@ internal fun panelFixtureModel(runtimeTarget: RuntimeTarget = RuntimeTarget.NoTa
  * @property String selectPart The keyform sheet's label entry that selects a part.
  * @property String sheetNoTracks The keyform sheet's notice for a parameter nothing is keyed on.
  * @property String sheetAllFiltered The keyform sheet's notice for tracks the filters hide.
+ * @property String outlinerRoot The outliner's puppet root row.
+ * @property String outlinerArmature The outliner's deformer-hierarchy row.
+ * @property String expand The accessible name of a closed branch's chevron in the outliner.
+ * @property String collapse The accessible name of an open branch's chevron in the outliner.
+ * @property String selectHierarchy The outliner's Select Hierarchy entry.
+ * @property String toggleVisibility The outliner's Toggle Visibility entry, which also names a row's eye.
+ * @property String toggleSelectable The outliner's Toggle Selectability entry, which also names a row's pointer.
+ * @property String outlinerRename The outliner's Rename entry.
+ * @property String outlinerDelete The outliner's Delete entry.
+ * @property String deleteHierarchy The outliner's Delete Hierarchy entry.
  */
 internal class PanelText(
 	val reset: String,
@@ -338,6 +354,16 @@ internal class PanelText(
 	val selectPart: String,
 	val sheetNoTracks: String,
 	val sheetAllFiltered: String,
+	val outlinerRoot: String,
+	val outlinerArmature: String,
+	val expand: String,
+	val collapse: String,
+	val selectHierarchy: String,
+	val toggleVisibility: String,
+	val toggleSelectable: String,
+	val outlinerRename: String,
+	val outlinerDelete: String,
+	val deleteHierarchy: String,
 )
 
 /**
@@ -350,6 +376,10 @@ internal class PanelText(
  * @property Boolean showKeyformSheet Whether a keyform sheet is mounted beside the panel, over the same
  *   session and the same pose hand-off.  The sheet gets what the shell gives it: the keyable hover, the
  *   open-sheet registry, and the keyform and select commands, routed as though the pointer were over it.
+ * @property Boolean showOutliner Whether an outliner is mounted beside the panel, over the same session.  It
+ *   gets what the shell gives it: a relation pick controller, a thumbnail provider, and the object commands.
+ * @property DrawableThumbnailProvider? thumbnails The art the outliner previews beside a rested-on row, or null
+ *   for none, which is what a document without rendered art gives it.
  * @property PuppetModel model The rig the session opens on.
  */
 internal class ParametersPanelHarness(
@@ -359,6 +389,8 @@ internal class ParametersPanelHarness(
 	val showHeader: Boolean = false,
 	val provideDocument: Boolean = true,
 	val showKeyformSheet: Boolean = false,
+	val showOutliner: Boolean = false,
+	val thumbnails: DrawableThumbnailProvider? = null,
 	val model: PuppetModel = panelFixtureModel(runtimeTarget),
 ) {
 	val session = EditorSession(model, PANEL_FIXTURE_POSE)
@@ -366,6 +398,7 @@ internal class ParametersPanelHarness(
 	val liveParamsHandle = LiveParamsAdapter(liveParams, session)
 	val scope = AreaScope(PANEL_AREA_ID)
 	val sheetScope = AreaScope(PANEL_SHEET_AREA_ID)
+	val outlinerScope = AreaScope(PANEL_OUTLINER_AREA_ID)
 	val inlineEditController = InlineEditController()
 	val rowDragCancel = RowDragCancelController()
 	val overlays = ShellOverlayState()
@@ -374,9 +407,13 @@ internal class ParametersPanelHarness(
 	val rootFocus = FocusRequester()
 	val keyableHover = KeyableHover()
 	val keyformSheetViews = KeyformSheetViews()
+	val relationPick = RelationPickController()
 
 	/** The size the keyform sheet is laid out at, when one is mounted. */
 	var sheetSize by mutableStateOf(DpSize(PANEL_SHEET_WIDTH, PANEL_SHEET_HEIGHT))
+
+	/** The size the outliner is laid out at, when one is mounted; a short one makes its list scroll. */
+	var outlinerSize by mutableStateOf(DpSize(PANEL_OUTLINER_WIDTH, PANEL_OUTLINER_HEIGHT))
 
 	/** Whether the root itself holds focus, so a focus left null can be told from one a field took. */
 	var rootFocused by mutableStateOf(false)
@@ -460,6 +497,11 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				selectCommands(harness.session, routing, harness.keyformSheetViews, availability),
 		)
 	}
+	if (harness.showOutliner) {
+		// The outliner's menu dispatches Select Hierarchy through the registry.  No selection handle: that
+		// command reads the selection off the session.
+		harness.registry.registerAll(objectCommands(harness.session, null, SessionAvailability(harness.session)))
+	}
 	setContent {
 		harness.text =
 			PanelText(
@@ -491,6 +533,16 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				selectPart = stringResource(Res.string.keyform_sheet_select_owner, stringResource(Res.string.owner_kind_part)),
 				sheetNoTracks = stringResource(Res.string.keyform_sheet_no_tracks),
 				sheetAllFiltered = stringResource(Res.string.keyform_sheet_all_filtered),
+				outlinerRoot = stringResource(Res.string.outliner_root),
+				outlinerArmature = stringResource(Res.string.outliner_armature),
+				expand = stringResource(Res.string.common_expand),
+				collapse = stringResource(Res.string.common_collapse),
+				selectHierarchy = stringResource(Res.string.outliner_menu_select_hierarchy),
+				toggleVisibility = stringResource(Res.string.outliner_menu_visibility),
+				toggleSelectable = stringResource(Res.string.outliner_menu_selectable),
+				outlinerRename = stringResource(Res.string.outliner_menu_rename),
+				outlinerDelete = stringResource(Res.string.outliner_menu_delete),
+				deleteHierarchy = stringResource(Res.string.outliner_menu_delete_hierarchy),
 			)
 		// Collected, not read once: an edit publishes a new model, and the panel has to be handed it.
 		val puppet by harness.session.model.collectAsState()
@@ -507,6 +559,8 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				LocalSelection provides rememberSessionEditorState(harness.session),
 				LocalKeyableHover provides (if (harness.showKeyformSheet) harness.keyableHover else null),
 				LocalKeyformSheetViews provides (if (harness.showKeyformSheet) harness.keyformSheetViews else null),
+				LocalRelationPick provides harness.relationPick,
+				LocalDrawableThumbnails provides harness.thumbnails,
 			) {
 				// The viewport binding's pose mirror.  A commit records the live hand-off's map, so without
 				// this an undo would leave the hand-off on the undone pose and the next commit would restore it.
@@ -585,6 +639,11 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 						if (harness.showKeyformSheet) {
 							Box(modifier = Modifier.size(harness.sheetSize).testTag(PANEL_SHEET_TAG)) {
 								KeyformSheetSpace(harness.sheetScope)
+							}
+						}
+						if (harness.showOutliner) {
+							Box(modifier = Modifier.size(harness.outlinerSize).testTag(PANEL_OUTLINER_TAG)) {
+								OutlinerSpace(harness.outlinerScope, Modifier.fillMaxSize())
 							}
 						}
 					}
@@ -1073,6 +1132,21 @@ internal val PANEL_SHEET_WIDTH: Dp = 580.dp
 
 /** The height the keyform sheet beside the panel is laid out at. */
 internal val PANEL_SHEET_HEIGHT: Dp = 320.dp
+
+/** The id of the area the outliner beside the panel is mounted in. */
+internal const val PANEL_OUTLINER_AREA_ID = "area-3"
+
+/** The tag of the box the outliner beside the panel is mounted in. */
+internal const val PANEL_OUTLINER_TAG = "outliner"
+
+/** The width the outliner beside the panel is laid out at: wide enough that no fixture name scrolls. */
+internal val PANEL_OUTLINER_WIDTH: Dp = 260.dp
+
+/** The height the outliner beside the panel is laid out at: tall enough for every row of its rig, open or not. */
+internal val PANEL_OUTLINER_HEIGHT: Dp = 480.dp
+
+/** An outliner short enough that revealing a row deep in the tree has to scroll: five rows of 22 dp. */
+internal val PANEL_OUTLINER_HEIGHT_SCROLLING: Dp = 110.dp
 
 /** The command the bound chord runs. */
 internal const val PANEL_SHORTCUT_COMMAND = "test.shortcut"

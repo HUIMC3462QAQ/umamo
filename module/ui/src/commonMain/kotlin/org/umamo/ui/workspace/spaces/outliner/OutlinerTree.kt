@@ -1,5 +1,6 @@
 package org.umamo.ui.workspace.spaces.outliner
 
+import androidx.compose.runtime.Immutable
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
 import org.umamo.runtime.model.Deformer
@@ -42,6 +43,10 @@ enum class OutlinerIcon {
  * grouping rows (the puppet root and the Armature deformer-hierarchy node). Synthetic rows carry a null
  * [target] - they only expand / collapse, they do not select.
  *
+ * Immutable: a node is built once with its tree and never changed after, its children included.  The
+ * annotation is that promise made to Compose, which then compares a node by value, so a row handed a
+ * node equal to the one it has skips.
+ *
  * @property String id A stable, unique key for expand-state and reveal lookup (never reused).
  * @property String label The display text (already localised for synthetic rows; raw document name otherwise).
  * @property OutlinerIcon icon The placeholder icon kind.
@@ -50,6 +55,7 @@ enum class OutlinerIcon {
  * @property List children The child rows, in display order (drawables before sub-parts within a part).
  * @property Boolean selectable Whether the row's entity is viewport-selectable (synthetic rows true).
  */
+@Immutable
 data class OutlinerNode(
 	val id: String,
 	val label: String,

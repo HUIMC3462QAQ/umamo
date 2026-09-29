@@ -160,6 +160,33 @@ class SourceArtImportTest {
 		)
 	}
 
+	/**
+	 * A layer or a folder with no name shows its id, so its row can be read and told from its neighbours.
+	 * The inventory keeps the layer's own name: it mirrors the file, and a reload matches against it.
+	 */
+	@Test
+	fun aLayerOrFolderWithNoNameShowsItsId() {
+		val art =
+			FixtureArt(
+				widthPx = 50,
+				heightPx = 50,
+				layers =
+					listOf(
+						layer("lyid:1", "", order = 1, left = 0, top = 0, raster = rasterOf(4, 4), groupPath = "Unnamed"),
+						layer("lyid:0", "  ", order = 0, left = 10, top = 10, raster = rasterOf(4, 4)),
+					),
+				groups = listOf(FixtureGroup("Unnamed", "")),
+			)
+
+		val puppet = SourceArtImport.fromSourceArt(art, descriptor).puppet
+
+		assertEquals(2, puppet.drawables.size)
+		assertEquals(puppet.drawables.map { drawable -> drawable.id.raw }, puppet.drawables.map { drawable -> drawable.name }, "each drawable shows its id")
+		assertEquals(puppet.parts.map { part -> part.id.raw }, puppet.parts.map { part -> part.name }, "the folder's part shows its id")
+		assertEquals(1, puppet.parts.size)
+		assertEquals(setOf("", "  "), puppet.sources.single().layers.map { row -> row.name }.toSet(), "the inventory keeps the file's names")
+	}
+
 	/** The quad spans the opaque bounds plus the margin, in canvas pixels and in the art's own frame. */
 	@Test
 	fun theBirthQuadIsTheOpaqueBoundsPlusTheMarginInBothFrames() {
