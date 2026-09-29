@@ -13,10 +13,10 @@ import org.umamo.runtime.model.Parameter
  *
  * The rules live in :edit rather than in the sheet because they are statements about what an edit MEANS,
  * and several call sites need to agree on each - the aimed removal behind Alt+I and the lane menu, the
- * selected-keys removal behind Delete, and the summary-mark removal all go through one rule, and a mark
- * drag and the arrow-key nudge through another.  A [TrackKeyRef]'s row key is opaque here, which is all
- * this needs: the algebra compares row keys, it never resolves one, and a caller that edits a track pairs
- * each ref with the track it resolves to.
+ * selected-keys removal behind Delete, and the summary-mark removal all go through one rule, and a
+ * multi-key drag, a summary-mark drag, and the arrow-key nudge through another.  A [TrackKeyRef]'s row key
+ * is opaque here, which is all this needs: the algebra compares row keys, it never resolves one, and a
+ * caller that edits a track pairs each ref with the track it resolves to.
  */
 
 /**
@@ -98,7 +98,8 @@ fun EditorSession.insertingKey(inserted: TrackKeyRef?, insertKey: () -> Unit) {
 
 /**
  * Drags every key in [keys] by [fraction] of its parameter's range, with the key selection re-pointed at
- * where they land, as ONE undo step - the keyform sheet's multi-key drag and its arrow-key nudge.
+ * where they land, as ONE undo step - the keyform sheet's multi-key drag, its summary-mark drag, and its
+ * arrow-key nudge.
  *
  * The selection becomes exactly [keys] at their landed ordinals: a crossing renumbers the axis, so the refs
  * as they read before the drag would name whichever keys took those places.  A selected ref the caller could
@@ -158,24 +159,6 @@ fun EditorSession.moveTrackKeySelectingIt(
 	stageKeySelection(landedSelection)
 	moveTrackKey(track, parameter, key.keyIndex, toValue)
 	setKeySelection(landedSelection)
-}
-
-/**
- * Moves every key in [keys] to [toValue] and clears the key selection, as ONE undo step - the keyform
- * sheet's summary-mark drag.
- *
- * Cleared rather than re-pointed: each member's ordinal may change on its own track, and dropping the
- * selection is safer than guessing.  STAGE, EDIT, CONFIRM, with the clear staged BEFORE the move so the
- * move's own snapshot records it; the confirm records it when the move records nothing (released where it
- * was picked up), where the clear would otherwise vanish with it.
- *
- * @param List keys The (track, parameter, key ordinal) triples to move.
- * @param Float toValue The destination, in the parameter's units.
- */
-fun EditorSession.moveTrackKeysClearingSelection(keys: List<Triple<KeyformTrackRef, Parameter, Int>>, toValue: Float) {
-	stageKeySelection(emptySet())
-	moveTrackKeys(keys, toValue)
-	setKeySelection(emptySet())
 }
 
 /**

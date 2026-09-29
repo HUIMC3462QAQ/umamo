@@ -303,6 +303,23 @@ internal fun opacityKeysOf(harness: ParametersPanelHarness, drawableId: Drawable
 		.toList()
 
 /**
+ * The key positions of the part's opacity grid on Body X.
+ *
+ * @param ParametersPanelHarness harness The mounted harness.
+ * @return List<Float> The positions, ascending.
+ */
+internal fun partOpacityKeysOf(harness: ParametersPanelHarness): List<Float> =
+	harness.session.model.value.parts
+		.first { part -> part.id == SheetIds.part }
+		.channelGrids
+		.gridsByChannel
+		.getValue(FormChannel.OPACITY)
+		.axes
+		.first { axis -> axis.parameterId == PanelIds.bodyX }
+		.keys
+		.toList()
+
+/**
  * Asserts key positions a gesture produced, each to within what a pixel of pointer travel can resolve.
  *
  * @param List expected The positions the gesture should have produced.

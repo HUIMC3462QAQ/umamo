@@ -28,6 +28,7 @@ class KeyformSheetGestureTest {
 	private val geometryKey1 = TrackKeyRef(PanelIds.bodyX, SheetRows.GEOMETRY, 1)
 	private val geometryKey2 = TrackKeyRef(PanelIds.bodyX, SheetRows.GEOMETRY, 2)
 	private val opacityKey0 = TrackKeyRef(PanelIds.bodyX, SheetRows.OPACITY, 0)
+	private val opacityKey1 = TrackKeyRef(PanelIds.bodyX, SheetRows.OPACITY, 1)
 
 	/** A click on a mark selects its key and lands the pose on it, as one step. */
 	@Test
@@ -88,8 +89,8 @@ class KeyformSheetGestureTest {
 		}
 
 	/**
-	 * An unselected key dragged while other keys are selected moves alone and replaces the selection, as a
-	 * click on it would, in one step that one undo reverses whole.
+	 * An unselected key dragged while other keys are selected replaces the selection as the drag starts, as a
+	 * click on it would, and moves alone, in one step that one undo reverses whole.
 	 */
 	@Test
 	fun anUnselectedMarkDraggedReplacesTheSelection() =
@@ -100,14 +101,19 @@ class KeyformSheetGestureTest {
 			assertEquals(setOf(geometryKey2, opacityKey0), harness.session.keySelection.value, "two keys selected before the drag")
 			val cursorBefore = harness.historyCursor
 
-			drag(
+			pressAndMove(
 				lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, -5f),
 				listOf(
 					lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, -2.5f),
 					lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, 2.5f),
 				),
 			)
+			assertEquals(setOf(geometryKey0), harness.session.keySelection.value, "mid-drag, the dragged key is the selection")
+			assertNull(harness.sheetViewState.dragPreviewFraction, "and it moves alone")
+			assertEquals(listOf(-5f, 0f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "the model is untouched until the release")
+			assertEquals(cursorBefore, harness.historyCursor, "and so is history")
 
+			releasePress()
 			assertKeysNear(listOf(0f, 2.5f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "only the dragged key moved, past the one at 0")
 			assertEquals(listOf(0f, 5f, 8f), opacityKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "the selected opacity key stayed put")
 			assertEquals(setOf(geometryKey1), harness.session.keySelection.value, "the dragged key, where it landed, is all that is selected")
@@ -191,27 +197,65 @@ class KeyformSheetGestureTest {
 			assertEquals(0f, harness.committed(PanelIds.bodyX))
 		}
 
-	/** Dragging a summary mark moves everything it stands for to one place, and drops the selection, as one step. */
+	/**
+	 * An unselected summary mark dragged selects every key it stands for as the drag starts, in place of the
+	 * selection, and drags them together, in one step that one undo reverses whole.
+	 */
 	@Test
-	fun aSummaryDragMovesItsKeysTogetherAndDropsTheSelection() =
+	fun anUnselectedSummaryDragSelectsAndMovesItsKeys() =
 		runComposeUiTest {
 			val harness = mountSheet(listOf(PanelIds.bodyX))
 			clickAt(chevronPoint(harness, SheetRows.DRAWABLE))
 			clickAt(lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, -5f))
-			assertEquals(setOf(geometryKey0), harness.session.keySelection.value, "a selection for the drag to drop")
+			assertEquals(setOf(geometryKey0), harness.session.keySelection.value, "a selection for the drag to replace")
 			val cursorBefore = harness.historyCursor
 
-			drag(
+			pressAndMove(
 				lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, 5f),
 				listOf(
 					lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, 6f),
 					lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, 7f),
 				),
 			)
+			assertEquals(setOf(geometryKey2, opacityKey1), harness.session.keySelection.value, "mid-drag, the summary's keys are the selection")
+			assertNear(0.1f, harness.sheetViewState.dragPreviewFraction, "and they drag together")
+			assertEquals(cursorBefore, harness.historyCursor)
 
+			releasePress()
 			assertKeysNear(listOf(-5f, 0f, 7f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "the geometry member")
 			assertKeysNear(listOf(0f, 7f, 8f), opacityKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "the opacity member")
-			assertEquals(emptySet(), harness.session.keySelection.value)
+			assertEquals(setOf(geometryKey2, opacityKey1), harness.session.keySelection.value, "they stay selected where they landed")
+			assertEquals(cursorBefore + 1, harness.historyCursor)
+
+			runOnIdle { harness.session.undo() }
+			waitForIdle()
+			assertEquals(listOf(-5f, 0f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX))
+			assertEquals(setOf(geometryKey0), harness.session.keySelection.value, "undo brings the selection back")
+		}
+
+	/** A summary mark whose keys are already selected drags the whole selection, like a selected key does. */
+	@Test
+	fun aSelectedSummaryDragsTheWholeSelection() =
+		runComposeUiTest {
+			val harness = mountSheet(listOf(PanelIds.bodyX))
+			val partOpacityKey0 = TrackKeyRef(PanelIds.bodyX, SheetRows.PART_OPACITY, 0)
+			clickAt(chevronPoint(harness, SheetRows.DRAWABLE))
+			clickAt(lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, -5f))
+			shiftClickAt(lanePoint(harness, SheetRows.PART_OPACITY, PanelIds.bodyX, -8f))
+			assertEquals(setOf(geometryKey0, partOpacityKey0), harness.session.keySelection.value, "the summary's key and one other")
+			val cursorBefore = harness.historyCursor
+
+			drag(
+				lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, -5f),
+				listOf(
+					lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, -4f),
+					lanePoint(harness, SheetRows.DRAWABLE, PanelIds.bodyX, -3f),
+				),
+			)
+
+			assertKeysNear(listOf(-3f, 0f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "the summary's key")
+			assertKeysNear(listOf(-6f, 8f), partOpacityKeysOf(harness), "and the other selected key, by the same share")
+			assertEquals(setOf(geometryKey0, partOpacityKey0), harness.session.keySelection.value)
 			assertEquals(cursorBefore + 1, harness.historyCursor)
 		}
 

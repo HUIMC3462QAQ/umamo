@@ -249,40 +249,4 @@ class KeyformKeyMoveSelectionTest {
 		assertEquals(setOf(key(0)), session.keySelection.value)
 		assertEquals(cursorBefore + 1, session.cursor())
 	}
-
-	/** A summary move clears the selection in the move's own step. */
-	@Test
-	fun aSummaryMoveClearsTheSelectionInItsStep() {
-		val session = session()
-		session.setKeySelection(setOf(key(0)))
-		val cursorBefore = session.cursor()
-
-		session.moveTrackKeysClearingSelection(listOf(Triple(track, parameter, 2)), toValue = 20f)
-
-		assertEquals(listOf(-30f, 0f, 20f), session.keys())
-		assertEquals(emptySet(), session.keySelection.value)
-		assertEquals(cursorBefore + 1, session.cursor())
-
-		session.undo()
-		assertEquals(listOf(-30f, 0f, 30f), session.keys())
-		assertEquals(setOf(key(0)), session.keySelection.value)
-	}
-
-	/** A summary released where it was picked up still clears the selection, as a step of its own. */
-	@Test
-	fun aSummaryReleasedInPlaceStillRecordsTheClear() {
-		val session = session()
-		session.setKeySelection(setOf(key(0)))
-		val modelBefore = session.model.value
-		val cursorBefore = session.cursor()
-
-		session.moveTrackKeysClearingSelection(listOf(Triple(track, parameter, 2)), toValue = 30f)
-
-		assertSame(modelBefore, session.model.value)
-		assertEquals(emptySet(), session.keySelection.value)
-		assertEquals(cursorBefore + 1, session.cursor())
-
-		session.undo()
-		assertEquals(setOf(key(0)), session.keySelection.value)
-	}
 }

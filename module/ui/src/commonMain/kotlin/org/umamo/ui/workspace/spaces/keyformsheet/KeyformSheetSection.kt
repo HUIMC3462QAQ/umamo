@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.TrackKeyRef
 import org.umamo.edit.moveTrackKeySelectingIt
-import org.umamo.edit.moveTrackKeysClearingSelection
 import org.umamo.runtime.model.Parameter
 import org.umamo.ui.action.LocalCommands
 import org.umamo.ui.action.LocalKeymap
@@ -169,9 +168,7 @@ internal fun KeyformSheetSection(
 		onMarkClick = { row, mark, additive ->
 			// A summary mark stands for every child key stacked at that value, so clicking it selects all
 			// of them - which is what makes Delete and the arrow nudges work on a folded group too.
-			val clicked =
-				projection.summaryMembers(row.key, mark.keyIndex)?.toSet()
-					?: setOf(TrackKeyRef(parameter.id, row.key, mark.keyIndex))
+			val clicked = projection.keysOfMark(parameter.id, row.key, mark.keyIndex).toSet()
 			if (additive) {
 				// Nothing follows a shift-click, so it records a step of its own.
 				onSelectedKeysChange(selectionAfterAdditiveClick(selectedKeys, clicked))
@@ -218,36 +215,41 @@ internal fun KeyformSheetSection(
 			// composition's snapshot of a selection the press has since changed.
 			session?.setKeySelection(session.keySelection.value)
 		},
-		// The whole selection follows the mark under the hand rather than snapping to it on release,
-		// which is what makes a group drag read as moving keys instead of as a deferred command.  The
-		// model is untouched until the release; only what is DRAWN moves.
+		// A drag works on the selection, and a mark that is not selected is selected as the drag starts:
+		// its keys replace the selection, as a click on it would.  STAGED, so the release records that
+		// selection and the move as one step.  The whole selection then follows the mark under the hand
+		// rather than snapping to it on release, which is what makes a group drag read as moving keys
+		// instead of as a deferred command.  The model is untouched until the release; only what is DRAWN
+		// moves.
 		onMarkDrag = { row, mark, at ->
-			val dragged = TrackKeyRef(parameter.id, row.key, mark.keyIndex)
-			groupDragFraction(parameter, selectedKeys, dragged, mark, at)?.let { fraction ->
+			val draggedKeys = projection.keysOfMark(parameter.id, row.key, mark.keyIndex)
+			val selection = selectionDraggedWith(selectedKeys, draggedKeys)
+			if (selection != selectedKeys) {
+				onStageSelectedKeys(selection)
+			}
+			groupDragFraction(parameter, selection, draggedKeys, row.key in projection.groupRowKeys, mark, at)?.let { fraction ->
 				onDragSelectedKeys(fraction, false)
 			}
 		},
 		selectedMarkDragDelta = selectedMarkDragDelta,
 		onMarkDragEnd = { row, mark, releasedAt ->
-			val members = projection.summaryMembers(row.key, mark.keyIndex)
+			val draggedKeys = projection.keysOfMark(parameter.id, row.key, mark.keyIndex)
+			val summary = row.key in projection.groupRowKeys
 			val track = projection.tracksByRowKey[row.key]
-			if (session != null && members != null) {
-				// Dragging a summary moves everything it stands for, to one destination, as one undo step -
-				// they were stacked at a value and stay stacked.  Every member's ordinal may have changed on
-				// its own track, so the selection is dropped rather than guessed at.
-				session.moveTrackKeysClearingSelection(
-					members.mapNotNull { member -> projection.trackKeyOf(parameter, member) },
-					releasedAt,
-				)
-			} else if (session != null && track != null) {
-				val dragged = TrackKeyRef(parameter.id, row.key, mark.keyIndex)
-				val groupFraction = groupDragFraction(parameter, selectedKeys, dragged, mark, releasedAt)
+			if (session != null) {
+				val selection = selectionDraggedWith(selectedKeys, draggedKeys)
+				val groupFraction = groupDragFraction(parameter, selection, draggedKeys, summary, mark, releasedAt)
 				if (groupFraction != null) {
+					// Commits the LIVE selection, which is the one the drag's start staged: the lane reports a
+					// drag's first move before it can report its release.
 					onDragSelectedKeys(groupFraction, true)
+				} else if (!summary && track != null) {
+					// The dragged key ends up selected at the ordinal it lands on.
+					session.moveTrackKeySelectingIt(draggedKeys.single(), track, parameter, releasedAt, selection)
 				} else {
-					// The dragged key ends up selected at the ordinal it lands on; an unselected one replaces
-					// the selection, as a click on it would.
-					session.moveTrackKeySelectingIt(dragged, track, parameter, releasedAt, selectedKeys)
+					// Nothing moves (a parameter with no range), but the selection the drag's start staged
+					// still has to be CONFIRMED, or it would reach no history at all.
+					session.setKeySelection(session.keySelection.value)
 				}
 			}
 		},
