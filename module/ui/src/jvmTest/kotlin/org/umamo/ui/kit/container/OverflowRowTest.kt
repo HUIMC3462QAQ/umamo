@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -140,6 +141,48 @@ class OverflowRowTest {
 	}
 
 	/**
+	 * A control that renders nothing until its gate opens takes its place on a strip that was full, and the
+	 * strip's last control gives up its own.  The strip keeps the verdict of its last packing for as long as
+	 * its width and its controls are the same, and a gate opening changes neither: what packs the strip
+	 * again is the gated control's own size.
+	 */
+	@OptIn(ExperimentalTestApi::class)
+	@Test
+	fun aGatedControlThatTurnsOnTakesItsPlaceOnAFullStrip() {
+		runComposeUiTest {
+			var gateOpen by mutableStateOf(false)
+			setContent {
+				UmamoTheme {
+					Box(modifier = Modifier.width(FULL_STRIP_WIDTH)) {
+						OverflowRow {
+							pinnedItem("a") { Box(modifier = Modifier.size(40.dp).testTag("a")) }
+							item("gated") {
+								if (gateOpen) {
+									Box(modifier = Modifier.size(40.dp).testTag("gated"))
+								}
+							}
+							item("b") { Box(modifier = Modifier.size(40.dp).testTag("b")) }
+							item("c") { Box(modifier = Modifier.size(40.dp).testTag("c")) }
+						}
+					}
+				}
+			}
+			waitForIdle()
+			onNodeWithTag("c").assertExists()
+			onNodeWithTag("gated").assertDoesNotExist()
+			onNodeWithContentDescription(MORE_LABEL, useUnmergedTree = true).assertDoesNotExist()
+
+			gateOpen = true
+			waitForIdle()
+
+			onNodeWithTag("a").assertIsDisplayed()
+			onNodeWithTag("gated").assertIsDisplayed()
+			onNodeWithTag("c").assertDoesNotExist()
+			onNodeWithContentDescription(MORE_LABEL, useUnmergedTree = true).assertExists()
+		}
+	}
+
+	/**
 	 * Composes the standard three-control strip inside a fixed-width box: one pinned 40.dp control
 	 * followed by two collapsible 40.dp controls.
 	 *
@@ -164,5 +207,8 @@ class OverflowRowTest {
 	private companion object {
 		/** The overflow chip's English name; it doubles as its accessible label. */
 		const val MORE_LABEL = "More"
+
+		/** Room for three 40.dp controls and the two 8.dp gaps between them, and for no fourth. */
+		val FULL_STRIP_WIDTH = 140.dp
 	}
 }

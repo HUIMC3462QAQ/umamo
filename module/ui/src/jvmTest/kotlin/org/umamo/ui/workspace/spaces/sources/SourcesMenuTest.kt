@@ -2,6 +2,7 @@ package org.umamo.ui.workspace.spaces.sources
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
+import org.umamo.edit.setLayerIgnored
 import org.umamo.runtime.model.SourceLayerRef
 import org.umamo.ui.workspace.spaces.keyformsheet.anyPopupOpen
 import org.umamo.ui.workspace.spaces.parameters.clickAt
@@ -285,6 +286,24 @@ class SourcesMenuTest {
 			assertFalse(popupShows(SourcesNames.BROW_OLD), "a layer the file lost is no target")
 			assertTrue(popupShows(harness.text.sourcesUnbind), "a bound tile may be unbound")
 			assertFalse(popupShows(harness.text.sourcesDeleteArt), "a tile a drawable samples may not leave the atlas")
+		}
+
+	/**
+	 * An open relink list follows the document: a layer ignored while the list shows leaves it.  The list
+	 * sits in a popup under a row of a lazy list, and reads the model there and nowhere above.
+	 */
+	@Test
+	fun anOpenRelinkListDropsALayerIgnoredWhileItShows() =
+		runComposeUiTest {
+			val harness = mountSources()
+			clickAt(sourcesSlotPoint(harness.text.sourcesRelink, SourcesNames.LOOSE_ART))
+			assertTrue(popupShows(SourcesNames.SKETCH), "the list must really have opened, with Sketch on it")
+
+			runOnIdle { harness.session.setLayerIgnored(SourceLayerRef(SourcesIds.body, SourcesKeys.SKETCH, stableKey = true), ignored = true) }
+			waitForIdle()
+
+			assertFalse(popupShows(SourcesNames.SKETCH), "an ignored layer is kept out of the rig")
+			assertTrue(popupShows(SourcesNames.HAIR), "and the list is still open")
 		}
 
 	/** The layer a tile is bound to already is listed and inert. */

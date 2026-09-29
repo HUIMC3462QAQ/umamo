@@ -29,6 +29,8 @@ import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.theme.LocalUmamoColors
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.workspace.rowdrag.RowDragController
+import org.umamo.ui.workspace.rowdrag.RowDragRole
+import org.umamo.ui.workspace.rowdrag.rememberRowDragRole
 
 /** Indentation applied per group nesting level, matching the outliner's indent idiom. */
 private val INDENT_PER_DEPTH = 12.dp
@@ -75,22 +77,14 @@ internal fun ParameterRowView(
 	DisposableEffect(key) {
 		onDispose { dragController.clearBounds(key) }
 	}
-	// The band this row would receive if a drop landed now (null unless it is the drag
-	// target), read from snapshot state so the indicator tracks the moving pointer.
-	val dropBand: RowDropBand? =
-		if (dragController.isDragging && dragController.dropTargetKey == key) {
-			dragController.draggedPayload?.let { subject ->
-				parameterDropBandFor(
-					subject,
-					row,
-					row.depth == 0,
-					dragController.dropTargetFraction ?: 0.5f,
-				)
-			}
-		} else {
-			null
-		}
-	val isDragged = dragController.draggingKey == key
+	// The band this row would receive if a drop landed now (null unless it is the drag target), and
+	// whether it is the row in hand.  Read as the row's part in the drag, which changes when this row's
+	// part does, so a pointer moving over other rows, or inside one band of this one, runs nothing here.
+	val dragRole by dragController.rememberRowDragRole(key) { dragged, fraction ->
+		parameterDropBandFor(dragged, currentRow, currentRow.depth == 0, fraction)
+	}
+	val dropBand: RowDropBand? = dragRole.bandOrNull
+	val isDragged = dragRole == RowDragRole.Dragged
 	// A row being named asks to be shown whole.  Its rename field asks for itself the moment it takes
 	// focus, and a list scrolling toward the row stops for that as soon as the field is in view, which
 	// leaves whatever of the row sits above the field cut off.  The row's own request holds the field's

@@ -102,10 +102,18 @@ fun fileModifiedAtMillis(path: String): Long? {
  * existence check over a real path.  A uri and a path the file system refuses both read as unknown
  * rather than missing - the space must never accuse a file it could not check.  One logged instance
  * for the app's life, so a path is named in the log once and again only when its answer changes.
+ *
+ * The check itself runs on the IO dispatcher and nothing else does, so a caller on the interface's
+ * thread never waits on the disk, and the log and the last answers stay in the caller's context.  The
+ * catch sits inside the hop: around it, it would take a cancellation for a failed check.
  */
 internal val systemSourceFilePresence: SourceFilePresence =
 	LoggedSourceFilePresence { path ->
-		if (isFileSystemPath(path)) runCatching { FileSystem.SYSTEM.exists(path.toPath()) }.getOrNull() else null
+		if (isFileSystemPath(path)) {
+			withContext(Dispatchers.IO) { runCatching { FileSystem.SYSTEM.exists(path.toPath()) }.getOrNull() }
+		} else {
+			null
+		}
 	}::probe
 
 /**

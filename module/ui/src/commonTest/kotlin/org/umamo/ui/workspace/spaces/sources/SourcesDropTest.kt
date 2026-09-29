@@ -20,6 +20,12 @@ class SourcesDropTest {
 	private val artA = ArtSourceId("art-0")
 	private val ref = SourceLayerRef(artA, "lyid:1", true)
 
+	/** The row the binding [ref] is listed under. */
+	private val layerRowId = sourcesLayerRowId(artA, "lyid:1")
+
+	/** The second row of a file that lists the key of [ref] twice. */
+	private val repeatedRowId = "$layerRowId~2"
+
 	private fun node(kind: SourcesNodeKind, status: SourcesStatus): SourcesNode = SourcesNode("row", "Row", SourcesDetail.None, kind, status, emptyList())
 
 	private fun node(id: String, kind: SourcesNodeKind, status: SourcesStatus): SourcesNode = SourcesNode(id, id, SourcesDetail.None, kind, status, emptyList())
@@ -104,23 +110,55 @@ class SourcesDropTest {
 	/** A tile dropped on a layer lands under that layer's row, so the drop opens it. */
 	@Test
 	fun aTileDropOpensTheLayerItLandsIn() {
-		val layer = node("layer", SourcesNodeKind.Layer(ref), SourcesStatus.Unbound)
-		val controller = dragOver("tile", SourcesDragPayload.Tile(AtlasTileId("t")), "layer")
+		val layer = node(layerRowId, SourcesNodeKind.Layer(ref), SourcesStatus.Unbound)
+		val controller = dragOver("tile", SourcesDragPayload.Tile(AtlasTileId("t")), layerRowId)
 
-		performSourcesDrop(controller, mapOf("layer" to layer), onRelink = { _, _, _ -> }, expand = { nodeId -> opened.add(nodeId) })
+		performSourcesDrop(controller, mapOf(layerRowId to layer), onRelink = { _, _, _ -> }, expand = { nodeId -> opened.add(nodeId) })
 
-		assertEquals(listOf("layer"), opened)
+		assertEquals(listOf(layerRowId), opened)
 	}
 
 	/** A layer dropped on a tile takes the tile under its own row, so the drop opens the dragged row. */
 	@Test
 	fun aLayerDropOpensTheLayerThatWasDragged() {
 		val tile = node("tile", SourcesNodeKind.Tile(AtlasTileId("t")), SourcesStatus.None)
-		val controller = dragOver("layer", SourcesDragPayload.Layer(ref), "tile")
+		val controller = dragOver(layerRowId, SourcesDragPayload.Layer(ref), "tile")
 
 		performSourcesDrop(controller, mapOf("tile" to tile), onRelink = { _, _, _ -> }, expand = { nodeId -> opened.add(nodeId) })
 
-		assertEquals(listOf("layer"), opened)
+		assertEquals(listOf(layerRowId), opened)
+	}
+
+	/**
+	 * A file that lists one key twice has a second row for it, which takes a drop like any unbound layer.
+	 * The tile is bound to the key, so it lands under the key's first row, and that is the row opened.
+	 */
+	@Test
+	fun aTileDropOnARepeatedRowOpensTheRowTheArtLandsUnder() {
+		val repeated = node(repeatedRowId, SourcesNodeKind.Layer(ref), SourcesStatus.Unbound)
+		val controller = dragOver("tile", SourcesDragPayload.Tile(AtlasTileId("t")), repeatedRowId)
+
+		performSourcesDrop(controller, mapOf(repeatedRowId to repeated), onRelink = { _, _, _ -> }, expand = { nodeId -> opened.add(nodeId) })
+
+		assertEquals(listOf(layerRowId), opened)
+	}
+
+	/** A repeated row dragged onto a tile carries the same key, so the row opened is the key's first row too. */
+	@Test
+	fun aRepeatedRowDroppedOnATileOpensTheRowTheArtLandsUnder() {
+		val tile = node("tile", SourcesNodeKind.Tile(AtlasTileId("t")), SourcesStatus.None)
+		val controller = dragOver(repeatedRowId, SourcesDragPayload.Layer(ref), "tile")
+
+		performSourcesDrop(controller, mapOf("tile" to tile), onRelink = { _, _, _ -> }, expand = { nodeId -> opened.add(nodeId) })
+
+		assertEquals(listOf(layerRowId), opened)
+	}
+
+	/** A layer's row is named by its file and its key, which is all a binding to it carries. */
+	@Test
+	fun aLayerRowIsNamedByItsFileAndKey() {
+		assertEquals("layer:art-0/lyid:1", sourcesLayerRowId(artA, "lyid:1"))
+		assertEquals("layer:art-0/name:Eye", sourcesLayerRowId(artA, "name:Eye"))
 	}
 
 	/** A release over a row the drag may not bind to asks for nothing, and still ends the drag. */

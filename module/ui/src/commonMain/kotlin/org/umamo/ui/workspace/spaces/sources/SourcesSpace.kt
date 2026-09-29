@@ -6,11 +6,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.ensureActive
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionOps
 import org.umamo.edit.SelectionTarget
@@ -189,17 +191,22 @@ fun SourcesSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 		)
 	}
 	// A name chip follows the cursor while dragging, so there is something clearly "in hand" beyond the
-	// faded row: the row being dragged (a layer or a tile).
+	// faded row: the row being dragged (a layer or a tile).  The space reads which row is in hand, which a
+	// drag changes as it starts and as it ends; where the pointer is, the chip asks for itself.
 	val draggingLabel = dragController.draggingKey?.let { id -> nodeById[id]?.label }
-	if (dragController.isDragging && draggingLabel != null) {
-		RowDragLabel(label = draggingLabel, cursorX = dragController.dragWindowX, cursorY = dragController.dragWindowY)
+	if (draggingLabel != null) {
+		RowDragLabel(label = draggingLabel, pointerInWindow = { dragController.pointerInWindow })
 	}
 }
 
 /**
- * The Sources tree as the body derives it from the open document: every file's presence asked of the
- * app's probe, the proposals for the bindings the files no longer resolve, and the tree built from both.
- * Each step is remembered on what it reads, so a recomposition that changes none of it builds nothing.
+ * The Sources tree as the body derives it from the open document: every file's presence as the app's
+ * probe last answered, the proposals for the bindings the files no longer resolve, and the tree built from
+ * both.  Each step is remembered on what it reads, so a recomposition that changes none of it builds
+ * nothing.
+ *
+ * The probe is asked from an effect, never while composing: asking is a look at the disk.  The tree is
+ * built from the answers in hand, and built again when a round of answers lands.
  *
  * Returns a value, so it is no restart scope of its own: what it reads invalidates the space that calls it.
  *
@@ -214,28 +221,23 @@ private fun rememberSourcesTree(puppet: PuppetModel, viewState: SourcesViewState
 	// The watcher's presence serial: a file deleted or returned re-probes without a click.
 	val watchSerial = LocalSourceWatch.current?.serial?.collectAsState()?.value ?: 0
 
-	// The presence probe runs once per source per refresh, off the row composition: a file check per
-	// recompose would hit the disk every time the pointer moves.
-	val presenceBySource =
-		remember(puppet.sources, viewState.refreshSerial, watchSerial, presenceProbe) {
-			puppet.sources.associate { source ->
-				val path = source.path
-				val present = if (path == null || presenceProbe == null) null else presenceProbe(path)
-				source.id to
-					when (present) {
-						null -> SourcePresence.Unknown
-						true -> SourcePresence.Present
-						false -> SourcePresence.Missing
-					}
-			}
-		}
+	// One round of asking per change of the files, per refresh, and per change the watcher saw.  The
+	// answers replace the last round's whole and only once all are in, so a missing file stays missing
+	// while it is asked about again, and a round the next one overtook lands nothing.
+	val sources = puppet.sources
+	LaunchedEffect(sources, viewState.refreshSerial, watchSerial, presenceProbe) {
+		val answers = probeSourcePresence(sources, presenceProbe)
+		ensureActive()
+		viewState.presenceBySource = answers
+	}
+	val presenceBySource = viewState.presenceBySource
 	// Two tiers of proposal for a binding the file no longer resolves: the one the last operation that
 	// read the file scored with pixels, else the one the model's own inventory ranks (names, folders,
 	// bounds, hashes) - so the chips show something even before any file is read.
 	val published = LocalSourceSuggestions.current?.suggestions?.collectAsState()?.value.orEmpty()
-	// Keyed on what the ranking reads - the files and the tile bindings - not the whole model: a
-	// vertex drag mints a model per frame, and the name-distance pass over every lost layer and every
-	// candidate must not run on each of them.
+	// Keyed on what the ranking reads - the files and the tile bindings - not the whole model: every
+	// committed edit publishes a model, few of them touch either, and the name-distance pass over every
+	// lost layer and every candidate must not run for the rest.
 	val modelSuggestions =
 		remember(puppet.sources, puppet.atlas.tiles) {
 			puppet.sources.associate { source -> source.id to suggestionsFor(puppet, source.id) }

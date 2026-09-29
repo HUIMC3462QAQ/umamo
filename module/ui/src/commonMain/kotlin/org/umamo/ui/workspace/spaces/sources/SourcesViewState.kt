@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import org.umamo.runtime.model.ArtSourceId
 import org.umamo.ui.workspace.PersistentSpaceState
 import org.umamo.ui.workspace.editorstate.foldDeviationsOf
 import org.umamo.ui.workspace.editorstate.restoreFoldStates
@@ -51,6 +52,15 @@ internal class SourcesViewState : PersistentSpaceState {
 
 	/** Bumped by the header's Refresh, so the file-presence probe runs again over every source. */
 	var refreshSerial by mutableStateOf(0)
+
+	/**
+	 * Where each artwork file stood the last time it was asked about; a file with no entry has not been
+	 * answered for yet and reads unknown.  Replaced whole when every answer of a round is in, so a file
+	 * keeps its last answer while the next is on its way.  Kept here, not in the body, so a Sources space
+	 * opened again in its area shows what it last knew; never saved with the document, since a file's
+	 * presence is a fact about the disk now.
+	 */
+	var presenceBySource: Map<ArtSourceId, SourcePresence> by mutableStateOf(emptyMap())
 
 	/**
 	 * Whether the row [nodeId] is open.

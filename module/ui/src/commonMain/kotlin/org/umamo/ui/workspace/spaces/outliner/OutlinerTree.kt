@@ -10,14 +10,14 @@ import org.umamo.runtime.model.Part
 import org.umamo.runtime.model.PuppetModel
 
 /** The stable node id of the synthetic puppet root - the one row open by default in the outliner. */
-const val OUTLINER_ROOT_ID = "root"
+internal const val OUTLINER_ROOT_ID = "root"
 
 /**
  * The icon a row carries, drawn as themed vector art from the shared UmamoIcons set inside a reserved
  * fixed-width slot (see OutlinerIconSlot). The two synthetic roots mirror Blender's armature object /
  * armature data icons.
  */
-enum class OutlinerIcon {
+internal enum class OutlinerIcon {
 	/** The puppet root (Blender's orange armature-object icon). */
 	PuppetRoot,
 
@@ -56,7 +56,7 @@ enum class OutlinerIcon {
  * @property Boolean selectable Whether the row's entity is viewport-selectable (synthetic rows true).
  */
 @Immutable
-data class OutlinerNode(
+internal data class OutlinerNode(
 	val id: String,
 	val label: String,
 	val icon: OutlinerIcon,
@@ -79,7 +79,7 @@ data class OutlinerNode(
  * @param String armatureLabel The localised label for the deformer-hierarchy row.
  * @return OutlinerNode The root node of the unified tree.
  */
-fun buildOutlinerTree(puppet: PuppetModel, rootLabel: String = "Armature", armatureLabel: String = "Armature"): OutlinerNode {
+internal fun buildOutlinerTree(puppet: PuppetModel, rootLabel: String = "Armature", armatureLabel: String = "Armature"): OutlinerNode {
 	val armature = buildArmatureNode(puppet, armatureLabel)
 
 	val partsById = puppet.parts.associateBy { part -> part.id }
@@ -148,7 +148,7 @@ fun buildOutlinerTree(puppet: PuppetModel, rootLabel: String = "Armature", armat
  * @param Boolean showDeformers Whether to keep the Armature deformer hierarchy.
  * @return OutlinerNode The pruned root.
  */
-fun filterOutliner(root: OutlinerNode, query: String, showParts: Boolean, showDrawables: Boolean, showDeformers: Boolean): OutlinerNode {
+internal fun filterOutliner(root: OutlinerNode, query: String, showParts: Boolean, showDrawables: Boolean, showDeformers: Boolean): OutlinerNode {
 	val kindRoot = kindFiltered(root, showParts, showDrawables, showDeformers).firstOrNull() ?: root.copy(children = emptyList())
 	return queryPruned(kindRoot, query.trim()) ?: kindRoot.copy(children = emptyList())
 }
@@ -166,7 +166,7 @@ fun filterOutliner(root: OutlinerNode, query: String, showParts: Boolean, showDr
  * @param SelectionTarget clickedTarget The clicked row's target (becomes active).
  * @return Selection The selection after the range add.
  */
-fun outlinerRangeSelection(orderedTargets: List<SelectionTarget?>, current: Selection, clickedIndex: Int, clickedTarget: SelectionTarget): Selection {
+internal fun outlinerRangeSelection(orderedTargets: List<SelectionTarget?>, current: Selection, clickedIndex: Int, clickedTarget: SelectionTarget): Selection {
 	val anchorIndex = current.active?.let { active -> orderedTargets.indexOfFirst { it == active } }?.takeIf { it >= 0 } ?: clickedIndex
 	val low = minOf(anchorIndex, clickedIndex)
 	val high = maxOf(anchorIndex, clickedIndex)

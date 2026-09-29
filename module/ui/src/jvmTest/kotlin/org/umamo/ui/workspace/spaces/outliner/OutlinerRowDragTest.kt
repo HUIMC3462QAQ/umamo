@@ -7,7 +7,9 @@ import androidx.compose.ui.test.runComposeUiTest
 import org.umamo.runtime.model.OrgChild
 import org.umamo.ui.workspace.spaces.keyformsheet.anyPopupOpen
 import org.umamo.ui.workspace.spaces.parameters.clickAt
+import org.umamo.ui.workspace.spaces.parameters.moveOn
 import org.umamo.ui.workspace.spaces.parameters.popupShows
+import org.umamo.ui.workspace.spaces.parameters.popupTextInWindow
 import org.umamo.ui.workspace.spaces.parameters.pressKey
 import org.umamo.ui.workspace.spaces.parameters.releasePress
 import kotlin.test.Test
@@ -141,6 +143,27 @@ class OutlinerRowDragTest {
 			assertFalse(anyPopupOpen())
 		}
 
+	/** The chip moves as far as the pointer does, and the same way. */
+	@Test
+	fun theDragChipFollowsThePointer() =
+		runComposeUiTest {
+			mountOutliner()
+			val loose = rowBox(OutlinerNames.LOOSE).center
+			clickAt(loose)
+			val first = rowBandPoint(OutlinerNames.HEAD, 0.5f)
+			val second = Offset(first.x + 37f, rowBandPoint(OutlinerNames.LIMBS, 0.5f).y)
+
+			longPressAndMove(loose, pathTo(loose, first))
+			val chipAtFirst = popupTextInWindow(OutlinerNames.LOOSE)
+			moveOn(listOf(second))
+			val chipAtSecond = popupTextInWindow(OutlinerNames.LOOSE)
+
+			assertEquals(second.x - first.x, chipAtSecond.left - chipAtFirst.left, CHIP_TOLERANCE)
+			assertEquals(second.y - first.y, chipAtSecond.top - chipAtFirst.top, CHIP_TOLERANCE)
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
 	/** Escape aborts a drag in flight: the chip goes, and the release then drops nothing. */
 	@Test
 	fun escapeCancelsADragInFlight() =
@@ -158,4 +181,9 @@ class OutlinerRowDragTest {
 
 			assertEquals(modelBefore, harness.session.model.value)
 		}
+
+	private companion object {
+		/** The chip lands on whole pixels, so it may sit up to one off the pointer's own move. */
+		const val CHIP_TOLERANCE = 1f
+	}
 }

@@ -2,15 +2,23 @@ package org.umamo.ui.workspace.spaces.outliner
 
 import androidx.compose.runtime.Composer
 import androidx.compose.runtime.InternalComposeTracingApi
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
+import org.umamo.edit.rename
+import org.umamo.edit.renameParameter
 import org.umamo.ui.workspace.spaces.keyformsheet.shiftClickAt
 import org.umamo.ui.workspace.spaces.parameters.ComposableRunCounter
+import org.umamo.ui.workspace.spaces.parameters.PanelIds
 import org.umamo.ui.workspace.spaces.parameters.clickAt
+import org.umamo.ui.workspace.spaces.parameters.moveOn
 import org.umamo.ui.workspace.spaces.parameters.popupShows
+import org.umamo.ui.workspace.spaces.parameters.pressKey
+import org.umamo.ui.workspace.spaces.parameters.releasePress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -195,8 +203,112 @@ class OutlinerRecompositionTest {
 			assertEquals(0, counter.runsOf("OutlinerRowView"))
 		}
 
+	/** An edit that changes nothing the outliner shows runs the space, which is handed the new model, and no row. */
+	@Test
+	fun anEditTheOutlinerDoesNotShowRunsNoRow() =
+		counting { counter ->
+			val harness = mountOutliner()
+			counter.reset()
+
+			runOnIdle { harness.session.renameParameter(PanelIds.breath, RENAMED) }
+			waitForIdle()
+
+			assertTrue(counter.runsOf("OutlinerSpace") >= 1, "the space must really have been handed the model")
+			assertEquals(0, counter.runsOf("OutlinerRowView"))
+			assertEquals(0, counter.runsOf("OutlinerRowBody"))
+		}
+
+	/**
+	 * An edit to one row runs it and the root over it, which holds it, and no row beside it.  The new name
+	 * is no longer than the old, so the rows are no wider for it.
+	 */
+	@Test
+	fun anEditToOneRowRunsItAndTheRowOverIt() =
+		counting { counter ->
+			val harness = mountOutliner()
+			counter.reset()
+
+			runOnIdle { harness.session.rename(SelectionTarget.Drawable(OutlinerIds.loose), SHORTER_NAME) }
+			waitForIdle()
+
+			assertTrue(outlinerShows(SHORTER_NAME), "the edit must really have reached the outliner")
+			assertEquals(2, counter.runsOf("OutlinerRowView"), "the renamed row and the root over it")
+			assertEquals(2, counter.runsOf("OutlinerRowBody"))
+		}
+
+	/**
+	 * Picks the Loose row up and carries it to [target], leaving the button held.  The row is selected
+	 * first, as a press would, and the drag has started by the time it arrives: the press's own hover
+	 * and the pick-up are over before anything is counted.
+	 *
+	 * @param ComposeUiTest test The running UI test.
+	 * @param Offset target Where the drag rests, in the panel body's pixels.
+	 */
+	private fun carryLooseTo(test: ComposeUiTest, target: Offset) {
+		val loose = test.rowBox(OutlinerNames.LOOSE).center
+		test.clickAt(loose)
+		test.longPressAndMove(loose, listOf(Offset(loose.x + 4f, loose.y + 6f), target))
+		assertTrue(test.popupShows(OutlinerNames.LOOSE), "the drag must really be in flight")
+	}
+
+	/** A pointer moving inside one band of one row changes no row's part in the drag, and runs nothing at all. */
+	@Test
+	fun aDragMovingInsideOneBandRunsNothing() =
+		counting { counter ->
+			mountOutliner()
+			carryLooseTo(this, rowBandPoint(OutlinerNames.HEAD, 0.45f))
+			counter.reset()
+
+			moveOn(listOf(rowBandPoint(OutlinerNames.HEAD, 0.5f), rowBandPoint(OutlinerNames.HEAD, 0.55f), rowBandPoint(OutlinerNames.HEAD, 0.6f)))
+
+			assertEquals(emptyMap(), counter.namedRuns())
+			assertEquals(0, counter.lambdaRuns())
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
+	/** A pointer crossing from one band of a row to another runs that row's body, which draws the band. */
+	@Test
+	fun aDragCrossingABandRunsTheTargetRowAlone() =
+		counting { counter ->
+			mountOutliner()
+			carryLooseTo(this, rowBandPoint(OutlinerNames.HEAD, 0.5f))
+			counter.reset()
+
+			moveOn(listOf(rowBandPoint(OutlinerNames.HEAD, 0.15f)))
+
+			assertEquals(1, counter.runsOf("OutlinerRowBody"), "the nest ring gives way to the line above")
+			assertEquals(0, counter.runsOf("OutlinerRowView"))
+			assertEquals(0, counter.runsOf("OutlinerSpace"))
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
+	/** A pointer crossing from one row to another runs the row it left and the row it reached. */
+	@Test
+	fun aDragCrossingToAnotherRowRunsTheTwoRows() =
+		counting { counter ->
+			mountOutliner()
+			carryLooseTo(this, rowBandPoint(OutlinerNames.HEAD, 0.5f))
+			counter.reset()
+
+			moveOn(listOf(rowBandPoint(OutlinerNames.LIMBS, 0.5f)))
+
+			assertEquals(2, counter.runsOf("OutlinerRowBody"), "the row the target left and the row it reached")
+			assertEquals(0, counter.runsOf("OutlinerRowView"))
+			assertEquals(0, counter.runsOf("OutlinerSpace"))
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
 	private companion object {
 		const val OUTLINER_PACKAGE_PREFIX = "org.umamo.ui.workspace.spaces.outliner."
+
+		/** A name no row of the rig carries. */
+		const val RENAMED = "Renamed"
+
+		/** A name for the Loose row no longer than its own. */
+		const val SHORTER_NAME = "Lost"
 
 		/** The rows the list shows as the fixture opens: the root and its four children. */
 		const val OPEN_ROWS = 5

@@ -7,7 +7,9 @@ import androidx.compose.ui.test.runComposeUiTest
 import org.umamo.runtime.model.SourceLayerRef
 import org.umamo.ui.workspace.spaces.keyformsheet.anyPopupOpen
 import org.umamo.ui.workspace.spaces.outliner.longPressAndMove
+import org.umamo.ui.workspace.spaces.parameters.moveOn
 import org.umamo.ui.workspace.spaces.parameters.popupShows
+import org.umamo.ui.workspace.spaces.parameters.popupTextInWindow
 import org.umamo.ui.workspace.spaces.parameters.pressKey
 import org.umamo.ui.workspace.spaces.parameters.releasePress
 import kotlin.test.Test
@@ -19,6 +21,9 @@ import kotlin.test.assertTrue
  * Pins what a dragged row does: a layer dropped on a tile and a tile dropped on a layer each rebind the
  * tile, every other pairing drops nothing, and a row that stands for no layer a tile could take neither
  * lifts nor takes a drop.
+ *
+ * The rig's files list no key twice, so the row a drop opens here is the row the pointer was on.  Which
+ * row a drop opens when a file repeats a key is pinned without a composition, in SourcesDropTest.
  */
 @OptIn(ExperimentalTestApi::class)
 class SourcesRowDragTest {
@@ -223,6 +228,26 @@ class SourcesRowDragTest {
 			assertFalse(anyPopupOpen(), "the chip goes with the drop")
 		}
 
+	/** The chip moves as far as the pointer does, and the same way. */
+	@Test
+	fun theDragChipFollowsThePointer() =
+		runComposeUiTest {
+			mountSources()
+			val loose = sourcesRowBox(SourcesNames.LOOSE_ART).center
+			val first = sourcesRowBox(SourcesNames.SKETCH).center
+			val second = Offset(first.x + 37f, sourcesRowBox(SourcesNames.HAIR).center.y)
+
+			longPressAndMove(loose, pathTo(loose, first))
+			val chipAtFirst = popupTextInWindow(SourcesNames.LOOSE_ART)
+			moveOn(listOf(second))
+			val chipAtSecond = popupTextInWindow(SourcesNames.LOOSE_ART)
+
+			assertEquals(second.x - first.x, chipAtSecond.left - chipAtFirst.left, CHIP_TOLERANCE)
+			assertEquals(second.y - first.y, chipAtSecond.top - chipAtFirst.top, CHIP_TOLERANCE)
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
 	/** Escape aborts a drag in flight: the chip goes, and the release then drops nothing. */
 	@Test
 	fun escapeCancelsADragInFlight() =
@@ -266,4 +291,9 @@ class SourcesRowDragTest {
 
 			assertTrue(harness.selectedDrawables.isEmpty())
 		}
+
+	private companion object {
+		/** The chip lands on whole pixels, so it may sit up to one off the pointer's own move. */
+		const val CHIP_TOLERANCE = 1f
+	}
 }

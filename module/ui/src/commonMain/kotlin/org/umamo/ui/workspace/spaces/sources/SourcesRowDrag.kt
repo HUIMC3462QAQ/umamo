@@ -52,6 +52,9 @@ internal fun relinkFor(payload: SourcesDragPayload, target: SourcesNode): Pair<A
  * the layer row the tile lands under so the rigger sees it land rather than fearing it vanished into a
  * closed row, and ends the drag.  A drop with no valid target asks for nothing and opens nothing.
  *
+ * The row opened is named by the BINDING the tile takes, not by the row the pointer was on: a file that
+ * lists one key twice has a second row for it, and a tile bound to the key is listed under the first.
+ *
  * @param RowDragController controller The drag state: read for the dragged row and the target, then ended.
  * @param Map               nodeById   The visible rows by node id, to resolve the target.
  * @param Function?         onRelink   Rebinds the tile to the layer, retiring nothing; null (no session to
@@ -65,17 +68,12 @@ internal fun performSourcesDrop(
 	expand: (String) -> Unit,
 ) {
 	val payload = controller.draggedPayload
-	val draggedKey = controller.draggingKey
 	val target = controller.dropTargetKey?.let { key -> nodeById[key] }
 	val rebind = if (payload != null && target != null) relinkFor(payload, target) else null
-	if (onRelink != null && rebind != null && target != null) {
+	if (onRelink != null && rebind != null) {
 		val (tileId, ref) = rebind
 		onRelink(listOf(tileId), ref, emptyList())
-		// The tile lands under the layer's row: the target of a tile's drop, the dragged row of a layer's.
-		val layerRowKey = if (target.kind is SourcesNodeKind.Layer) target.id else draggedKey
-		if (layerRowKey != null) {
-			expand(layerRowKey)
-		}
+		expand(sourcesLayerRowId(ref.sourceId, ref.layerKey))
 	}
 	controller.end()
 }

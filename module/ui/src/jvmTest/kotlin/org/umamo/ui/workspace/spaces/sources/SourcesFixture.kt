@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CompletableDeferred
 import org.umamo.edit.SelectionTarget
 import org.umamo.reimport.LayerMatch
 import org.umamo.reimport.MatchSignals
@@ -278,6 +279,8 @@ internal fun sourcesFixtureArt(): SourceArtRasters {
  * @param SourceArtRasters? sourceArt The art a tile or a layer row previews, or null for none.
  * @param Dp height The Sources space's height; a short one makes its list scroll.
  * @param Boolean provideDocument Whether the composition gets an open document at all.
+ * @param Function onSourcePresenceAsked Told the path each time the file-presence probe is asked, as it is asked.
+ * @param CompletableDeferred? presenceGate Holds the probe's first answers back until it completes, or null.
  * @return ParametersPanelHarness The mounted harness.
  */
 @OptIn(ExperimentalTestApi::class)
@@ -287,10 +290,21 @@ internal fun ComposeUiTest.mountSources(
 	sourceArt: SourceArtRasters? = null,
 	height: Dp = PANEL_SOURCES_HEIGHT,
 	provideDocument: Boolean = true,
+	onSourcePresenceAsked: (path: String) -> Unit = {},
+	presenceGate: CompletableDeferred<Unit>? = null,
 ): ParametersPanelHarness {
-	val harness = ParametersPanelHarness(showSources = true, thumbnails = thumbnails, sourceArt = sourceArt, model = model, provideDocument = provideDocument)
+	val harness =
+		ParametersPanelHarness(
+			showSources = true,
+			thumbnails = thumbnails,
+			sourceArt = sourceArt,
+			model = model,
+			provideDocument = provideDocument,
+			onSourcePresenceAsked = onSourcePresenceAsked,
+		)
 	harness.sourcesSize = DpSize(PANEL_SOURCES_WIDTH, height)
 	harness.sourcePresenceByPath[SourcesPaths.FACE] = false
+	harness.sourcePresenceGate = presenceGate
 	harness.publishedSuggestions.value =
 		mapOf((SourcesIds.body to SourcesKeys.BROW_OLD) to LayerMatch(SourcesKeys.BROW, PROPOSAL_SCORE, MatchSignals(1f, 1f, 1f, 1f, null, hashEqual = false)))
 	mountParametersPanel(harness)
