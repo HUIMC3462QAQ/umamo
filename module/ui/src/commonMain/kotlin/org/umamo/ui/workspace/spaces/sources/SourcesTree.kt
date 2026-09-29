@@ -1,5 +1,6 @@
 package org.umamo.ui.workspace.spaces.sources
 
+import androidx.compose.runtime.Immutable
 import org.umamo.reimport.LayerMatch
 import org.umamo.reimport.tileCarriesNoRigWork
 import org.umamo.runtime.model.ArtSource
@@ -15,7 +16,7 @@ import org.umamo.runtime.model.originRelativeZ
 /*
  * The Sources table as a tree: artwork file -> its layers (the inventory as of the last read) -> the
  * tiles bound to each layer -> the drawables over each tile, plus a trailing group for art bound to
- * no layer.  A pure function over the model so it unit-tests without Compose; the space renders it.
+ * no layer.  A pure function over the model so it unit-tests without a composition; the space renders it.
  */
 
 /** Whether an artwork file is still where the document last read it. */
@@ -81,6 +82,13 @@ enum class SourcesStatus {
 	/** Whether the row stands for a binding waiting on a person: a layer lost, erased, or lost to a replacement. */
 	val isReview: Boolean
 		get() = this == NeedsReview || this == Emptied || this == SourceReplaced
+
+	/**
+	 * Whether a layer row carries the ignore toggle: an unbound present layer, or one already ignored.  A
+	 * bound row is matched by key and needs no mark; a review row has a binding to settle first.
+	 */
+	val isIgnorable: Boolean
+		get() = this == Unbound || this == Ignored
 }
 
 /** What a row stands for, and the identity a click or a drop acts on. */
@@ -149,6 +157,10 @@ data class LayerSuggestion(
 /**
  * One row of the Sources tree.
  *
+ * Immutable: a node is built once with its tree and never changed after, its children included.  The
+ * annotation is that promise made to Compose, which then compares a node by value, so a row handed a node
+ * equal to the one it has skips.  It is the one Compose name this file knows.
+ *
  * @property String           id         A stable, unique key for expand state and drop hit-testing.
  * @property String           label      The display text (a document name, never localized chrome, except the unbound group's).
  * @property SourcesDetail    detail     The secondary text.
@@ -156,7 +168,15 @@ data class LayerSuggestion(
  * @property SourcesStatus    status     The status chip.
  * @property List             children   The child rows, in display order.
  * @property LayerSuggestion? suggestion The proposed relink on a row that needs review, or null.
+ * @property List<DrawableId> drawableIds The drawables the row stands over, in document order: on a tile
+ *   row every drawable sampling the tile, on a layer row every drawable over every tile bound to the layer;
+ *   empty on every other row.  What a click selects, whatever a search leaves listed under the row.
+ * @property SourceLayerRef?  binding    On a tile row, the layer the tile is bound to, as the tile carries
+ *   it; null for a tile bound to none, and on every other row.
+ * @property List<AtlasTileId> tileIds   On a layer row, every tile bound to the layer, by file and key;
+ *   empty on every other row.  What a review moves and a hover previews, whatever a search leaves listed.
  */
+@Immutable
 data class SourcesNode(
 	val id: String,
 	val label: String,
@@ -165,10 +185,10 @@ data class SourcesNode(
 	val status: SourcesStatus,
 	val children: List<SourcesNode>,
 	val suggestion: LayerSuggestion? = null,
+	val drawableIds: List<DrawableId> = emptyList(),
+	val binding: SourceLayerRef? = null,
+	val tileIds: List<AtlasTileId> = emptyList(),
 )
-
-/** One visible row after flattening: the node and its depth. */
-data class SourcesRow(val node: SourcesNode, val depth: Int)
 
 /** The id of the synthetic unbound-art group row. */
 const val SOURCES_UNBOUND_GROUP_ID: String = "unbound"
@@ -208,6 +228,7 @@ fun buildSourcesTree(
 	fun tileNode(tileId: AtlasTileId): SourcesNode {
 		val tile = puppet.atlas.tileById.getValue(tileId)
 		val placement = tile.placement
+		val drawableIds = drawableIdsByTile[tile.id].orEmpty()
 		return SourcesNode(
 			id = "tile:${tile.id.raw}",
 			label = tile.name,
@@ -215,7 +236,7 @@ fun buildSourcesTree(
 			kind = SourcesNodeKind.Tile(tile.id),
 			status = if (placement == null) SourcesStatus.Unplaced else SourcesStatus.None,
 			children =
-				drawableIdsByTile[tile.id].orEmpty().map { drawableId ->
+				drawableIds.map { drawableId ->
 					SourcesNode(
 						id = "drawable:${drawableId.raw}",
 						label = drawableNameById[drawableId] ?: drawableId.raw,
@@ -225,6 +246,8 @@ fun buildSourcesTree(
 						children = emptyList(),
 					)
 				},
+			drawableIds = drawableIds,
+			binding = tile.source,
 		)
 	}
 
@@ -270,10 +293,12 @@ fun buildSourcesTree(
 			id = "layer:${sourceId.raw}/$key",
 			label = label,
 			detail = detail,
-			kind = SourcesNodeKind.Layer(SourceLayerRef(sourceId, key, stableKey = stable || layerKeyLooksStable(key))),
+			kind = SourcesNodeKind.Layer(relinkTargetRef(bound, sourceId, key)),
 			status = status,
 			children = bound.map { tile -> tileNode(tile.id) },
 			suggestion = suggestion,
+			drawableIds = bound.flatMap { tile -> drawableIdsByTile[tile.id].orEmpty() },
+			tileIds = bound.map { tile -> tile.id },
 		)
 	}
 
@@ -313,7 +338,11 @@ fun buildSourcesTree(
 						)
 					val ordinal = (rowCountByKey[layer.key] ?: 0) + 1
 					rowCountByKey[layer.key] = ordinal
-					if (ordinal == 1) node else node.copy(id = "${node.id}~$ordinal", status = SourcesStatus.Unbound, children = emptyList(), suggestion = null)
+					if (ordinal == 1) {
+						node
+					} else {
+						node.copy(id = "${node.id}~$ordinal", status = SourcesStatus.Unbound, children = emptyList(), suggestion = null, drawableIds = emptyList(), tileIds = emptyList())
+					}
 				}
 			// Tiles bound to this file under a key its inventory never listed (a CMO3 whose walk found no such
 			// layer, or a document from before the inventory kept lost rows): shown so the binding is never invisible.
@@ -354,8 +383,8 @@ fun buildSourcesTree(
 /**
  * Whether a layer key reads as format-minted: the PSD name-and-order fallback (`name:` or a `#` order
  * suffix) is the one weak shape the readers produce; everything else (a lyid, a CLIP or Krita uuid)
- * survives a rename.  Used only to type a relink to a layer no tile was bound to before - a bound
- * layer's own ref says what it is.
+ * survives a rename.  Used only to type a binding to a layer no tile is bound to - a bound layer's
+ * tiles say what its key is (relinkTargetRef).
  *
  * @param String key The reader's layer key.
  * @return Boolean True when the key looks stable.
@@ -399,29 +428,4 @@ fun filterSourcesTree(nodes: List<SourcesNode>, query: String, filters: Set<Sour
 		}
 	}
 	return nodes.mapNotNull { node -> prune(node, satisfiedAbove = false) }
-}
-
-/**
- * Flattens the tree into the visible rows: a node's children follow it when [isOpen] says its row
- * is expanded.
- *
- * @param List<SourcesNode> nodes  The top-level rows.
- * @param Function          isOpen Whether the row with the given id is expanded.
- * @return List<SourcesRow> The rows top to bottom, each with its depth.
- */
-fun flattenSources(nodes: List<SourcesNode>, isOpen: (String) -> Boolean): List<SourcesRow> {
-	val rows = ArrayList<SourcesRow>()
-
-	fun visit(node: SourcesNode, depth: Int) {
-		rows.add(SourcesRow(node, depth))
-		if (node.children.isNotEmpty() && isOpen(node.id)) {
-			for (child in node.children) {
-				visit(child, depth + 1)
-			}
-		}
-	}
-	for (node in nodes) {
-		visit(node, 0)
-	}
-	return rows
 }

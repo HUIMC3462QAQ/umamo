@@ -29,10 +29,17 @@ internal val OUTLINER_ROW_HEIGHT = 22.dp
 /** Fixed width of the trailing restriction indicator slot. */
 internal val OUTLINER_RESTRICTION_SLOT_WIDTH = 16.dp
 
-/** The padding on each side of a row, left and right of its content. */
+/**
+ * How far the row's fill, border, and drop ring sit inside its bounds, so neighboring highlighted rows
+ * read as separate bands.  The row's hit area stays the full row, and its content padding gives the inset
+ * back so nothing inside moves.
+ */
+internal val OUTLINER_ROW_BAND_INSET = 1.dp
+
+/** The padding on each side of a row, left and right of its content, band inset included. */
 internal val OUTLINER_ROW_PADDING_HORIZONTAL = 4.dp
 
-/** The padding above and below a row's content. */
+/** The padding above and below a row's content, band inset included. */
 internal val OUTLINER_ROW_PADDING_VERTICAL = 2.dp
 
 /** The inset before the chevron of a row at depth 0, inside the row's padding. */

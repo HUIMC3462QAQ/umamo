@@ -4,6 +4,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.unit.dp
 import org.umamo.edit.EditorSession
 import org.umamo.edit.RowDropBand
@@ -28,22 +29,26 @@ import org.umamo.ui.workspace.rowdrag.RowDragController
  */
 internal fun Modifier.outlinerDropLine(band: RowDropBand?, depth: Int, accentColor: Color): Modifier =
 	this.drawBehind {
-		// Inset the line by half its stroke so the full 2.5dp stays inside the row: drawn at the very edge
-		// (y == 0) its top half would clip against the row bound, leaving the first row's line a sliver.
-		val strokeWidth = 2.5.dp.toPx()
-		val edgeY =
-			when (band) {
-				RowDropBand.Before -> strokeWidth / 2f
-				RowDropBand.After -> size.height - strokeWidth / 2f
-				RowDropBand.Into, null -> return@drawBehind
-			}
-		val startX = OUTLINER_CONTENT_START.toPx() + OUTLINER_INDENT_PER_DEPTH.toPx() * depth
-		drawLine(
-			color = accentColor,
-			start = Offset(startX, edgeY),
-			end = Offset(size.width, edgeY),
-			strokeWidth = strokeWidth,
-		)
+		// Drawn inside the row's band inset, so widen back out to the row's own frame: the line sits on the
+		// row's edge, not the band's.
+		inset(-OUTLINER_ROW_BAND_INSET.toPx()) {
+			// Inset the line by half its stroke so the full 2.5dp stays inside the row: drawn at the very edge
+			// (y == 0) its top half would clip against the row bound, leaving the first row's line a sliver.
+			val strokeWidth = 2.5.dp.toPx()
+			val edgeY =
+				when (band) {
+					RowDropBand.Before -> strokeWidth / 2f
+					RowDropBand.After -> size.height - strokeWidth / 2f
+					RowDropBand.Into, null -> return@drawBehind
+				}
+			val startX = OUTLINER_CONTENT_START.toPx() + OUTLINER_INDENT_PER_DEPTH.toPx() * depth
+			drawLine(
+				color = accentColor,
+				start = Offset(startX, edgeY),
+				end = Offset(size.width, edgeY),
+				strokeWidth = strokeWidth,
+			)
+		}
 	}
 
 /**

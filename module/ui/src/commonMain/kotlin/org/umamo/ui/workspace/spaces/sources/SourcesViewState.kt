@@ -24,6 +24,12 @@ internal class SourcesViewState : PersistentSpaceState {
 	/** The name-search query; blank shows the whole table. */
 	var query by mutableStateOf("")
 
+	/**
+	 * Whether a search is running.  While one is, every row shows open and a press on a row or its chevron
+	 * folds nothing.
+	 */
+	val searching: Boolean get() = query.isNotBlank()
+
 	/** Each row's open state by node id; an absent id follows [sourcesOpensByDefault]. */
 	val expanded = mutableStateMapOf<String, Boolean>()
 
@@ -53,6 +59,36 @@ internal class SourcesViewState : PersistentSpaceState {
 	 * @return Boolean True when open.
 	 */
 	fun isOpen(nodeId: String): Boolean = expanded[nodeId] ?: sourcesOpensByDefault(nodeId)
+
+	/**
+	 * Opens the row [nodeId] if it is closed, and closes it if it is open.  Does nothing while a search
+	 * runs: every row shows open then, so a press has nothing to fold and must not write a fold the rigger
+	 * cannot see change.
+	 *
+	 * @param String nodeId The Sources node id.
+	 */
+	fun toggleFold(nodeId: String) {
+		if (searching) {
+			return
+		}
+		expanded[nodeId] = !isOpen(nodeId)
+	}
+
+	/**
+	 * Opens the row [nodeId] when it is closed, and writes nothing when it is open already.  A fold written
+	 * for a row that is open by default adds a key the map did not hold, and everything keyed on the map is
+	 * built again for a table that looks the same.
+	 *
+	 * Unlike [toggleFold] this writes during a search too.  It is what a drop opens the row it lands in
+	 * with, and the row has to be open once the search is gone.
+	 *
+	 * @param String nodeId The Sources node id.
+	 */
+	fun open(nodeId: String) {
+		if (!isOpen(nodeId)) {
+			expanded[nodeId] = true
+		}
+	}
 
 	/**
 	 * The Sources space's member of its area block.
