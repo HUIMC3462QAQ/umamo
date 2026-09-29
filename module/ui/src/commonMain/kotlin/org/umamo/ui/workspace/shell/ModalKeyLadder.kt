@@ -43,7 +43,7 @@ internal fun handleModalKeyLadder(stroke: ShellKeyStroke, state: ShellModalState
 			overlays.noteEnterStroke(stroke.isDown)
 		}
 		// The five modal alert arms below run in the order ShellOverlayState.topmostModalAlert names, and
-		// EditorShell paints them in reverse, so the dialog taking a key is always the one drawn on top.  Each
+		// ShellModalOverlays paints them in reverse, so the dialog taking a key is always the one drawn on top.  Each
 		// acts on the head of its kind's queue; the next of that kind shows once that one is answered.  They
 		// act on Enter only while it is armed: an Enter already down when the topmost modal took over - the
 		// palette's Enter that raised it, or the Enter that answered the modal queued ahead of it -

@@ -69,6 +69,25 @@ internal suspend fun PointerInputScope.observeWindowPointer(onPointer: (Offset) 
 }
 
 /**
+ * The shell-level cursor overlays in stacking order: near-cursor notices, the pie menu (which owns the
+ * pointer while open), the relation-pick eyedropper, and the parameter-choice menu.
+ *
+ * Siblings of the shell's content column, so they float above the whole area tree - escaping viewport
+ * bounds - and below the modal overlays painted after them.  Emits no layout of its own.  The position
+ * arrives as a reader and is read here, so a pointer move recomposes this group and nothing around it.
+ *
+ * @param Function pointerPosition Reads the pointer's last position in shell-root pixels, null before any pointer event.
+ */
+@Composable
+internal fun ShellCursorOverlayStack(pointerPosition: () -> Offset?) {
+	val position = pointerPosition()
+	ShellNearCursorNotice(pointerPosition = position)
+	ShellPieMenuHost(pointerPosition = position)
+	ShellRelationPickOverlay(pointerPosition = position)
+	ShellParameterChoiceMenu(pointerPosition = position)
+}
+
+/**
  * The shell-level radial pie menu host: observes the open document's pie latch and renders the entry
  * ring at the window-space pointer position, frozen at open (the pie opens under the hand,
  * Blender-style).  Living ABOVE the area tree - not inside a viewport's clipped box - is what lets

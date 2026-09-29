@@ -1,8 +1,13 @@
 package org.umamo.ui.workspace.shell
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
+import org.umamo.ui.kit.textentry.InlineEditController
+import org.umamo.ui.workspace.ShellOverlayState
 
 /**
  * Whether a press that has finished dispatching should end text entry and hand the keyboard back to the
@@ -44,3 +49,40 @@ internal suspend fun PointerInputScope.observeTextEntryPresses(
 		}
 	}
 }
+
+/**
+ * Hands the keyboard back to [focusRequester] after a press that lands away from a live text editor, so a
+ * filter cannot keep the keyboard after the pointer has moved on.
+ *
+ * Its own observer rather than a branch of the window-pointer tracker: that one is an always-on position
+ * feed, this one is a per-press state machine over the editor's press claim.  The release takes focus and
+ * never clears it, since a null focus owner silently kills every shortcut.  Moving focus still fires each
+ * control's onFocusChanged(hasFocus = false), and that is what commits an inline rename and unparks the
+ * cancel hook.
+ *
+ * @param InlineEditController inlineEditController The text-entry seam: the cancel hook and the press claim.
+ * @param ShellOverlayState    overlays             The modal chrome; a self-focused overlay keeps its keyboard.
+ * @param FocusRequester       focusRequester       The shell root's focus, taken back on a release.
+ * @return Modifier This modifier, observing the presses that end text entry.
+ */
+internal fun Modifier.releaseTextEntryOnPress(
+	inlineEditController: InlineEditController,
+	overlays: ShellOverlayState,
+	focusRequester: FocusRequester,
+): Modifier =
+	pointerInput(Unit) {
+		observeTextEntryPresses(
+			beginPress = { inlineEditController.pressLandedOnTextEditor = false },
+			settlePress = {
+				val releases =
+					shouldReleaseTextEntry(
+						textEntryActive = inlineEditController.cancel != null,
+						pressLandedOnTextEditor = inlineEditController.pressLandedOnTextEditor,
+						selfFocusedOverlayOpen = overlays.selfFocusedOverlayOpen,
+					)
+				if (releases) {
+					focusRequester.requestFocus()
+				}
+			},
+		)
+	}

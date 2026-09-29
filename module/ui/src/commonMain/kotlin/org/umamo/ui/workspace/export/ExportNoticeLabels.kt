@@ -4,20 +4,27 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.interop.ExportEntityCategory
+import org.umamo.interop.ExportFormat
+import org.umamo.interop.ExportNotice
 import org.umamo.interop.ExportNoticeReason
+import org.umamo.interop.ExportReport
 import org.umamo.interop.KeyformBundleRejection
 import org.umamo.runtime.model.FormChannel
 import org.umamo.ui.properties.formChannelLabelRes
+import org.umamo.ui.properties.runtimeFeatureLabelRes
 import org.umamo.ui.resources.*
 
 /*
- * Localized text for the export report's findings.  :interop carries only the structured facts (see
- * ExportNoticeReason); the sentences a rigger reads are assembled here, so the exporters stay
- * presentation-free and every locale gets the same coverage.
+ * Localized text for the export report: each finding's sentence, and the alert that lists them.
+ * :interop carries only the structured facts (see ExportNoticeReason); the sentences a rigger reads are
+ * assembled here, so the exporters stay presentation-free and every locale gets the same coverage.
  *
  * Each mapping is an exhaustive `when` with no `else`, so a new reason is a compile error here until
  * it gets a sentence - the same compile-time completeness EnumLabels.kt relies on.
  */
+
+/** How many affected entities an export notice spells out before counting the rest. */
+private const val SUBJECTS_SHOWN: Int = 8
 
 /**
  * One localizable sentence: the resource to format, plus the arguments to format it with.
@@ -298,4 +305,87 @@ fun exportNoticePhraseText(phrase: ExportNoticePhrase): String {
 		)
 	}
 	return stringResource(phrase.resource, *resolved.toTypedArray())
+}
+
+/**
+ * Builds the export-report alert's text: the localized header, then one line per notice.
+ *
+ * Every line is localized from the notice's structured fields - the entity category, the reason and
+ * whatever it carries, the affected drawable names, the missing page count, or the stripped feature
+ * and the entities that carried it.  The only text passed through verbatim is document data: an
+ * entity's own id, which is format-level and must never be translated.
+ *
+ * The header names the format the export actually wrote, from the report's own discriminator - a
+ * notice reads identically for either format, so nothing else in the alert says which file the
+ * rigger is being told about.
+ *
+ * @param ExportReport report The export's advisory report.
+ * @return String The multiline alert text.
+ */
+@Composable
+internal fun exportReportMessage(report: ExportReport): String {
+	val lines = ArrayList<String>(report.notices.size + 1)
+	lines.add(
+		stringResource(
+			when (report.format) {
+				ExportFormat.Cmo3 -> Res.string.export_report_message_cmo3
+				ExportFormat.Moc3 -> Res.string.export_report_message_moc3
+			},
+		),
+	)
+	for (notice in report.notices) {
+		when (notice) {
+			is ExportNotice.UnsupportedChange -> {
+				val categoryLabel = stringResource(exportEntityCategoryLabelRes(notice.category))
+				val reasonText = exportNoticePhraseText(exportNoticeReasonPhrase(notice.reason))
+				// A document-level finding has no entity to name; its reason names the field instead.
+				lines.add(
+					if (notice.subject == null) {
+						"• [$categoryLabel] $reasonText"
+					} else {
+						"• [$categoryLabel] ${notice.subject}: $reasonText"
+					},
+				)
+			}
+
+			is ExportNotice.WeldDivergence ->
+				lines.add("• " + stringResource(Res.string.export_weld_divergence, notice.drawableNames.joinToString()))
+
+			is ExportNotice.MissingSourceArt ->
+				lines.add("• " + stringResource(Res.string.export_missing_source_art, notice.pageCount))
+
+			is ExportNotice.SharedAtlasSlotKept ->
+				lines.add("• " + stringResource(Res.string.export_shared_atlas_slot_kept, abbreviatedSubjects(notice.drawableNames)))
+
+			is ExportNotice.FeatureStripped ->
+				lines.add(
+					"• " +
+						stringResource(
+							Res.string.export_feature_stripped,
+							stringResource(runtimeFeatureLabelRes(notice.feature)),
+							abbreviatedSubjects(notice.subjects),
+						),
+				)
+		}
+	}
+	return lines.joinToString("\n")
+}
+
+/**
+ * A subject list short enough for an alert: the first few names, then how many were left out.
+ *
+ * Stripping a 5.3 feature out of a large rig names every drawable that carried it - a thousand-name
+ * line in a dialog nobody can dismiss past.  The report itself keeps the full list; only this display
+ * abbreviates, so a caller that wants them all (a log, a future report panel) still has them.
+ *
+ * @param List subjects The affected entities' names.
+ * @return String The display text.
+ */
+@Composable
+private fun abbreviatedSubjects(subjects: List<String>): String {
+	val shown = subjects.take(SUBJECTS_SHOWN)
+	if (shown.size == subjects.size) {
+		return shown.joinToString()
+	}
+	return shown.joinToString() + " " + stringResource(Res.string.export_more_subjects, subjects.size - shown.size)
 }

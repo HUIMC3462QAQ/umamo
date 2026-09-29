@@ -478,6 +478,46 @@ suspend fun runAtlasRepack(
 }
 
 /**
+ * The repack command's action for one document: each call repacks [session]'s atlas over the area it is
+ * given, starting from the options [sessionOptions] holds for that session, and records what a
+ * successful pack ran with so the next repack starts there.
+ *
+ * @param EditorSession             session            The document's session.
+ * @param SourceArtRasters          artRasters         The source-art pixels to pack.
+ * @param SessionAtlasPages?        sessionAtlasPages  The session's page resolver, pre-warmed on success.
+ * @param Boolean                   premultipliedAlpha The document's texture-convention flag.
+ * @param CoroutineScope            scope              Where the pack and its adjustments launch.
+ * @param AtlasRepackSessionOptions sessionOptions     The window's repack memory, read and recorded.
+ * @param Function                  report             Receives the abort report when a pack refuses.
+ * @return Function The action, handed the area id the command was dispatched over, or null.
+ */
+internal fun atlasRepackLauncher(
+	session: EditorSession,
+	artRasters: SourceArtRasters,
+	sessionAtlasPages: SessionAtlasPages?,
+	premultipliedAlpha: Boolean,
+	scope: CoroutineScope,
+	sessionOptions: AtlasRepackSessionOptions,
+	report: (AtlasRepackReport) -> Unit,
+): (areaId: String?) -> Unit {
+	val host =
+		AtlasRepackHost(
+			session = session,
+			artRasters = artRasters,
+			sessionAtlasPages = sessionAtlasPages,
+			premultipliedAlpha = premultipliedAlpha,
+			scope = scope,
+			report = report,
+			rememberOptions = { options, keepPinned -> sessionOptions.record(session, options, keepPinned) },
+		)
+	return { areaId ->
+		val options = sessionOptions.optionsFor(session, repackPageSizeOf(session.model.value))
+		val keepPinned = sessionOptions.keepPinnedFor()
+		scope.launch { runAtlasRepack(host, options, areaId, keepPinned) }
+	}
+}
+
+/**
  * Re-packs for an adjustment of the strip: the record's parameters become the options, the SAME
  * decoded [packInput] packs again off-thread, and the result lands over the repack's own step from
  * the record's base model.  A refusal reports like the first run's and leaves the previous result

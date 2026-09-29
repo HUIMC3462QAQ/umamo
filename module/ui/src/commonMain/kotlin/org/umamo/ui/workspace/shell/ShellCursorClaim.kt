@@ -1,5 +1,8 @@
 package org.umamo.ui.workspace.shell
 
+import androidx.compose.ui.input.pointer.PointerIcon
+import org.umamo.ui.theme.hiddenPointerIcon
+
 /**
  * What the shell root is saying about the pointer, window-wide, over every cursor a panel or gizmo would
  * otherwise choose for itself.  A whole-window claim is how a mode announces itself: the pointer changes
@@ -43,4 +46,18 @@ internal fun shellCursorClaim(
 		relationPickArmed -> ShellCursorClaim.Hidden
 		textEntryActive -> ShellCursorClaim.TextEdit
 		else -> ShellCursorClaim.None
+	}
+
+/**
+ * The pointer icon this claim puts on the whole window: none of the OS's for a pick, the platform's text
+ * pointer for text entry, and the plain pointer when nothing is claimed.
+ *
+ * @return PointerIcon The icon the shell root applies.
+ * @note The hidden icon is a native cursor built on every call, so a caller remembers the result per claim.
+ */
+internal fun ShellCursorClaim.pointerIcon(): PointerIcon =
+	when (this) {
+		ShellCursorClaim.Hidden -> hiddenPointerIcon()
+		ShellCursorClaim.TextEdit -> PointerIcon.Text
+		ShellCursorClaim.None -> PointerIcon.Default
 	}
