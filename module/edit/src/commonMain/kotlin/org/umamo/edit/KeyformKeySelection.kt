@@ -1,16 +1,22 @@
 package org.umamo.edit
 
+import org.umamo.runtime.model.KeyformTrackRef
+import org.umamo.runtime.model.Parameter
+
 /*
- * What a key REMOVAL does to the keyform sheet's key selection.
+ * What an edit to a track's keys does to the keyform sheet's key selection.
  *
- * Removing keys renumbers the ones above them: a [TrackKeyRef] names a row and an ordinal on that row's
- * track, so a selection left untouched across a removal stops naming the key the user selected and instead
- * names whichever key slides down onto the freed ordinal.
+ * A [TrackKeyRef] names a row and an ordinal on that row's track, and a key edit can renumber a track: a
+ * removal slides the keys above it down, an insert pushes them up, and a move or a drag that crosses a
+ * neighbour re-sorts the axis.  A selection left untouched across one stops naming the key the user
+ * selected and names whichever key took its ordinal instead.
  *
- * The rule lives in :edit rather than in the sheet because it is a statement about what an edit MEANS, and
- * three call sites need to agree on it - the aimed removal behind Alt+I and the lane menu, the selected-keys
- * removal behind Delete, and the summary-mark removal.  A [TrackKeyRef]'s row key is opaque here, which is
- * all this needs: the algebra compares row keys, it never resolves one.
+ * The rules live in :edit rather than in the sheet because they are statements about what an edit MEANS,
+ * and several call sites need to agree on each - the aimed removal behind Alt+I and the lane menu, the
+ * selected-keys removal behind Delete, and the summary-mark removal all go through one rule, and a
+ * multi-key drag, a summary-mark drag, and the arrow-key nudge through another.  A [TrackKeyRef]'s row key
+ * is opaque here, which is all this needs: the algebra compares row keys, it never resolves one, and a
+ * caller that edits a track pairs each ref with the track it resolves to.
  */
 
 /**
@@ -88,6 +94,71 @@ fun EditorSession.removingKeys(removed: Set<TrackKeyRef>, removeKeys: () -> Unit
  */
 fun EditorSession.insertingKey(inserted: TrackKeyRef?, insertKey: () -> Unit) {
 	editingKeys({ current -> if (inserted == null) current else selectionAfterKeyInsertion(current, inserted) }, insertKey)
+}
+
+/**
+ * Drags every key in [keys] by [fraction] of its parameter's range, with the key selection re-pointed at
+ * where they land, as ONE undo step - the keyform sheet's multi-key drag, its summary-mark drag, and its
+ * arrow-key nudge.
+ *
+ * The selection becomes exactly [keys] at their landed ordinals: a crossing renumbers the axis, so the refs
+ * as they read before the drag would name whichever keys took those places.  A selected ref the caller could
+ * not resolve to a track is not in [keys], so it drops out of the selection here.
+ *
+ * STAGE, EDIT, CONFIRM (see [EditorSession.stageKeySelection]), with the landings asked for BEFORE the drag
+ * so the re-pointed selection rides the drag's own snapshot.  The confirm is what records the re-pointing
+ * when the drag itself records nothing (clamped to a standstill against a range wall).
+ *
+ * @param List keys Each dragged key as the sheet names it, paired with the (track, parameter, key ordinal)
+ *   it resolves to.
+ * @param Float fraction The drag as a signed fraction of each parameter's range.
+ */
+fun EditorSession.dragTrackKeysKeepingSelection(keys: List<Pair<TrackKeyRef, Triple<KeyformTrackRef, Parameter, Int>>>, fraction: Float) {
+	if (keys.isEmpty()) {
+		return
+	}
+	val dragged = keys.map { (_, key) -> key }
+	val landed = model.value.trackKeyDragLandings(dragged, fraction)
+	val landedSelection =
+		keys.mapIndexed { position, (keyRef, _) -> keyRef.copy(keyIndex = landed.getOrElse(position) { keyRef.keyIndex }) }.toSet()
+	stageKeySelection(landedSelection)
+	dragTrackKeys(dragged, fraction)
+	setKeySelection(landedSelection)
+}
+
+/**
+ * Moves one key to [toValue] and leaves it selected, as ONE undo step - the keyform sheet's single-mark drag.
+ *
+ * A key already in [selection] keeps the rest of the selection with it.  Any other key REPLACES the
+ * selection, exactly as a click on it would: dragging an unselected key is a selection of that key first,
+ * which is how every editor with a selection treats it.
+ *
+ * A move may cross the key's neighbours, which renumbers the axis, so the key's ref has to follow it to the
+ * ordinal it lands on; keeping the old ordinal would leave the selection on whichever key took its place.
+ * STAGE, EDIT, CONFIRM, with the landing asked for BEFORE the move so the selection rides the move's own
+ * snapshot: staged afterwards, every recorded step would hold the pre-move ordinal, which redo would then
+ * restore onto the wrong key.  The confirm records the selection when the move records nothing (released
+ * where it was picked up).
+ *
+ * @param TrackKeyRef key The moved key as the sheet names it.
+ * @param KeyformTrackRef track The track the key sits on.
+ * @param Parameter parameter The parameter whose axis the key sits on.
+ * @param Float toValue Where the key was released, in the parameter's units.
+ * @param Set<TrackKeyRef> selection The key selection the gesture was made against.
+ */
+fun EditorSession.moveTrackKeySelectingIt(
+	key: TrackKeyRef,
+	track: KeyformTrackRef,
+	parameter: Parameter,
+	toValue: Float,
+	selection: Set<TrackKeyRef>,
+) {
+	val landedIndex = model.value.trackKeyIndexAfterMove(track, parameter, key.keyIndex, toValue)
+	val keptSelection = if (key in selection) selection - key else emptySet()
+	val landedSelection = keptSelection + key.copy(keyIndex = landedIndex)
+	stageKeySelection(landedSelection)
+	moveTrackKey(track, parameter, key.keyIndex, toValue)
+	setKeySelection(landedSelection)
 }
 
 /**

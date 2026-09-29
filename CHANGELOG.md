@@ -88,6 +88,7 @@ Umamo is early alpha.
 * Parameters: Switching to Edit Mode during a slider drag now discards the drag.
 * Parameters: A new, restored, or moved row at the top of the list is now fully visible.
 * Keyform Sheet: Scrubbing a track or clicking a key in Edit Mode no longer changes the pose.
+* Keyform Sheet: Clicking and dragging on an unselected key when there is an active selection now properly switches the selection.  Previously it would select it after the drag finished and create weird interactions when there were multiple keys selected.
 * Outliner: Clicking a branch's arrow during a search no longer changes its saved fold.
 
 ## 0.3.0-dev - 2026-09-15
