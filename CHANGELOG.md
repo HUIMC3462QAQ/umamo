@@ -55,6 +55,8 @@ Umamo is early alpha.
 * Packaging: The app starts Java with the options that keep newer Java versions from warning about native libraries and memory access.
 * Import/Export: CMO3 and MOC3 no longer block the application process while processing.  New, save, and open document will be blocked while waiting for an export to finish.
 * Parameters: Clicking a parameter's name now only opens or closes its range editor; it no longer selects the parameter.
+* Parameters: In Edit Mode the parameter sliders now show the rest pose which matches the pose in edit mode.  The sliders return to their set positions after returning to object mode.
+* Keyform Sheet: Insert Key and Delete Key in Edit Mode act at the rest pose shown in the viewport.
 
 ### Fixed
 * UI: Modal key ladder issue with escape closing the preferences window first instead of the confirmation dialog.
@@ -86,6 +88,7 @@ Umamo is early alpha.
 * Parameters: Switching to Edit Mode during a slider drag now discards the drag.
 * Parameters: A new, restored, or moved row at the top of the list is now fully visible.
 * Keyform Sheet: Scrubbing a track or clicking a key in Edit Mode no longer changes the pose.
+* Outliner: Clicking a branch's arrow during a search no longer changes its saved fold.
 
 ## 0.3.0-dev - 2026-09-15
 
