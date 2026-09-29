@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
@@ -56,7 +57,9 @@ import org.umamo.ui.theme.LocalUmamoTypography
 import org.umamo.ui.workspace.LocalRelationPick
 import org.umamo.ui.workspace.rowdrag.RowCoordinatesHolder
 import org.umamo.ui.workspace.rowdrag.RowDragController
+import org.umamo.ui.workspace.rowdrag.RowDragRole
 import org.umamo.ui.workspace.rowdrag.dragRowOnLongPress
+import org.umamo.ui.workspace.rowdrag.rememberRowDragRole
 import org.umamo.ui.workspace.rowdrag.rowDropHighlight
 import org.umamo.ui.workspace.spaces.ReportRowHover
 import org.umamo.ui.workspace.spaces.RowHoverPreviewState
@@ -273,21 +276,17 @@ private fun OutlinerRowBody(
 	// when its keys change, and onDrop closes over live state; this keeps the drag's release pointed at the
 	// latest callback.
 	val currentOnDrop by rememberUpdatedState(onDrop)
-	// Drag feedback: this row is the one being dragged (faded), or the row the pointer is over (a drop
-	// target).  Only real rows are valid drop targets.
-	val isDragged = dragController.draggingKey == node.id
-	val isDropTarget =
-		dragController.isDragging && !isDragged && node.target != null && dragController.dropTargetKey == node.id
-	// The drop band for THIS row, resolved by the same band rules the dispatch uses (so the indicator always
-	// matches the move): an insertion line above (before) or below (after), or a whole-row fill (nest into).
-	val draggedPayload = dragController.draggedPayload
-	val dropBand =
-		// isDropTarget already includes node.target != null, so it smart-casts non-null inside this branch.
-		if (isDropTarget && draggedPayload != null) {
-			outlinerDropBandFor(draggedPayload, node.target, dragController.dropTargetFraction ?: 0.5f)
-		} else {
-			null
-		}
+	// Drag feedback: this row is the one being dragged (faded), or the row a release would drop on, with
+	// the band the drop would land in - resolved by the same band rules the dispatch uses, so the indicator
+	// always matches the move: an insertion line above (before) or below (after), or a whole-row ring (nest
+	// into).  Only real rows take a drop.  Read as the row's part in the drag, which changes when this row's
+	// part does, so a pointer moving over other rows, or inside one band of this one, runs nothing here.
+	val rowTarget = node.target
+	val dragRole by dragController.rememberRowDragRole(node.id) { dragged, fraction ->
+		rowTarget?.let { target -> outlinerDropBandFor(dragged, target, fraction) }
+	}
+	val isDragged = dragRole == RowDragRole.Dragged
+	val dropBand = dragRole.bandOrNull
 	val isIntoTarget = dropBand == RowDropBand.Into
 	val colors = LocalUmamoColors.current
 	val shapes = LocalUmamoShapes.current
@@ -330,7 +329,7 @@ private fun OutlinerRowBody(
 	// an edge line instead (outlinerDropLine).
 	val background =
 		when {
-			selected -> colors.selection
+			selected -> colors.selection.copy(alpha = 0.75f)
 			hovered -> colors.rowHover
 			ancestorOfSelection -> colors.selectionAncestorBackground
 			matched -> colors.searchMatchBackground
@@ -359,16 +358,6 @@ private fun OutlinerRowBody(
 				// The dragged row fades while it is in flight - the whole row, fill and ring included, so the
 				// alpha layer wraps everything painted below it.
 				.alpha(if (isDragged) 0.4f else 1f)
-				// Background and border paint on the full row, before padding insets the content - otherwise the
-				// selection / hover band is drawn inside the 2dp vertical padding, so the highlighted rows read
-				// as having extra vertical padding while the plain rows (no visible band) do not.
-				.background(background, shape = shapes.medium)
-				.border(BorderStroke(1.dp, borderColor), shapes.medium)
-				.rowDropHighlight(isIntoTarget, shapes.medium, colors)
-				// Painted over the zebra fill but behind the content, in this order: the guides, then the
-				// drop line over them.
-				.outlinerAncestryGuides(row.depth, rowIndex, colors.treeGuideLine)
-				.outlinerDropLine(dropBand, row.depth, colors.accent)
 				.hoverable(interaction)
 				.onGloballyPositioned { coordinates ->
 					boundsHolder.coordinates = coordinates
@@ -401,7 +390,20 @@ private fun OutlinerRowBody(
 						}
 					},
 				)
-				.padding(horizontal = OUTLINER_ROW_PADDING_HORIZONTAL, vertical = OUTLINER_ROW_PADDING_VERTICAL),
+				// The fill, border, and ring sit inside the band inset, after the pointer input so the gap between
+				// two bands still belongs to a row.
+				.padding(OUTLINER_ROW_BAND_INSET)
+				.background(background, shape = shapes.medium)
+				.border(BorderStroke(1.dp, borderColor), shapes.medium)
+				.rowDropHighlight(isIntoTarget, shapes.medium, colors)
+				// Painted over the fill but behind the content, in this order: the guides, then the drop line
+				// over them.
+				.outlinerAncestryGuides(row.depth, rowIndex, colors.treeGuideLine)
+				.outlinerDropLine(dropBand, row.depth, colors.accent)
+				.padding(
+					horizontal = OUTLINER_ROW_PADDING_HORIZONTAL - OUTLINER_ROW_BAND_INSET,
+					vertical = OUTLINER_ROW_PADDING_VERTICAL - OUTLINER_ROW_BAND_INSET,
+				),
 		verticalAlignment = Alignment.CenterVertically,
 	) {
 		Spacer(modifier = Modifier.width(OUTLINER_INDENT_BASE + OUTLINER_INDENT_PER_DEPTH * row.depth))
@@ -472,27 +474,31 @@ private fun Modifier.outlinerAncestryGuides(depth: Int, rowIndex: () -> Int, col
 		if (depth == 0) {
 			return@drawBehind
 		}
-		val leftEdgePx = OUTLINER_CONTENT_START.toPx()
-		val indentPx = OUTLINER_INDENT_PER_DEPTH.toPx()
-		val chevronHalfPx = OUTLINER_CHEVRON_WIDTH.toPx() / 2f
-		val dashOnPx = 2.dp.toPx()
-		val dashOffPx = 3.dp.toPx()
-		val dashPeriodPx = dashOnPx + dashOffPx
-		val dashEffect =
-			PathEffect.dashPathEffect(
-				floatArrayOf(dashOnPx, dashOffPx),
-				(rowIndex() * size.height) % dashPeriodPx,
-			)
-		var ancestorLevel = 0
-		while (ancestorLevel < depth) {
-			val lineX = leftEdgePx + indentPx * ancestorLevel + chevronHalfPx
-			drawLine(
-				color = color,
-				start = Offset(lineX, 0f),
-				end = Offset(lineX, size.height),
-				strokeWidth = 1.dp.toPx(),
-				pathEffect = dashEffect,
-			)
-			ancestorLevel += 1
+		// Drawn inside the row's band inset, so widen back out to the row's own frame: the guides run its full
+		// height and join the next row's.
+		inset(-OUTLINER_ROW_BAND_INSET.toPx()) {
+			val leftEdgePx = OUTLINER_CONTENT_START.toPx()
+			val indentPx = OUTLINER_INDENT_PER_DEPTH.toPx()
+			val chevronHalfPx = OUTLINER_CHEVRON_WIDTH.toPx() / 2f
+			val dashOnPx = 2.dp.toPx()
+			val dashOffPx = 3.dp.toPx()
+			val dashPeriodPx = dashOnPx + dashOffPx
+			val dashEffect =
+				PathEffect.dashPathEffect(
+					floatArrayOf(dashOnPx, dashOffPx),
+					(rowIndex() * size.height) % dashPeriodPx,
+				)
+			var ancestorLevel = 0
+			while (ancestorLevel < depth) {
+				val lineX = leftEdgePx + indentPx * ancestorLevel + chevronHalfPx
+				drawLine(
+					color = color,
+					start = Offset(lineX, 0f),
+					end = Offset(lineX, size.height),
+					strokeWidth = 1.dp.toPx(),
+					pathEffect = dashEffect,
+				)
+				ancestorLevel += 1
+			}
 		}
 	}

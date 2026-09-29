@@ -3,7 +3,7 @@ package org.umamo.ui.workspace.spaces.properties
 import org.umamo.ui.kit.container.OverflowRowScope
 import org.umamo.ui.kit.field.SEARCH_FIELD_MIN_WIDTH
 import org.umamo.ui.kit.field.SearchField
-import org.umamo.ui.model.LocalPuppet
+import org.umamo.ui.model.documentIsOpen
 import org.umamo.ui.properties.PROPERTIES_VIEW_STATE_KEY
 import org.umamo.ui.properties.PropertiesViewState
 import org.umamo.ui.workspace.AreaScope
@@ -23,7 +23,7 @@ internal fun OverflowRowScope.propertiesHeaderControls(scope: AreaScope) {
 	item("search", minWidth = SEARCH_FIELD_MIN_WIDTH) {
 		// The item gates itself on the document: an item that renders nothing measures zero, so the strip
 		// empties without the builder needing a CompositionLocal it cannot read.
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			SearchField(value = viewState.query, onValueChange = { newQuery -> viewState.query = newQuery })
 		}
 	}

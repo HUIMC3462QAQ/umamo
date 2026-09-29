@@ -175,10 +175,11 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	val createMenuItems =
 		createParameterMenuItems(labels, puppet.runtimeTarget, session, viewState) + newParameterGroupMenuItem(labels, session, viewState)
 	// One release handler for every row's grip: a drag reads the panel's drag state, not the row it began on.
-	// The rows are read through state at the release, so the handler stays one object while the panel
-	// builds new rows, and no grip runs again for it.
+	// The rows and the model are read through state at the release, so the handler stays one object while
+	// the panel builds new rows and an edit publishes a new model, and no grip runs again for it.
+	val currentPuppet = rememberUpdatedState(puppet)
 	val onDrop = {
-		performParameterDrop(dragController, currentRows.value, puppet, session) { groupId ->
+		performParameterDrop(dragController, currentRows.value, currentPuppet.value, session) { groupId ->
 			expandedGroups[groupId] = true
 		}
 	}
@@ -221,13 +222,12 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 				VerticalScrollbarOverlay(listState)
 			}
 		}
-		// The floating drag ghost follows the cursor over everything.
-		if (dragController.isDragging) {
-			RowDragLabel(
-				label = draggedRowLabel(rows, dragController.draggingKey),
-				cursorX = dragController.dragWindowX,
-				cursorY = dragController.dragWindowY,
-			)
+		// The floating drag ghost follows the cursor over everything.  What is read here is which row is in
+		// hand, which a drag changes as it starts and as it ends; where the pointer is, the ghost asks for
+		// itself.
+		val draggingKey = dragController.draggingKey
+		if (draggingKey != null) {
+			RowDragLabel(label = draggedRowLabel(rows, draggingKey), pointerInWindow = { dragController.pointerInWindow })
 		}
 	}
 }

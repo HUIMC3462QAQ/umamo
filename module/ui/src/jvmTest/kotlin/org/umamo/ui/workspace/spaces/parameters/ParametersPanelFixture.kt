@@ -21,6 +21,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,12 +48,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.EditorMode
 import org.umamo.edit.EditorSession
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
+import org.umamo.edit.deleteTile
+import org.umamo.edit.setLayerIgnored
+import org.umamo.edit.setTileSources
+import org.umamo.reimport.LayerMatch
+import org.umamo.render.SourceArtRasters
+import org.umamo.runtime.model.ArtSourceId
 import org.umamo.runtime.model.BlendMode
 import org.umamo.runtime.model.Drawable
 import org.umamo.runtime.model.DrawableId
@@ -69,6 +80,8 @@ import org.umamo.runtime.model.ParameterLink
 import org.umamo.runtime.model.ParameterNode
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.runtime.model.RuntimeTarget
+import org.umamo.settings.Settings
+import org.umamo.ui.LocalSettings
 import org.umamo.ui.action.Command
 import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.action.Keymap
@@ -84,6 +97,13 @@ import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalLiveParams
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.model.LocalSelection
+import org.umamo.ui.model.LocalSourceArtRasters
+import org.umamo.ui.model.artwork.LocalSourceFilePresence
+import org.umamo.ui.model.artwork.LocalSourceSuggestions
+import org.umamo.ui.model.artwork.LocalSourceWatch
+import org.umamo.ui.model.artwork.SourceFilePresence
+import org.umamo.ui.model.artwork.SourceSuggestionState
+import org.umamo.ui.model.artwork.SourceWatchState
 import org.umamo.ui.model.rememberSessionEditorState
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.UmamoTheme
@@ -102,9 +122,17 @@ import org.umamo.ui.workspace.ShellOverlayState
 import org.umamo.ui.workspace.SpaceKind
 import org.umamo.ui.workspace.area.AreaDragController
 import org.umamo.ui.workspace.area.SplitterDragCancelController
+import org.umamo.ui.workspace.commands.ArtworkOperations
 import org.umamo.ui.workspace.commands.CommandRouting
+import org.umamo.ui.workspace.commands.DeleteArtRequest
+import org.umamo.ui.workspace.commands.IgnoreLayerRequest
+import org.umamo.ui.workspace.commands.RelinkRequest
+import org.umamo.ui.workspace.commands.ReloadScope
+import org.umamo.ui.workspace.commands.ReplaceRequest
 import org.umamo.ui.workspace.commands.SessionAvailability
 import org.umamo.ui.workspace.commands.chromeCommands
+import org.umamo.ui.workspace.commands.fileArtworkCommands
+import org.umamo.ui.workspace.commands.inMemorySettings
 import org.umamo.ui.workspace.commands.keyformCommands
 import org.umamo.ui.workspace.commands.objectCommands
 import org.umamo.ui.workspace.commands.registerAll
@@ -120,6 +148,7 @@ import org.umamo.ui.workspace.shell.shouldReleaseTextEntry
 import org.umamo.ui.workspace.shell.toShellKeyStroke
 import org.umamo.ui.workspace.spaces.keyformsheet.KeyformSheetSpace
 import org.umamo.ui.workspace.spaces.outliner.OutlinerSpace
+import org.umamo.ui.workspace.spaces.sources.SourcesSpace
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -324,6 +353,31 @@ internal fun panelFixtureModel(runtimeTarget: RuntimeTarget = RuntimeTarget.NoTa
  * @property String outlinerRename The outliner's Rename entry.
  * @property String outlinerDelete The outliner's Delete entry.
  * @property String deleteHierarchy The outliner's Delete Hierarchy entry.
+ * @property String sourcesUnboundArt The Sources space's row for art bound to no layer.
+ * @property String sourcesFileMenu The accessible name of a file row's actions chip.
+ * @property String sourcesFileReplace The Sources space's Replace Artwork entry.
+ * @property String sourcesFileReload The Sources space's Reload This File entry.
+ * @property String sourcesLayerMenu The accessible name of an unbound layer row's actions chip.
+ * @property String sourcesLayerIgnore The Sources space's Ignore Layer entry.
+ * @property String sourcesLayerUnignore The Sources space's Stop Ignoring entry.
+ * @property String sourcesReview The accessible name of a review row's chip.
+ * @property String sourcesAccept The review chip's Accept entry, for the Sources rig's proposal.
+ * @property String sourcesAcceptMerge The review chip's Accept entry when accepting retires a fresh drawable.
+ * @property String sourcesRelinkByHand The review chip's entry that opens the relink list.
+ * @property String sourcesLeave The review chip's entry that leaves the binding as it is.
+ * @property String sourcesRelink The accessible name of a tile row's relink chip.
+ * @property String sourcesUnbind The relink list's Unbind entry.
+ * @property String sourcesDeleteArt The relink list's Delete Art entry.
+ * @property String sourcesNoMatches The relink list's line for a search that matches nothing.
+ * @property String sourcesPresent The status of a file that is where the document read it.
+ * @property String sourcesMissing The status of a file that is gone.
+ * @property String sourcesUnknown The status of a file nothing could check.
+ * @property String sourcesBound The status of a layer bound by a stable key.
+ * @property String sourcesBoundByName The status of a layer bound by its name and place.
+ * @property String sourcesUnbound The status of a layer no tile binds.
+ * @property String sourcesUnplaced The status of a tile on no page.
+ * @property String sourcesNeedsReview The status of a binding whose layer the file lost.
+ * @property String sourcesIgnored The status of a layer kept out of the rig.
  */
 internal class PanelText(
 	val reset: String,
@@ -364,13 +418,56 @@ internal class PanelText(
 	val outlinerRename: String,
 	val outlinerDelete: String,
 	val deleteHierarchy: String,
+	val sourcesUnboundArt: String,
+	val sourcesFileMenu: String,
+	val sourcesFileReplace: String,
+	val sourcesFileReload: String,
+	val sourcesLayerMenu: String,
+	val sourcesLayerIgnore: String,
+	val sourcesLayerUnignore: String,
+	val sourcesReview: String,
+	val sourcesAccept: String,
+	val sourcesAcceptMerge: String,
+	val sourcesRelinkByHand: String,
+	val sourcesLeave: String,
+	val sourcesRelink: String,
+	val sourcesUnbind: String,
+	val sourcesDeleteArt: String,
+	val sourcesNoMatches: String,
+	val sourcesPresent: String,
+	val sourcesMissing: String,
+	val sourcesUnknown: String,
+	val sourcesBound: String,
+	val sourcesBoundByName: String,
+	val sourcesUnbound: String,
+	val sourcesUnplaced: String,
+	val sourcesNeedsReview: String,
+	val sourcesIgnored: String,
+)
+
+/**
+ * What the Sources space's commands were asked to do, in the order the requests landed.
+ *
+ * @property MutableList relinks  Every relink request.
+ * @property MutableList replaces Every Replace Artwork request.
+ * @property MutableList reloads  Every reload's scope; null for a reload of every file.
+ * @property MutableList deletes  Every Delete Art request.
+ * @property MutableList ignores  Every ignore toggle.
+ */
+internal class ArtworkRequests(
+	val relinks: MutableList<RelinkRequest> = ArrayList(),
+	val replaces: MutableList<ReplaceRequest> = ArrayList(),
+	val reloads: MutableList<ReloadScope?> = ArrayList(),
+	val deletes: MutableList<DeleteArtRequest> = ArrayList(),
+	val ignores: MutableList<IgnoreLayerRequest> = ArrayList(),
 )
 
 /**
  * The state one case shares between its composition and its assertions.
  *
  * @property Boolean provideLiveParams Whether the composition gets a live-parameter handle at all.
- * @property Boolean provideSession Whether the composition gets an editing session at all.
+ * @property Boolean provideSession Whether the composition gets an editing session at all.  A rig with no
+ *   document gets none whatever this says: a session is its document's, and the app provides the two together.
  * @property Boolean showHeader Whether the panel's header strip is mounted above the body.
  * @property Boolean provideDocument Whether the composition gets an open document at all.
  * @property Boolean showKeyformSheet Whether a keyform sheet is mounted beside the panel, over the same
@@ -381,6 +478,12 @@ internal class PanelText(
  * @property DrawableThumbnailProvider? thumbnails The art the outliner previews beside a rested-on row, or null
  *   for none, which is what a document without rendered art gives it.
  * @property PuppetModel model The rig the session opens on.
+ * @property Boolean showSources Whether a Sources space is mounted beside the panel, over the same session.
+ *   It gets what the app gives it: the file-presence probe, the watcher's state, the published proposals,
+ *   and the artwork commands, whose requests are recorded.
+ * @property SourceArtRasters? sourceArt The document's source-art pixels, which a Sources tile row previews,
+ *   or null for a document that holds none.
+ * @property Function onSourcePresenceAsked Told the path each time the file-presence probe is asked, as it is asked.
  */
 internal class ParametersPanelHarness(
 	runtimeTarget: RuntimeTarget = RuntimeTarget.NoTarget,
@@ -392,6 +495,9 @@ internal class ParametersPanelHarness(
 	val showOutliner: Boolean = false,
 	val thumbnails: DrawableThumbnailProvider? = null,
 	val model: PuppetModel = panelFixtureModel(runtimeTarget),
+	val showSources: Boolean = false,
+	val sourceArt: SourceArtRasters? = null,
+	val onSourcePresenceAsked: (path: String) -> Unit = {},
 ) {
 	val session = EditorSession(model, PANEL_FIXTURE_POSE)
 	val liveParams: LiveParams = initialLiveParams(session.model.value, PANEL_FIXTURE_POSE)
@@ -408,12 +514,89 @@ internal class ParametersPanelHarness(
 	val keyableHover = KeyableHover()
 	val keyformSheetViews = KeyformSheetViews()
 	val relationPick = RelationPickController()
+	val sourcesScope = AreaScope(PANEL_SOURCES_AREA_ID)
+	val settings: Settings = inMemorySettings()
+
+	/**
+	 * What the file-presence probe answers per path: false for a file that is gone, null for one nothing can
+	 * check.  A path with no entry is present.
+	 */
+	val sourcePresenceByPath: MutableMap<String, Boolean?> = HashMap()
+
+	/**
+	 * Holds every answer of the probe back until it completes, or null to answer at once.  A probe held
+	 * here has taken its answer already and gives it however long it waits, even once the round that asked
+	 * was overtaken: a look at the disk that is under way finishes whatever became of whoever asked.
+	 */
+	var sourcePresenceGate: CompletableDeferred<Unit>? = null
+
+	/** The probe itself.  One instance for the harness's life: the Sources space keys its asking on it. */
+	val sourcePresence: SourceFilePresence = { path ->
+		onSourcePresenceAsked(path)
+		val answer = if (sourcePresenceByPath.containsKey(path)) sourcePresenceByPath[path] else true
+		val gate = sourcePresenceGate
+		if (gate != null) {
+			withContext(NonCancellable) { gate.await() }
+		}
+		answer
+	}
+
+	/** The files the watcher reports changed on disk. */
+	val sourceWatchPending = MutableStateFlow<Set<ArtSourceId>>(emptySet())
+
+	/** The watcher's presence serial; a bump makes the Sources space probe again. */
+	val sourceWatchSerial = MutableStateFlow(0)
+
+	/** The proposals the last operation that read a file published, by file and lost layer key. */
+	val publishedSuggestions = MutableStateFlow<Map<Pair<ArtSourceId, String>, LayerMatch>>(emptyMap())
+	val sourceWatch = SourceWatchState(sourceWatchPending, sourceWatchSerial)
+	val sourceSuggestions = SourceSuggestionState(publishedSuggestions)
+
+	/** Every request the Sources space's commands were handed. */
+	val artworkRequests = ArtworkRequests()
+
+	/**
+	 * Whether a recorded request also lands on the session, as the binding-only change the app makes when it
+	 * cannot read the layer's file.  On, so the table shows what a relink, a delete, or an ignore did.
+	 */
+	var applyArtworkEdits = true
+
+	/** The app's artwork orchestrations, standing in for the ones that read files: each records, then applies. */
+	val artwork =
+		ArtworkOperations(
+			importArtwork = { _, _ -> },
+			reloadArtwork = { _, scope -> artworkRequests.reloads.add(scope) },
+			relinkArtwork = { request, _ ->
+				artworkRequests.relinks.add(request)
+				if (applyArtworkEdits) {
+					session.setTileSources(request.tileIds, request.ref)
+				}
+			},
+			matchArtwork = { _ -> },
+			replaceArtwork = { request, _ -> artworkRequests.replaces.add(request) },
+			deleteArt = { request ->
+				artworkRequests.deletes.add(request)
+				if (applyArtworkEdits) {
+					session.deleteTile(request.tileId)
+				}
+			},
+			ignoreLayer = { request ->
+				artworkRequests.ignores.add(request)
+				if (applyArtworkEdits) {
+					session.setLayerIgnored(request.ref, request.ignored)
+				}
+			},
+			canReload = { true },
+		)
 
 	/** The size the keyform sheet is laid out at, when one is mounted. */
 	var sheetSize by mutableStateOf(DpSize(PANEL_SHEET_WIDTH, PANEL_SHEET_HEIGHT))
 
 	/** The size the outliner is laid out at, when one is mounted; a short one makes its list scroll. */
 	var outlinerSize by mutableStateOf(DpSize(PANEL_OUTLINER_WIDTH, PANEL_OUTLINER_HEIGHT))
+
+	/** The size the Sources space is laid out at, when one is mounted; a short one makes its list scroll. */
+	var sourcesSize by mutableStateOf(DpSize(PANEL_SOURCES_WIDTH, PANEL_SOURCES_HEIGHT))
 
 	/** Whether the root itself holds focus, so a focus left null can be told from one a field took. */
 	var rootFocused by mutableStateOf(false)
@@ -502,6 +685,12 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 		// command reads the selection off the session.
 		harness.registry.registerAll(objectCommands(harness.session, null, SessionAvailability(harness.session)))
 	}
+	if (harness.showSources) {
+		// The shell's own table over recording orchestrations, routed as though the pointer were over the
+		// Sources space, which is where its rows dispatch from.
+		val routing = CommandRouting { HoveredSurface(PANEL_SOURCES_AREA_ID, SpaceKind.Sources) }
+		harness.registry.registerAll(fileArtworkCommands(routing) { harness.artwork })
+	}
 	setContent {
 		harness.text =
 			PanelText(
@@ -543,10 +732,37 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				outlinerRename = stringResource(Res.string.outliner_menu_rename),
 				outlinerDelete = stringResource(Res.string.outliner_menu_delete),
 				deleteHierarchy = stringResource(Res.string.outliner_menu_delete_hierarchy),
+				sourcesUnboundArt = stringResource(Res.string.sources_unbound_art),
+				sourcesFileMenu = stringResource(Res.string.sources_file_menu),
+				sourcesFileReplace = stringResource(Res.string.sources_file_menu_replace),
+				sourcesFileReload = stringResource(Res.string.sources_file_menu_reload),
+				sourcesLayerMenu = stringResource(Res.string.sources_layer_menu),
+				sourcesLayerIgnore = stringResource(Res.string.sources_layer_menu_ignore),
+				sourcesLayerUnignore = stringResource(Res.string.sources_layer_menu_unignore),
+				sourcesReview = stringResource(Res.string.sources_suggestion_title),
+				sourcesAccept = stringResource(Res.string.sources_suggestion_accept, SOURCES_CANDIDATE_NAME, SOURCES_CANDIDATE_PERCENT),
+				sourcesAcceptMerge = stringResource(Res.string.sources_suggestion_accept_merge, SOURCES_CANDIDATE_NAME, SOURCES_CANDIDATE_PERCENT),
+				sourcesRelinkByHand = stringResource(Res.string.sources_suggestion_relink),
+				sourcesLeave = stringResource(Res.string.sources_suggestion_leave),
+				sourcesRelink = stringResource(Res.string.sources_relink_title),
+				sourcesUnbind = stringResource(Res.string.sources_relink_clear),
+				sourcesDeleteArt = stringResource(Res.string.sources_relink_delete),
+				sourcesNoMatches = stringResource(Res.string.sources_relink_no_matches),
+				sourcesPresent = stringResource(Res.string.sources_status_present),
+				sourcesMissing = stringResource(Res.string.sources_status_missing),
+				sourcesUnknown = stringResource(Res.string.sources_status_unknown),
+				sourcesBound = stringResource(Res.string.sources_status_bound),
+				sourcesBoundByName = stringResource(Res.string.sources_status_bound_unstable),
+				sourcesUnbound = stringResource(Res.string.sources_status_unbound),
+				sourcesUnplaced = stringResource(Res.string.sources_status_unplaced),
+				sourcesNeedsReview = stringResource(Res.string.sources_status_needs_review),
+				sourcesIgnored = stringResource(Res.string.sources_status_ignored),
 			)
 		// Collected, not read once: an edit publishes a new model, and the panel has to be handed it.
 		val puppet by harness.session.model.collectAsState()
-		val session = if (harness.provideSession) harness.session else null
+		// A session is the document's: the app provides the two together, so a rig with no document has
+		// no session either, whatever it was asked for.
+		val session = if (harness.provideSession && harness.provideDocument) harness.session else null
 		UmamoTheme {
 			CompositionLocalProvider(
 				LocalInlineEditController provides harness.inlineEditController,
@@ -561,6 +777,11 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				LocalKeyformSheetViews provides (if (harness.showKeyformSheet) harness.keyformSheetViews else null),
 				LocalRelationPick provides harness.relationPick,
 				LocalDrawableThumbnails provides harness.thumbnails,
+				LocalSettings provides harness.settings,
+				LocalSourceFilePresence provides (if (harness.showSources) harness.sourcePresence else null),
+				LocalSourceWatch provides (if (harness.showSources) harness.sourceWatch else null),
+				LocalSourceSuggestions provides (if (harness.showSources) harness.sourceSuggestions else null),
+				LocalSourceArtRasters provides harness.sourceArt,
 			) {
 				// The viewport binding's pose mirror.  A commit records the live hand-off's map, so without
 				// this an undo would leave the hand-off on the undone pose and the next commit would restore it.
@@ -644,6 +865,11 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 						if (harness.showOutliner) {
 							Box(modifier = Modifier.size(harness.outlinerSize).testTag(PANEL_OUTLINER_TAG)) {
 								OutlinerSpace(harness.outlinerScope, Modifier.fillMaxSize())
+							}
+						}
+						if (harness.showSources) {
+							Box(modifier = Modifier.size(harness.sourcesSize).testTag(PANEL_SOURCES_TAG)) {
+								SourcesSpace(harness.sourcesScope, Modifier.fillMaxSize())
 							}
 						}
 					}
@@ -1004,6 +1230,16 @@ internal fun ComposeUiTest.popupShows(label: String): Boolean =
 	onAllNodes(hasText(label) and hasAnyAncestor(isPopup()), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
 /**
+ * Where an open popup shows the text [label], in window pixels.
+ *
+ * @param String label The text.
+ * @return Rect The text's bounds.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.popupTextInWindow(label: String): Rect =
+	onNode(hasText(label) and hasAnyAncestor(isPopup()), useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+
+/**
  * Clicks the control whose accessible name is [description].
  *
  * @param String description The accessible name.
@@ -1147,6 +1383,27 @@ internal val PANEL_OUTLINER_HEIGHT: Dp = 480.dp
 
 /** An outliner short enough that revealing a row deep in the tree has to scroll: five rows of 22 dp. */
 internal val PANEL_OUTLINER_HEIGHT_SCROLLING: Dp = 110.dp
+
+/** The id of the area the Sources space beside the panel is mounted in. */
+internal const val PANEL_SOURCES_AREA_ID = "area-4"
+
+/** The tag of the box the Sources space beside the panel is mounted in. */
+internal const val PANEL_SOURCES_TAG = "sources"
+
+/** The width the Sources space beside the panel is laid out at: wide enough that no fixture label is cut. */
+internal val PANEL_SOURCES_WIDTH: Dp = 420.dp
+
+/** The height the Sources space beside the panel is laid out at: tall enough for every row of its rig, open or not. */
+internal val PANEL_SOURCES_HEIGHT: Dp = 480.dp
+
+/** A Sources space short enough that its list has to scroll: five rows of 22 dp. */
+internal val PANEL_SOURCES_HEIGHT_SCROLLING: Dp = 110.dp
+
+/** The name of the layer the Sources rig's proposal names, which the Accept entry shows. */
+internal const val SOURCES_CANDIDATE_NAME = "Brow"
+
+/** The confidence of the Sources rig's proposal as the Accept entry shows it. */
+internal const val SOURCES_CANDIDATE_PERCENT = 92
 
 /** The command the bound chord runs. */
 internal const val PANEL_SHORTCUT_COMMAND = "test.shortcut"

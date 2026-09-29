@@ -13,6 +13,7 @@ import org.umamo.ui.kit.menu.Menu
 import org.umamo.ui.kit.menu.MenuItem
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.model.LocalPuppetTextures
+import org.umamo.ui.model.documentIsOpen
 import org.umamo.ui.resources.*
 import org.umamo.ui.viewport.uv.atlasPageIndexFor
 import org.umamo.ui.workspace.AreaScope
@@ -39,7 +40,7 @@ internal fun OverflowRowScope.uvEditorHeaderControls(scope: AreaScope) {
 	item("textureSelector") {
 		// The vanish gate: without a document there are no pages to choose, and the space body is a
 		// placeholder anyway - an item that renders nothing measures zero.
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			UvTextureSelectorDropdown(viewState)
 		}
 	}

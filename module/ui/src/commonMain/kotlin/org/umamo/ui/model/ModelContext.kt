@@ -1,6 +1,10 @@
 package org.umamo.ui.model
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import org.umamo.edit.EditorMode
@@ -26,17 +30,44 @@ import org.umamo.ui.viewport.PuppetViewportService
  * (Outliner, Properties, Parameters) read `LocalPuppet.current` to display parts/parameters; the host
  * app provides it. Kept in `:ui` commonMain (PuppetModel is in `:runtime`, a shared dependency) so the
  * panels stay common and Android-sharable while only the GL viewport is platform code.
+ *
+ * A tracked local, unlike its neighbors: its value is a new model after every committed edit and every
+ * undo, and a tracked local's change runs the scopes that READ it and no others.  So a commit reaches
+ * each space that shows the model, and each space decides what of itself the commit changed: a row handed
+ * what it was handed before skips.  Read it where the model is used, as low as that is; a composable that
+ * reads it only to pass it down runs on every commit for nothing.  Asking whether a document is open at
+ * all is [documentIsOpen]'s business.
+ *
+ * Compared by reference.  The session publishes a model only when it differs from the last, and two rigs
+ * compared by value are walked whole.
  */
-val LocalPuppet = staticCompositionLocalOf<PuppetModel?> { null }
+val LocalPuppet = compositionLocalOf<PuppetModel?>(referentialEqualityPolicy()) { null }
 
 /**
  * The open document's [EditorSession] for the composition, or null when nothing is open. The session is
  * the single mutable owner of the document model, the editor state (selection, mode), and the undo
  * history; mutation sites (a visibility toggle, a future rename / reparent) resolve it and call its
  * mutation API, while [LocalPuppet] is the read-only model projection panels display. The host provides
- * both from the same session, so a mutation republishes the model and every panel recomposes.
+ * both from the same session, so a mutation republishes the model, and whatever reads the model runs.
+ *
+ * One session for as long as the document is open, so this local changes when a document opens, closes,
+ * or gives way to another, and at no edit.
  */
 val LocalEditorSession = staticCompositionLocalOf<EditorSession?> { null }
+
+/**
+ * Whether a document is open.  What a control asks when all it needs of the document is that there is
+ * one: a header control that shows only with a document open.
+ *
+ * Asked of the session, which is the document's for as long as it is open, and not of [LocalPuppet],
+ * whose value is a new model after every edit: a control that read the model to ask this would run
+ * again on each edit, to learn what it knew.  The host provides the two together, so they agree.
+ *
+ * @return Boolean True when a document is open.
+ */
+@Composable
+@ReadOnlyComposable
+internal fun documentIsOpen(): Boolean = LocalEditorSession.current != null
 
 /**
  * A thin, platform-neutral handle for streaming transient preview models to the puppet renderer,

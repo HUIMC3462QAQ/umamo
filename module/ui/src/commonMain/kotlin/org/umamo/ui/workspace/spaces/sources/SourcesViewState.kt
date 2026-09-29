@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import org.umamo.runtime.model.ArtSourceId
 import org.umamo.ui.workspace.PersistentSpaceState
 import org.umamo.ui.workspace.editorstate.foldDeviationsOf
 import org.umamo.ui.workspace.editorstate.restoreFoldStates
@@ -23,6 +24,12 @@ internal const val SOURCES_VIEW_STATE_KEY = "sources"
 internal class SourcesViewState : PersistentSpaceState {
 	/** The name-search query; blank shows the whole table. */
 	var query by mutableStateOf("")
+
+	/**
+	 * Whether a search is running.  While one is, every row shows open and a press on a row or its chevron
+	 * folds nothing.
+	 */
+	val searching: Boolean get() = query.isNotBlank()
 
 	/** Each row's open state by node id; an absent id follows [sourcesOpensByDefault]. */
 	val expanded = mutableStateMapOf<String, Boolean>()
@@ -47,12 +54,51 @@ internal class SourcesViewState : PersistentSpaceState {
 	var refreshSerial by mutableStateOf(0)
 
 	/**
+	 * Where each artwork file stood the last time it was asked about; a file with no entry has not been
+	 * answered for yet and reads unknown.  Replaced whole when every answer of a round is in, so a file
+	 * keeps its last answer while the next is on its way.  Kept here, not in the body, so a Sources space
+	 * opened again in its area shows what it last knew; never saved with the document, since a file's
+	 * presence is a fact about the disk now.
+	 */
+	var presenceBySource: Map<ArtSourceId, SourcePresence> by mutableStateOf(emptyMap())
+
+	/**
 	 * Whether the row [nodeId] is open.
 	 *
 	 * @param String nodeId The Sources node id.
 	 * @return Boolean True when open.
 	 */
 	fun isOpen(nodeId: String): Boolean = expanded[nodeId] ?: sourcesOpensByDefault(nodeId)
+
+	/**
+	 * Opens the row [nodeId] if it is closed, and closes it if it is open.  Does nothing while a search
+	 * runs: every row shows open then, so a press has nothing to fold and must not write a fold the rigger
+	 * cannot see change.
+	 *
+	 * @param String nodeId The Sources node id.
+	 */
+	fun toggleFold(nodeId: String) {
+		if (searching) {
+			return
+		}
+		expanded[nodeId] = !isOpen(nodeId)
+	}
+
+	/**
+	 * Opens the row [nodeId] when it is closed, and writes nothing when it is open already.  A fold written
+	 * for a row that is open by default adds a key the map did not hold, and everything keyed on the map is
+	 * built again for a table that looks the same.
+	 *
+	 * Unlike [toggleFold] this writes during a search too.  It is what a drop opens the row it lands in
+	 * with, and the row has to be open once the search is gone.
+	 *
+	 * @param String nodeId The Sources node id.
+	 */
+	fun open(nodeId: String) {
+		if (!isOpen(nodeId)) {
+			expanded[nodeId] = true
+		}
+	}
 
 	/**
 	 * The Sources space's member of its area block.

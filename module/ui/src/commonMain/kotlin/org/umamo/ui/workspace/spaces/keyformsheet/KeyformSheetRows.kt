@@ -105,8 +105,11 @@ class KeyformTrackLabels(
  * @property Boolean hiddenByFilter Whether the filter dropped at least one row that would otherwise be
  *   listed - what lets an empty sheet say "hidden by filters" instead of "nothing is keyed here", which
  *   are opposite diagnoses and only one of them is the user's own doing.
+ *
+ * Equal by value: a projection is built again from every model an edit publishes, and a section handed
+ * one equal to the last skips.  Nothing may change a list or a map of it once it is built.
  */
-class KeyformSheetProjection(
+data class KeyformSheetProjection(
 	val rows: List<TrackRow>,
 	val tracksByRowKey: Map<String, KeyformTrackRef>,
 	val ownerKindByRowKey: Map<String, KeyformOwnerKind>,

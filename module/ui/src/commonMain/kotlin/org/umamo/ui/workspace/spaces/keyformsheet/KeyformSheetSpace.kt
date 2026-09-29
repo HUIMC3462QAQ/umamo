@@ -199,9 +199,11 @@ internal fun KeyformSheetSpace(scope: AreaScope) {
 			}
 			// Dragging one mark of a multi-key selection drags the whole selection, which means resolving refs
 			// from EVERY section.  The section that owns the gesture sees only its own projection, so the drag
-			// runs here and is handed down as an action.
+			// runs here and is handed down as an action.  The projections are read through state as the drag
+			// runs: an action holding the list itself would be a new action after every edit, for every section.
+			val currentProjections = rememberUpdatedState(projections)
 			val dragSelectedKeys: (Float, Boolean) -> Unit = { fraction, commit ->
-				viewState.dragKeySelection(session, projections, fraction, commit)
+				viewState.dragKeySelection(session, currentProjections.value, fraction, commit)
 			}
 			// After both early returns on purpose: a sheet with nothing to show offers the shell's commands
 			// nothing, so they fall through to a sheet that does.

@@ -13,7 +13,7 @@ import org.umamo.ui.kit.container.OverflowRowScope
 import org.umamo.ui.kit.field.Checkbox
 import org.umamo.ui.kit.field.SEARCH_FIELD_MIN_WIDTH
 import org.umamo.ui.kit.field.SearchField
-import org.umamo.ui.model.LocalPuppet
+import org.umamo.ui.model.documentIsOpen
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.workspace.AreaScope
@@ -41,13 +41,13 @@ internal fun OverflowRowScope.outlinerHeaderControls(scope: AreaScope) {
 	item("search", minWidth = SEARCH_FIELD_MIN_WIDTH) {
 		// Each item gates itself on the document: an item that renders nothing measures zero, so the
 		// whole strip disappears without the builder needing a CompositionLocal it cannot read.
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			SearchField(value = viewState.query, onValueChange = { newQuery -> viewState.query = newQuery })
 		}
 	}
 	flexibleSpace()
 	item("filter") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			FilterDropdownButton(viewState)
 		}
 	}

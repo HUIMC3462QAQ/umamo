@@ -14,8 +14,7 @@ import kotlin.test.assertTrue
 
 /**
  * Pins the grip's drag: where a drop lands, what it refuses, and everything that ends a drag without a
- * drop.  A drag is the gesture most easily broken by the panel recomposing under it, because moving the
- * drop indicator recomposes the panel on every pointer move.
+ * drop.  A drag is a long gesture, and whatever recomposes the panel under it must not end it.
  */
 @OptIn(ExperimentalTestApi::class)
 class ParametersRowDragTest {
@@ -218,6 +217,27 @@ class ParametersRowDragTest {
 			releasePress()
 		}
 
+	/** The label moves as far as the pointer does, and the same way. */
+	@Test
+	fun theDragLabelFollowsThePointer() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			val grip = gripBounds(harness, PanelRows.BREATH).center
+			val first = overSliderRow(this, harness, PanelRows.BODY_X, PanelValues.BODY_X, down = 0.75f)
+			val second = Offset(first.x + 37f, overSliderRow(this, harness, PanelRows.SMILE, PanelValues.SMILE, down = 0.25f).y)
+
+			pressAndMove(grip, pathTo(grip, first))
+			val labelAtFirst = popupTextInWindow(PanelNames.BREATH)
+			moveOn(listOf(second))
+			val labelAtSecond = popupTextInWindow(PanelNames.BREATH)
+
+			assertEquals(second.x - first.x, labelAtSecond.left - labelAtFirst.left, LABEL_TOLERANCE)
+			assertEquals(second.y - first.y, labelAtSecond.top - labelAtFirst.top, LABEL_TOLERANCE)
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
 	/** A drag outlives the panel recomposing under it. */
 	@Test
 	fun aDragSurvivesThePanelRecomposing() =
@@ -262,4 +282,9 @@ class ParametersRowDragTest {
 				rootOrderOf(harness.session.model.value),
 			)
 		}
+
+	private companion object {
+		/** The label lands on whole pixels, so it may sit up to one off the pointer's own move. */
+		const val LABEL_TOLERANCE = 1f
+	}
 }

@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
 /**
  * Unit-tests the Sources tree: files with their presence, inventory layers with their binding status,
  * tiles under the layers they are bound to (and strays under keys the inventory lacks), drawables
- * under tiles, the unbound-art group, the four filters, and the flatten.  Hand-built rig, no Compose.
+ * under tiles, the unbound-art group, and the four filters.  Hand-built rig, no Compose.
  */
 class SourcesTreeTest {
 	private val artA = ArtSourceId("art-0")
@@ -109,6 +109,13 @@ class SourcesTreeTest {
 		assertEquals(listOf("tile:tA1"), eye.children.map { node -> node.id })
 		assertEquals(SourcesDetail.TilePage(1), eye.children[0].detail)
 		assertEquals(listOf("drawable:a", "drawable:b"), eye.children[0].children.map { node -> node.id })
+		assertEquals(listOf(DrawableId("a"), DrawableId("b")), eye.children[0].drawableIds, "a tile row carries the drawables over it")
+		assertEquals(SourceLayerRef(artA, "lyid:1", true), eye.children[0].binding, "and its binding as the tile carries it")
+		assertEquals(listOf(AtlasTileId("tA1")), eye.tileIds, "a layer row carries the tiles bound to it")
+		assertEquals(listOf(DrawableId("a"), DrawableId("b")), eye.drawableIds, "and the drawables over them")
+		assertNull(eye.binding, "the binding is the tile's to carry")
+		assertTrue(fileA.children[1].tileIds.isEmpty() && fileA.children[1].drawableIds.isEmpty(), "a layer no tile binds carries none")
+		assertTrue(fileA.tileIds.isEmpty() && fileA.drawableIds.isEmpty(), "and neither does a file")
 		assertEquals(SourcesStatus.Unbound, fileA.children[1].status, "a layer no tile binds")
 		val stray = fileA.children[2]
 		assertEquals("Stray", stray.label, "a name key shows as the name")
@@ -119,6 +126,37 @@ class SourcesTreeTest {
 		val unbound = tree[2]
 		assertEquals(SourcesNodeKind.UnboundGroup, unbound.kind)
 		assertEquals(listOf("tile:tLoose"), unbound.children.map { node -> node.id })
+		assertNull(unbound.children[0].binding, "a tile bound to no layer")
+		assertEquals(listOf(DrawableId("d")), unbound.children[0].drawableIds)
+	}
+
+	/** A search that lists only some of a tile's drawables leaves the tile's own list whole. */
+	@Test
+	fun aSearchLeavesATilesDrawablesWhole() {
+		val tree = buildSourcesTree(model(), ::presence, "Unbound art")
+
+		val tile = filterSourcesTree(tree, "b", SourcesFilter.entries.toSet())[0].children[0].children[0]
+
+		assertEquals(listOf("drawable:b"), tile.children.map { node -> node.id }, "the search lists the one match")
+		assertEquals(listOf(DrawableId("a"), DrawableId("b")), tile.drawableIds)
+	}
+
+	/** A search that lists only one of a layer's tiles leaves the layer's own lists whole. */
+	@Test
+	fun aSearchLeavesALayersTilesWhole() {
+		val base = model()
+		val puppet =
+			base.copy(
+				drawables = base.drawables + drawable("e", "tA2"),
+				atlas = base.atlas.copy(tiles = base.atlas.tiles + AtlasTile(AtlasTileId("tA2"), "Lash", 4, 4, source = SourceLayerRef(artA, "lyid:1", true))),
+			)
+		val tree = buildSourcesTree(puppet, ::presence, "Unbound art")
+
+		val layer = filterSourcesTree(tree, "lash", SourcesFilter.entries.toSet())[0].children[0]
+
+		assertEquals(listOf("tile:tA2"), layer.children.map { node -> node.id }, "the search lists the one tile")
+		assertEquals(listOf(AtlasTileId("tA1"), AtlasTileId("tA2")), layer.tileIds)
+		assertEquals(listOf(DrawableId("a"), DrawableId("b"), DrawableId("e")), layer.drawableIds)
 	}
 
 	/**
@@ -161,19 +199,6 @@ class SourcesTreeTest {
 		assertEquals(listOf("source:art-1"), searched.map { node -> node.id }, "a search keeps the matching row's ancestors")
 		assertEquals(listOf("layer:art-1/uuid-9"), searched[0].children.map { node -> node.id })
 		assertTrue(filterSourcesTree(tree, "wing", setOf(SourcesFilter.Bound)).isEmpty(), "a search narrows within the enabled kinds")
-	}
-
-	@Test
-	fun flattenFollowsTheOpenRows() {
-		val tree = buildSourcesTree(model(), ::presence, "Unbound art")
-		val closed = flattenSources(tree) { id -> id.startsWith("source:") }
-		assertEquals(
-			listOf("source:art-0", "layer:art-0/lyid:1", "layer:art-0/lyid:2", "layer:art-0/name:Stray", "source:art-1", "layer:art-1/uuid-9", SOURCES_UNBOUND_GROUP_ID),
-			closed.map { row -> row.node.id },
-		)
-		assertEquals(listOf(0, 1, 1, 1, 0, 1, 0), closed.map { row -> row.depth })
-		val open = flattenSources(tree) { true }
-		assertTrue(open.any { row -> row.node.id == "drawable:b" && row.depth == 3 }, "an open tile lists its drawables three deep")
 	}
 
 	/**
@@ -298,6 +323,31 @@ class SourcesTreeTest {
 		assertEquals(listOf("layer:art-0/lyid:9", "layer:art-0/name:Stray"), filterSourcesTree(tree, "", setOf(SourcesFilter.NeedsReview))[0].children.map { node -> node.id }, "the replaced row reviews beside the stray")
 	}
 
+	/**
+	 * A layer row hands out the binding its tiles carry: a key its reader marked weak stays weak on the row,
+	 * though its shape reads stable, so the row's status and the ref a drag carries agree.
+	 */
+	@Test
+	fun aLayerRowsRefTakesItsTilesWord() {
+		val base = model()
+		val puppet =
+			base.copy(
+				atlas = base.atlas.copy(tiles = base.atlas.tiles + AtlasTile(AtlasTileId("tHat"), "Hat", 4, 4, source = SourceLayerRef(artB, "hat.png", false))),
+				sources =
+					base.sources.map { source ->
+						if (source.id == artB) source.copy(layers = source.layers + ArtSourceLayer("hat.png", "Hat", "", 0, 0, 4, 4, true)) else source
+					},
+			)
+
+		val fileB = buildSourcesTree(puppet, ::presence, "Unbound art")[1]
+		val hat = fileB.children.first { node -> node.id == "layer:art-1/hat.png" }
+		val wing = fileB.children.first { node -> node.id == "layer:art-1/uuid-9" }
+
+		assertEquals(SourcesStatus.BoundByName, hat.status)
+		assertEquals(SourcesNodeKind.Layer(SourceLayerRef(artB, "hat.png", stableKey = false)), hat.kind, "the reader's word, not the shape's")
+		assertEquals(SourcesNodeKind.Layer(SourceLayerRef(artB, "uuid-9", stableKey = true)), wing.kind, "a layer no tile binds goes by its key's shape")
+	}
+
 	@Test
 	fun keyShapesSayWhatTheyAre() {
 		assertTrue(layerKeyLooksStable("lyid:12"))
@@ -341,6 +391,8 @@ class SourcesTreeTest {
 		assertEquals(listOf("layer:art-0/name:1", "layer:art-0/name:1~2", "layer:art-0/name:1~3"), file.children.map { node -> node.id })
 		assertEquals(listOf("tile:t1"), file.children[0].children.map { node -> node.id }, "the first row owns the binding")
 		assertTrue(file.children.drop(1).all { node -> node.children.isEmpty() && node.status == SourcesStatus.Unbound }, "later rows list nothing")
+		assertEquals(listOf(AtlasTileId("t1")), file.children[0].tileIds)
+		assertTrue(file.children.drop(1).all { node -> node.tileIds.isEmpty() && node.drawableIds.isEmpty() }, "and stand for no art, so a click selects nothing and a hover previews nothing")
 
 		fun ids(nodes: List<SourcesNode>): List<String> = nodes.flatMap { node -> listOf(node.id) + ids(node.children) }
 		val allIds = ids(listOf(file))
