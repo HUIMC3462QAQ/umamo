@@ -71,6 +71,7 @@ Umamo is early alpha.
 * UI: The keybindings editor's clear button no longer sits underneath the scrollbar.
 * UI: Double-clicking a workspace tab after reordering the tabs now renames the tab that was clicked instead of the tab that used to be in that spot.
 * UI: Keyboard shortcuts no longer stop working after an alert is dismissed with mouse input.
+* UI: Changing the language no longer breaks hitting escape to close the settings.
 * Source Artwork: Removed the singleton that could be accidentally be shared across documents.
 * Format: An artwork file whose magic bytes are missing now routes to its reader by extension.
 * Format: Performance optimizations for the PNG CODEC resulting in up to 50% less memory usage and up to 50% faster loads.
