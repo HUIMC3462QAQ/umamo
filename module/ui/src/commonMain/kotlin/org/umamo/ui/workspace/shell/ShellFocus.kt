@@ -2,21 +2,25 @@ package org.umamo.ui.workspace.shell
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalWindowInfo
+import kotlinx.coroutines.flow.drop
 
 /**
  * Keeps the keyboard on the shell root: takes root focus back after every transition that can leave it
- * null, and whenever the window regains OS focus.
+ * null, whenever the window regains OS focus, and after a language switch.
  *
- * The shell calls this outside its locale key, so a language switch restarts neither effect.
+ * The shell calls this outside its locale key, so a language switch restarts none of the effects.
  *
  * @param ShellControllers controllers The shell's controllers: the root's focus and the states that trigger
  *   a reclaim.
+ * @param String           languageTag The active UI language, whose every switch rebuilds the shell's content.
  */
 @Composable
-internal fun ReclaimShellFocus(controllers: ShellControllers) {
+internal fun ReclaimShellFocus(controllers: ShellControllers, languageTag: String) {
 	val workspaces = controllers.workspaces
 	val overlays = controllers.overlays
 	val inlineEditController = controllers.inlineEditController
@@ -63,6 +67,22 @@ internal fun ReclaimShellFocus(controllers: ShellControllers) {
 				inlineEditController.cancel != null ||
 					overlays.selfFocusedOverlayOpen
 			if (windowFocused && !overlayOwnsFocus) {
+				focusRequester.requestFocus()
+			}
+		}
+	}
+
+	// A language switch rebuilds everything under the locale key, so a field that held focus there - one
+	// being edited in Preferences when the language was picked - is gone, and focus with it.  No trigger
+	// above fires for that (Preferences is still open), so the switch is a trigger of its own: once the
+	// rebuild has settled, the root takes focus back.  Unless something under it already holds focus by
+	// then - an overlay that focuses its own field when it composes keeps it - since nothing was lost.
+	val currentLanguageTag by rememberUpdatedState(languageTag)
+	LaunchedEffect(Unit) {
+		snapshotFlow { currentLanguageTag }.drop(1).collect {
+			withFrameNanos {}
+			withFrameNanos {}
+			if (!controllers.rootHoldsFocus) {
 				focusRequester.requestFocus()
 			}
 		}

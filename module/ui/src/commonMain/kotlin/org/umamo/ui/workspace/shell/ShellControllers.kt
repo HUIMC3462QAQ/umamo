@@ -73,6 +73,12 @@ internal class ShellControllers(
 	/** The shell root's focus: the one node the keyboard dispatches from. */
 	val focusRequester = FocusRequester()
 
+	/**
+	 * Whether the shell root or anything under it holds focus - false once the focused node has left the
+	 * composition with nothing taking its place.  Kept by the root and read by the focus reclaim.
+	 */
+	var rootHoldsFocus: Boolean = false
+
 	/** The corner-drag join and split gesture over the area tree. */
 	val dragController = AreaDragController()
 

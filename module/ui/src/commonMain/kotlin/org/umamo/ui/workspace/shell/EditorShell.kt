@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -152,83 +153,88 @@ fun EditorShell(
 	// command groups must not re-register (the palette order would shuffle) and the focus effects must not
 	// restart.  Registration comes first, so the palette lists the shell's groups in the order declared there.
 	RegisterShellCommands(commandRegistry, controllers, artwork, exportImage)
-	ReclaimShellFocus(controllers)
+	ReclaimShellFocus(controllers, languageTag)
 
 	// The open document the key ladder hands its arms, read afresh for each key event.
 	val editorSession = LocalEditorSession.current
 	val selection = LocalSelection.current
+	// The window-wide cursor: hidden under an armed relation pick (the shell draws the eyedropper
+	// itself), the editor's I-beam while text entry is live, and otherwise nothing of its own.
+	// Claiming it here rather than in each viewport is what makes a mode announce itself the
+	// instant it begins, wherever the pointer happens to be sitting.
+	val cursorClaim =
+		shellCursorClaim(
+			relationPickArmed = controllers.relationPick.request != null,
+			textEntryActive = controllers.inlineEditController.cancel != null,
+		)
+	val claimedPointerIcon = remember(cursorClaim) { cursorClaim.pointerIcon() }
 
-	ProvideAppLocale(languageTag) {
-		// Resolved here, inside the locale key, so it follows a language switch; the workspace commands
-		// registered outside the key read it when they run.
-		val newWorkspaceBaseName = stringResource(Res.string.workspace_new_name)
-		SideEffect { controllers.newWorkspaceBaseName = newWorkspaceBaseName }
-		UmamoTheme {
-			CompositionLocalProvider(
-				LocalCommands provides commandRegistry,
-				LocalKeymap provides keymap,
-				LocalSpaceRegistry provides spaceRegistry,
-				LocalPropertyTabRegistry provides propertyTabRegistry,
-				LocalViewportHost provides viewportHost,
-				*controllers.compositionLocals(),
-			) {
-				// The window-wide cursor: hidden under an armed relation pick (the shell draws the eyedropper
-				// itself), the editor's I-beam while text entry is live, and otherwise nothing of its own.
-				// Claiming it here rather than in each viewport is what makes a mode announce itself the
-				// instant it begins, wherever the pointer happens to be sitting.
-				val cursorClaim =
-					shellCursorClaim(
-						relationPickArmed = controllers.relationPick.request != null,
-						textEntryActive = controllers.inlineEditController.cancel != null,
+	// The keyboard root: the one focusable node the keyboard dispatches from, with the window's pointer
+	// observers.  Outside the locale key for the same reason as the effects above - a language switch that
+	// disposed the focused node would leave focus null, and every key dead, with nothing to take it back.
+	Box(
+		modifier =
+			Modifier
+				.fillMaxSize()
+				// Before the focus target it observes: after focusable() it would report only a descendant's focus.
+				.onFocusChanged { focusState -> controllers.rootHoldsFocus = focusState.hasFocus }
+				.focusRequester(controllers.focusRequester)
+				.focusable()
+				// Declared once on a node that lives the whole time, never mounted when a mode starts: a
+				// hover icon that appears mid-gesture is not consulted until the pointer next MOVES, and
+				// text entry begins with a click the hand then rests on - the I-beam would never appear.
+				// The unclaimed case resolves to the plain pointer, which is what an unclaimed pointer
+				// already resolves to, so with no mode running the descendants still decide.
+				.pointerHoverIcon(claimedPointerIcon, overrideDescendants = cursorClaim.overridesDescendants)
+				// The window-space pointer tracker for the shell cursor overlays.  The root surface inside
+				// fills this box from its origin, so the observer and the overlays agree on positions.
+				.pointerInput(Unit) {
+					observeWindowPointer { position -> shellPointerPosition = position }
+				}
+				// The press that ends text entry (ShellTextEntry.kt).
+				.releaseTextEntryOnPress(controllers.inlineEditController, controllers.overlays, controllers.focusRequester)
+				// Root key handling is the modal ladder (ModalKeyLadder.kt): modal chrome and
+				// in-flight gestures pre-empt the keymap in stacking order; whatever the ladder
+				// does not consume falls through to the keymap + action registry.
+				.onPreviewKeyEvent { event ->
+					handleModalKeyLadder(
+						stroke = event.toShellKeyStroke(),
+						state = controllers.modalState(editorSession, selection, commandRegistry, keymap),
 					)
-				val claimedPointerIcon = remember(cursorClaim) { cursorClaim.pointerIcon() }
-				Surface(
-					modifier =
-						Modifier
-							.fillMaxSize()
-							.focusRequester(controllers.focusRequester)
-							.focusable()
-							// Declared once on a node that lives the whole time, never mounted when a mode starts: a
-							// hover icon that appears mid-gesture is not consulted until the pointer next MOVES, and
-							// text entry begins with a click the hand then rests on - the I-beam would never appear.
-							// The unclaimed case resolves to the plain pointer, which is what an unclaimed pointer
-							// already resolves to, so with no mode running the descendants still decide.
-							.pointerHoverIcon(claimedPointerIcon, overrideDescendants = cursorClaim.overridesDescendants)
-							// The window-space pointer tracker for the shell cursor overlays.  On the root
-							// surface, whose content Box shares this coordinate space, so the observer and
-							// the overlays agree on positions.
-							.pointerInput(Unit) {
-								observeWindowPointer { position -> shellPointerPosition = position }
-							}
-							// The press that ends text entry (ShellTextEntry.kt).
-							.releaseTextEntryOnPress(controllers.inlineEditController, controllers.overlays, controllers.focusRequester)
-							// Root key handling is the modal ladder (ModalKeyLadder.kt): modal chrome and
-							// in-flight gestures pre-empt the keymap in stacking order; whatever the ladder
-							// does not consume falls through to the keymap + action registry.
-							.onPreviewKeyEvent { event ->
-								handleModalKeyLadder(
-									stroke = event.toShellKeyStroke(),
-									state = controllers.modalState(editorSession, selection, commandRegistry, keymap),
-								)
-							},
-					color = LocalUmamoColors.current.windowBackground,
+				},
+	) {
+		ProvideAppLocale(languageTag) {
+			// Resolved here, inside the locale key, so it follows a language switch; the workspace commands
+			// registered outside the key read it when they run.
+			val newWorkspaceBaseName = stringResource(Res.string.workspace_new_name)
+			SideEffect { controllers.newWorkspaceBaseName = newWorkspaceBaseName }
+			UmamoTheme {
+				CompositionLocalProvider(
+					LocalCommands provides commandRegistry,
+					LocalKeymap provides keymap,
+					LocalSpaceRegistry provides spaceRegistry,
+					LocalPropertyTabRegistry provides propertyTabRegistry,
+					LocalViewportHost provides viewportHost,
+					*controllers.compositionLocals(),
 				) {
-					Column(modifier = Modifier.fillMaxSize()) {
-						ShellTabRow(appMenu = appMenu, workspaces = controllers.workspaces)
-						ShellAreaHost(
-							workspaces = controllers.workspaces,
-							dragController = controllers.dragController,
-							onSplitterDragChange = { dragActive -> currentOnLayoutDragChange(dragActive) },
-							modifier = Modifier.weight(1f).fillMaxWidth(),
-						)
-						// The bottom status strip is the Column's last child: fixed-height chrome under the
-						// weight(1f) area host, so the area tree fills the gap between the tabs and the strip.
-						StatusBar(modifier = Modifier.fillMaxWidth())
+					Surface(modifier = Modifier.fillMaxSize(), color = LocalUmamoColors.current.windowBackground) {
+						Column(modifier = Modifier.fillMaxSize()) {
+							ShellTabRow(appMenu = appMenu, workspaces = controllers.workspaces)
+							ShellAreaHost(
+								workspaces = controllers.workspaces,
+								dragController = controllers.dragController,
+								onSplitterDragChange = { dragActive -> currentOnLayoutDragChange(dragActive) },
+								modifier = Modifier.weight(1f).fillMaxWidth(),
+							)
+							// The bottom status strip is the Column's last child: fixed-height chrome under the
+							// weight(1f) area host, so the area tree fills the gap between the tabs and the strip.
+							StatusBar(modifier = Modifier.fillMaxWidth())
+						}
+						// The cursor overlays, above the area tree and below the modals (ShellCursorOverlays.kt).
+						ShellCursorOverlayStack(pointerPosition = { shellPointerPosition })
+						// The modal overlays, above everything else (ShellModalOverlays.kt).
+						ShellModalOverlays(overlays = controllers.overlays, commandRegistry = commandRegistry, hoveredSurfaces = controllers.hoveredSurfaces)
 					}
-					// The cursor overlays, above the area tree and below the modals (ShellCursorOverlays.kt).
-					ShellCursorOverlayStack(pointerPosition = { shellPointerPosition })
-					// The modal overlays, above everything else (ShellModalOverlays.kt).
-					ShellModalOverlays(overlays = controllers.overlays, commandRegistry = commandRegistry, hoveredSurfaces = controllers.hoveredSurfaces)
 				}
 			}
 		}
