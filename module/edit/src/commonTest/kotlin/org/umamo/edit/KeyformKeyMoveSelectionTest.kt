@@ -22,7 +22,8 @@ import kotlin.test.assertSame
  * A move or drag that crosses a neighbour re-sorts the axis, so the selection has to follow the keys to the
  * ordinals they land on, and it has to ride the edit's own undo step: one undo puts back the keys AND the
  * selection, and a redo re-points it again.  A gesture that ends where it began records the selection
- * change on its own, or it would never reach history at all.
+ * change on its own, or it would never reach history at all.  A key dragged while unselected is selected in
+ * place of the selection, the way a click on it would select it.
  */
 class KeyformKeyMoveSelectionTest {
 	private val angleX = ParameterId("ParamAngleX")
@@ -158,7 +159,7 @@ class KeyformKeyMoveSelectionTest {
 		session.setKeySelection(selection)
 		val cursorBefore = session.cursor()
 
-		session.moveTrackKeyKeepingSelection(key(0), track, parameter, toValue = 15f, selection = selection)
+		session.moveTrackKeySelectingIt(key(0), track, parameter, toValue = 15f, selection = selection)
 
 		assertEquals(listOf(0f, 15f, 30f), session.keys())
 		assertEquals(setOf(key(1), key(2)), session.keySelection.value)
@@ -177,24 +178,75 @@ class KeyformKeyMoveSelectionTest {
 		session.setKeySelection(selection)
 		val cursorBefore = session.cursor()
 
-		session.moveTrackKeyKeepingSelection(key(1), track, parameter, toValue = 0f, selection = selection)
+		session.moveTrackKeySelectingIt(key(1), track, parameter, toValue = 0f, selection = selection)
 
 		assertEquals(selection, session.keySelection.value)
 		assertEquals(cursorBefore, session.cursor())
 	}
 
-	/** A key outside the selection moves on its own and leaves the selection as it was. */
+	/**
+	 * An unselected key dragged while other keys are selected replaces the selection, as a click on it would,
+	 * in the move's own step: one undo puts back both the key and the selection it replaced.
+	 */
 	@Test
-	fun anUnselectedKeyMovesWithoutTouchingTheSelection() {
+	fun anUnselectedKeyReplacesTheSelection() {
 		val session = session()
-		val selection = setOf(key(2))
+		val selection = setOf(key(2), TrackKeyRef(angleX, "drawable:other/geometry", 0))
 		session.setKeySelection(selection)
 		val cursorBefore = session.cursor()
 
-		session.moveTrackKeyKeepingSelection(key(0), track, parameter, toValue = -20f, selection = selection)
+		session.moveTrackKeySelectingIt(key(0), track, parameter, toValue = -20f, selection = selection)
 
 		assertEquals(listOf(-20f, 0f, 30f), session.keys())
+		assertEquals(setOf(key(0)), session.keySelection.value)
+		assertEquals(cursorBefore + 1, session.cursor())
+
+		session.undo()
+		assertEquals(listOf(-30f, 0f, 30f), session.keys())
 		assertEquals(selection, session.keySelection.value)
+	}
+
+	/**
+	 * An unselected key dragged past a selected one ends up the selected key at the ordinal it lands on, and
+	 * the key that was selected is not.
+	 */
+	@Test
+	fun anUnselectedKeyDraggedPastASelectedOneIsTheOneSelected() {
+		val session = session()
+		val selection = setOf(key(2))
+		session.setKeySelection(selection)
+
+		session.moveTrackKeySelectingIt(key(0), track, parameter, toValue = 15f, selection = selection)
+
+		assertEquals(listOf(0f, 15f, 30f), session.keys())
+		assertEquals(setOf(key(1)), session.keySelection.value, "the key now at 15")
+	}
+
+	/** With nothing selected, the dragged key is selected. */
+	@Test
+	fun anUnselectedKeyIsSelectedWhenNothingWas() {
+		val session = session()
+		val cursorBefore = session.cursor()
+
+		session.moveTrackKeySelectingIt(key(2), track, parameter, toValue = 20f, selection = emptySet())
+
+		assertEquals(listOf(-30f, 0f, 20f), session.keys())
+		assertEquals(setOf(key(2)), session.keySelection.value)
+		assertEquals(cursorBefore + 1, session.cursor())
+	}
+
+	/** An unselected key released where it was picked up is still selected, as a step of its own, like a click. */
+	@Test
+	fun anUnselectedKeyReleasedInPlaceIsStillSelected() {
+		val session = session()
+		session.setKeySelection(setOf(key(2)))
+		val modelBefore = session.model.value
+		val cursorBefore = session.cursor()
+
+		session.moveTrackKeySelectingIt(key(0), track, parameter, toValue = -30f, selection = setOf(key(2)))
+
+		assertSame(modelBefore, session.model.value)
+		assertEquals(setOf(key(0)), session.keySelection.value)
 		assertEquals(cursorBefore + 1, session.cursor())
 	}
 

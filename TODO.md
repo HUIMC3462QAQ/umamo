@@ -174,7 +174,7 @@ See format planning document: docs/plan/uma-format.md
 
 ## Refactor
 * module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/shell/EditorShell.kt
-* `OutlinerSpace.kt`(The pure helpers sit naturally beside `OutlinerTree.kt`.), `KeyformSheetSpace.kt`(About 175 lines of pure selection and marquee math.), `SourcesSpace.kt`(The relink UI and the tested pure logic.), `EditorShell.kt`, and `ViewportEditGizmoOverlay.kt`.
+* `OutlinerSpace.kt`(The pure helpers sit naturally beside `OutlinerTree.kt`.), `SourcesSpace.kt`(The relink UI and the tested pure logic.), `EditorShell.kt`, and `ViewportEditGizmoOverlay.kt`.
 
 ## DRY/Standardization
 * Fields like PropertyFieldRow need to take a key use use that to get the correct resource key automatically instead of passing it.

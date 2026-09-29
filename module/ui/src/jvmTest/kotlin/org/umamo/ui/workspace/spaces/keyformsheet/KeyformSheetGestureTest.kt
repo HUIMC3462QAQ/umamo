@@ -28,7 +28,6 @@ class KeyformSheetGestureTest {
 	private val geometryKey1 = TrackKeyRef(PanelIds.bodyX, SheetRows.GEOMETRY, 1)
 	private val geometryKey2 = TrackKeyRef(PanelIds.bodyX, SheetRows.GEOMETRY, 2)
 	private val opacityKey0 = TrackKeyRef(PanelIds.bodyX, SheetRows.OPACITY, 0)
-	private val opacityKey1 = TrackKeyRef(PanelIds.bodyX, SheetRows.OPACITY, 1)
 
 	/** A click on a mark selects its key and lands the pose on it, as one step. */
 	@Test
@@ -88,25 +87,36 @@ class KeyformSheetGestureTest {
 			assertEquals(setOf(geometryKey0), harness.session.keySelection.value, "undo puts the selection back on the key")
 		}
 
-	/** An unselected key dragged on its own moves alone and leaves the selection where it was. */
+	/**
+	 * An unselected key dragged while other keys are selected moves alone and replaces the selection, as a
+	 * click on it would, in one step that one undo reverses whole.
+	 */
 	@Test
-	fun anUnselectedMarkDraggedAloneLeavesTheSelection() =
+	fun anUnselectedMarkDraggedReplacesTheSelection() =
 		runComposeUiTest {
 			val harness = mountSheet(listOf(PanelIds.bodyX))
 			clickAt(lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, 5f))
+			shiftClickAt(lanePoint(harness, SheetRows.OPACITY, PanelIds.bodyX, 0f))
+			assertEquals(setOf(geometryKey2, opacityKey0), harness.session.keySelection.value, "two keys selected before the drag")
 			val cursorBefore = harness.historyCursor
 
 			drag(
 				lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, -5f),
 				listOf(
-					lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, -4f),
-					lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, -3f),
+					lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, -2.5f),
+					lanePoint(harness, SheetRows.GEOMETRY, PanelIds.bodyX, 2.5f),
 				),
 			)
 
-			assertKeysNear(listOf(-3f, 0f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "only the dragged key moved")
-			assertEquals(setOf(geometryKey2), harness.session.keySelection.value)
+			assertKeysNear(listOf(0f, 2.5f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "only the dragged key moved, past the one at 0")
+			assertEquals(listOf(0f, 5f, 8f), opacityKeysOf(harness, PanelIds.drawable, PanelIds.bodyX), "the selected opacity key stayed put")
+			assertEquals(setOf(geometryKey1), harness.session.keySelection.value, "the dragged key, where it landed, is all that is selected")
 			assertEquals(cursorBefore + 1, harness.historyCursor)
+
+			runOnIdle { harness.session.undo() }
+			waitForIdle()
+			assertEquals(listOf(-5f, 0f, 5f), geometryKeysOf(harness, PanelIds.drawable, PanelIds.bodyX))
+			assertEquals(setOf(geometryKey2, opacityKey0), harness.session.keySelection.value, "undo brings the selection back")
 		}
 
 	/**

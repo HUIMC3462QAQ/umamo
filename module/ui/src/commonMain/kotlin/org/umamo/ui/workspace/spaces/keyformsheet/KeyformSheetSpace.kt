@@ -78,10 +78,11 @@ import org.umamo.ui.workspace.LocalKeyformSheetViews
  * exists to make visible: an item can key opacity on a parameter its geometry never touches.  A collapsed
  * group still shows its subtree's key positions, so folding hides detail, never the presence of keys.
  *
- * Clicking a mark scrubs the parameter onto it and selects it; dragging a mark moves the key (clamped at
- * its neighbours); Delete removes the selection as one undo step; right-clicking a lane inserts a key
- * there or removes the one under the pointer; Box Select (B) arms a marquee that adds the keys it
- * encloses to the selection.
+ * Clicking a mark scrubs the parameter onto it and selects it; dragging a selected mark moves the whole
+ * selection, and dragging an unselected one moves that key alone and selects it in place of the selection
+ * (a key may cross its neighbours, and stops only at the parameter's range); Delete removes the selection
+ * as one undo step; right-clicking a lane inserts a key there or removes the one under the pointer; Box
+ * Select (B) arms a marquee that adds the keys it encloses to the selection.
  *
  * This composable is the wiring: it derives the sections, holds the scroll and the drag cursor, registers
  * the area's command surface, and hands each section to [KeyformSheetSection].

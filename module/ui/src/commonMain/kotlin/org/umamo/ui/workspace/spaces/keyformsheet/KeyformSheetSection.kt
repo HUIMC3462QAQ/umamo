@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.TrackKeyRef
-import org.umamo.edit.moveTrackKeyKeepingSelection
+import org.umamo.edit.moveTrackKeySelectingIt
 import org.umamo.edit.moveTrackKeysClearingSelection
 import org.umamo.runtime.model.Parameter
 import org.umamo.ui.action.LocalCommands
@@ -245,9 +245,9 @@ internal fun KeyformSheetSection(
 				if (groupFraction != null) {
 					onDragSelectedKeys(groupFraction, true)
 				} else {
-					// A key may cross its neighbours, which renumbers the axis, so a selected key's ref
-					// follows it to the ordinal it lands on.
-					session.moveTrackKeyKeepingSelection(dragged, track, parameter, releasedAt, selectedKeys)
+					// The dragged key ends up selected at the ordinal it lands on; an unselected one replaces
+					// the selection, as a click on it would.
+					session.moveTrackKeySelectingIt(dragged, track, parameter, releasedAt, selectedKeys)
 				}
 			}
 		},

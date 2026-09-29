@@ -126,15 +126,18 @@ fun EditorSession.dragTrackKeysKeepingSelection(keys: List<Pair<TrackKeyRef, Tri
 }
 
 /**
- * Moves one key to [toValue] as ONE undo step, with [selection] re-pointed at where the key lands when it
- * holds the key - the keyform sheet's single-mark drag.
+ * Moves one key to [toValue] and leaves it selected, as ONE undo step - the keyform sheet's single-mark drag.
  *
- * A move may cross the key's neighbours, which renumbers the axis, so the selected key's ref has to follow
- * it to the ordinal it lands on; keeping the old ordinal would leave the selection on whichever key took its
- * place.  STAGE, EDIT, CONFIRM, with the landing asked for BEFORE the move so the re-pointed selection rides
- * the move's own snapshot: staged afterwards, every recorded step would hold the pre-move ordinal, which redo
- * would then restore onto the wrong key.  The confirm records it when the move records nothing (released
- * where it was picked up).  A key outside [selection] is moved with no selection bookkeeping at all.
+ * A key already in [selection] keeps the rest of the selection with it.  Any other key REPLACES the
+ * selection, exactly as a click on it would: dragging an unselected key is a selection of that key first,
+ * which is how every editor with a selection treats it.
+ *
+ * A move may cross the key's neighbours, which renumbers the axis, so the key's ref has to follow it to the
+ * ordinal it lands on; keeping the old ordinal would leave the selection on whichever key took its place.
+ * STAGE, EDIT, CONFIRM, with the landing asked for BEFORE the move so the selection rides the move's own
+ * snapshot: staged afterwards, every recorded step would hold the pre-move ordinal, which redo would then
+ * restore onto the wrong key.  The confirm records the selection when the move records nothing (released
+ * where it was picked up).
  *
  * @param TrackKeyRef key The moved key as the sheet names it.
  * @param KeyformTrackRef track The track the key sits on.
@@ -142,19 +145,16 @@ fun EditorSession.dragTrackKeysKeepingSelection(keys: List<Pair<TrackKeyRef, Tri
  * @param Float toValue Where the key was released, in the parameter's units.
  * @param Set<TrackKeyRef> selection The key selection the gesture was made against.
  */
-fun EditorSession.moveTrackKeyKeepingSelection(
+fun EditorSession.moveTrackKeySelectingIt(
 	key: TrackKeyRef,
 	track: KeyformTrackRef,
 	parameter: Parameter,
 	toValue: Float,
 	selection: Set<TrackKeyRef>,
 ) {
-	if (key !in selection) {
-		moveTrackKey(track, parameter, key.keyIndex, toValue)
-		return
-	}
 	val landedIndex = model.value.trackKeyIndexAfterMove(track, parameter, key.keyIndex, toValue)
-	val landedSelection = selection - key + key.copy(keyIndex = landedIndex)
+	val keptSelection = if (key in selection) selection - key else emptySet()
+	val landedSelection = keptSelection + key.copy(keyIndex = landedIndex)
 	stageKeySelection(landedSelection)
 	moveTrackKey(track, parameter, key.keyIndex, toValue)
 	setKeySelection(landedSelection)
