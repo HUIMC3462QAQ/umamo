@@ -1,6 +1,7 @@
 package org.umamo.ui.workspace.spaces.outliner
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ComposeUiTest
@@ -11,11 +12,13 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import org.umamo.runtime.model.BlendMode
 import org.umamo.runtime.model.Deformer
 import org.umamo.runtime.model.DeformerId
@@ -280,6 +283,36 @@ internal fun ComposeUiTest.slotPoint(description: String, rowName: String): Offs
 }
 
 /**
+ * A point given in the panel body's pixels, in the window's.  A popup is placed in the window, so a
+ * case comparing one with a row or with the pointer compares them there.
+ *
+ * @param Offset point The point, in the panel body's pixels.
+ * @return Offset The point, in window pixels.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.pointInWindow(point: Offset): Offset = onNodeWithTag(PANEL_BODY_TAG).fetchSemanticsNode().positionInWindow + point
+
+/**
+ * The hover art preview's card for the row named [name], in window pixels.
+ *
+ * A popup's own node is its layer, which spans the window, so the card is worked out from the one node
+ * inside it that has semantics: the name under the art.  The card pads its content by 6 dp and stacks
+ * the 120 dp art and a 4 dp gap over the name.
+ *
+ * @param String name The previewed row's name, which the card shows under its art.
+ * @return Rect The card's bounds.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.previewCardInWindow(name: String): Rect {
+	val label = onNode(hasText(name) and hasAnyAncestor(isPopup()), useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+	val padding = with(density) { PREVIEW_CARD_PADDING.toPx() }
+	val art = with(density) { PREVIEW_CARD_ART.toPx() }
+	val artGap = with(density) { PREVIEW_CARD_ART_GAP.toPx() }
+	val left = label.left - padding
+	return Rect(left = left, top = label.top - artGap - art - padding, right = left + art + padding * 2f, bottom = label.bottom + padding)
+}
+
+/**
  * Rests the pointer at [point], which is what hovers a row.
  *
  * @param Offset point Where to rest, in the panel body's pixels.
@@ -337,6 +370,15 @@ internal object StubThumbnails : DrawableThumbnailProvider {
 
 	override fun partThumbnailFor(id: PartId): ImageBitmap = art
 }
+
+/** The padding RowThumbnailPreview's card puts around its content. */
+private val PREVIEW_CARD_PADDING: Dp = 6.dp
+
+/** The edge of the square art in RowThumbnailPreview's card. */
+private val PREVIEW_CARD_ART: Dp = 120.dp
+
+/** The gap between the art and the name in RowThumbnailPreview's card. */
+private val PREVIEW_CARD_ART_GAP: Dp = 4.dp
 
 /** How much longer than the long-press timeout a press is held, so the timeout has surely elapsed. */
 private const val LONG_PRESS_MARGIN_MILLIS = 100L

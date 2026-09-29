@@ -72,6 +72,8 @@ Umamo is early alpha.
 * Viewport: Camera fitting now falls back to the canvas bounds when there are no drawables.
 * Viewport: Changing an area between the UV Editor and the 2D Viewport no longer leaves the previous editor's contents and camera behind.
 * Outliner: A CTRL+Left Click or Shift+Left Click followed quickly by a plain click on the same row no longer opens rename.
+* Outliner: Clicking a branch's arrow during a search no longer changes its saved fold.
+* Outliner, Sources: The art thumbnail hover preview no longer flickers and blocks clicks when there is not enough room to the left or right.  It now falls back to anchoring to the pointer when it does not have enough room.
 * Source Artwork: "Show source artwork" no longer draws layers misshaped, misplaced, and cut off on CMO3 models whose drawables use Cubism's reduced resolution texture copies.
 * Source Artwork: Reloading or relinking a layer in a CMO3 whose drawables use Cubism's reduced resolution copies now points them at the new art on export, so Cubism shows the reloaded layer instead of the stale copy.
 * Texture Atlas: Rebuilding the atlas after a reload, Replace Artwork, added artwork, or a repack no longer smears stretched pixels around art that touches the edge of its layer.
@@ -89,7 +91,6 @@ Umamo is early alpha.
 * Parameters: A new, restored, or moved row at the top of the list is now fully visible.
 * Keyform Sheet: Scrubbing a track or clicking a key in Edit Mode no longer changes the pose.
 * Keyform Sheet: Clicking and dragging on an unselected key when there is an active selection now properly switches the selection.  Previously it would select it after the drag finished and create weird interactions when there were multiple keys selected.
-* Outliner: Clicking a branch's arrow during a search no longer changes its saved fold.
 
 ## 0.3.0-dev - 2026-09-15
 

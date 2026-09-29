@@ -94,6 +94,7 @@ import org.umamo.ui.workspace.spaces.ReportRowHover
 import org.umamo.ui.workspace.spaces.RowHoverPreviewState
 import org.umamo.ui.workspace.spaces.RowThumbnailPreview
 import org.umamo.ui.workspace.spaces.rememberRowHoverPreviewState
+import org.umamo.ui.workspace.spaces.trackRowHoverPointer
 import org.umamo.ui.workspace.spaces.zebraFill
 
 /*
@@ -234,7 +235,11 @@ fun SourcesSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	}
 	LazyColumn(
 		state = listState,
-		modifier = modifier.fillMaxSize().zebraFill(listState, SOURCES_ROW_HEIGHT, colors.rowStripe),
+		modifier =
+			modifier
+				.fillMaxSize()
+				.zebraFill(listState, SOURCES_ROW_HEIGHT, colors.rowStripe)
+				.trackRowHoverPointer(hoverPreview, enabled = tileThumbnails != null || drawableThumbnails != null),
 	) {
 		items(rows, key = { row -> row.node.id }) { row ->
 			SourcesRowView(
@@ -255,7 +260,8 @@ fun SourcesSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 			)
 		}
 	}
-	// One art preview for the whole space, beside the rested-on row, once its art resolves.
+	// One art preview for the whole space, beside the rested-on row or at the pointer when the row has no
+	// room beside it, once its art resolves.
 	val preview = hoverPreview.shown
 	val previewBitmap =
 		preview?.let { shown -> nodeById[shown.key]?.let(::sourcesPreviewSubject) }?.let { subject ->
@@ -265,7 +271,12 @@ fun SourcesSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 			}
 		}
 	if (preview != null && previewBitmap != null) {
-		RowThumbnailPreview(name = preview.name, thumbnail = previewBitmap, anchorRect = preview.rowBounds)
+		RowThumbnailPreview(
+			name = preview.name,
+			thumbnail = previewBitmap,
+			anchorRect = preview.rowBounds,
+			pointerInWindow = { hoverPreview.pointerInWindow },
+		)
 	}
 	// A name chip follows the cursor while dragging, so there is something clearly "in hand" beyond the
 	// faded row: the row being dragged (a layer or a tile).

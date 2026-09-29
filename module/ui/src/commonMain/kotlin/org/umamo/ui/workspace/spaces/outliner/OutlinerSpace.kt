@@ -37,6 +37,7 @@ import org.umamo.ui.workspace.rowdrag.RowDragLabel
 import org.umamo.ui.workspace.rowdrag.parkCancelOnSeam
 import org.umamo.ui.workspace.spaces.RowThumbnailPreview
 import org.umamo.ui.workspace.spaces.rememberRowHoverPreviewState
+import org.umamo.ui.workspace.spaces.trackRowHoverPointer
 import org.umamo.ui.workspace.spaces.zebraFill
 
 /*
@@ -187,7 +188,7 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 		performOutlinerDrop(dragController, rows, puppet, editorSession) { nodeId -> expanded[nodeId] = true }
 	}
 
-	Column(modifier = modifier.fillMaxSize()) {
+	Column(modifier = modifier.fillMaxSize().trackRowHoverPointer(hoverPreview, enabled = thumbnails != null)) {
 		Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
 			BoxWithConstraints(modifier = Modifier.fillMaxSize().zebraFill(listState, OUTLINER_ROW_HEIGHT, stripeColor)) {
 				val viewportWidth = maxWidth
@@ -254,7 +255,8 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 			}
 			VerticalScrollbarOverlay(listState)
 		}
-		// One art preview for the whole space, anchored beside the rested-on row.  Gated on a provider being
+		// One art preview for the whole space, beside the rested-on row, or at the pointer when the row has
+		// no room beside it.  Gated on a provider being
 		// present and the entity actually having art (untextured drawables / art-less parts pop nothing): a
 		// drawable shows its own crop, a part shows the combined preview of every art mesh under it.
 		val preview = hoverPreview.shown
@@ -267,7 +269,12 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 				}
 			}
 		if (preview != null && previewBitmap != null) {
-			RowThumbnailPreview(name = preview.name, thumbnail = previewBitmap, anchorRect = preview.rowBounds)
+			RowThumbnailPreview(
+				name = preview.name,
+				thumbnail = previewBitmap,
+				anchorRect = preview.rowBounds,
+				pointerInWindow = { hoverPreview.pointerInWindow },
+			)
 		}
 		// A name chip follows the cursor while dragging, so there is something clearly "in hand".
 		val draggingLabel =

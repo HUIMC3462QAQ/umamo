@@ -8,8 +8,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
 import org.umamo.ui.workspace.rowdrag.RowCoordinatesHolder
 
@@ -19,6 +25,9 @@ import org.umamo.ui.workspace.rowdrag.RowCoordinatesHolder
  * its own hover into it, and the space draws the one preview the state shows beside its row
  * (RowThumbnailPreview).  What a row previews is the space's business: the state carries only the row's
  * key, which the space resolves back to its art.
+ *
+ * The state also follows the pointer over the space (trackRowHoverPointer), because a row with no room
+ * beside it shows its preview at the pointer instead.
  */
 
 /** Pause the pointer must rest on a row before its art preview pops, so a sweep down the list does not flicker. */
@@ -52,6 +61,13 @@ internal class RowHoverPreviewState<Key> {
 		internal set
 
 	/**
+	 * Where the pointer last was over the space, in window pixels, or null before it has been over it.  The
+	 * preview anchors here when there is no room for it beside its row.
+	 */
+	var pointerInWindow: Offset? by mutableStateOf(null)
+		private set
+
+	/**
 	 * Reports a row the pointer is over, replacing whichever row was.
 	 *
 	 * @param RowHoverPreview preview The hovered row.
@@ -69,6 +85,15 @@ internal class RowHoverPreviewState<Key> {
 		if (hovered?.key == key) {
 			hovered = null
 		}
+	}
+
+	/**
+	 * Records where the pointer is over the space.
+	 *
+	 * @param Offset windowPosition The pointer, in window pixels.
+	 */
+	fun reportPointer(windowPosition: Offset) {
+		pointerInWindow = windowPosition
 	}
 }
 
@@ -128,4 +153,36 @@ internal fun <Key> ReportRowHover(
 	DisposableEffect(state, key) {
 		onDispose { state.clear(key) }
 	}
+}
+
+/**
+ * Follows the pointer over a list space into [state], so a preview with no room beside its row can anchor
+ * to the pointer.  One tracker on the space's root covers every row.  It reads each event on the initial
+ * pass and consumes nothing, so the rows under it see the same events they always did.
+ *
+ * @param RowHoverPreviewState state   The space's hover preview state.
+ * @param Boolean              enabled Whether the space previews art at all; false attaches nothing.
+ * @return Modifier This modifier with the tracker attached.
+ */
+@Composable
+internal fun Modifier.trackRowHoverPointer(state: RowHoverPreviewState<*>, enabled: Boolean): Modifier {
+	// Plain holder, so a layout pass recomposes nothing; read only when an event arrives.
+	val surface = remember { RowCoordinatesHolder() }
+	if (!enabled) {
+		return this
+	}
+	return this
+		.onGloballyPositioned { coordinates -> surface.coordinates = coordinates }
+		.pointerInput(state) {
+			awaitPointerEventScope {
+				while (true) {
+					val event = awaitPointerEvent(PointerEventPass.Initial)
+					val coordinates = surface.coordinates
+					// An exit reports where the pointer left to, which is no longer over the space.
+					if (event.type != PointerEventType.Exit && coordinates != null && coordinates.isAttached) {
+						state.reportPointer(coordinates.localToWindow(event.changes.first().position))
+					}
+				}
+			}
+		}
 }
