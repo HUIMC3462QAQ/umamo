@@ -17,7 +17,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -51,8 +50,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Drives the release under a miniature shell: a focusable root carrying the real modal ladder and the two
- * pointer observers the shell installs, with real presses and real key events.
+ * Drives the release under a miniature shell: a focusable root carrying the real modal ladder and the
+ * shell's own press release (releaseTextEntryOnPress), with real presses and real key events.
  *
  * The bug this pins let a header filter keep the keyboard for the rest of the session - undo and every
  * other shortcut went quietly dead the moment someone typed in one, because nothing in the tree ever took
@@ -109,22 +108,7 @@ class TextEntryReleaseInteractionTest {
 								.onFocusChanged { focusState -> harness.rootFocused = focusState.isFocused }
 								.focusRequester(harness.rootFocus)
 								.focusable()
-								.pointerInput(Unit) {
-									observeTextEntryPresses(
-										beginPress = { harness.controller.pressLandedOnTextEditor = false },
-										settlePress = {
-											val releases =
-												shouldReleaseTextEntry(
-													textEntryActive = harness.controller.cancel != null,
-													pressLandedOnTextEditor = harness.controller.pressLandedOnTextEditor,
-													selfFocusedOverlayOpen = harness.overlays.selfFocusedOverlayOpen,
-												)
-											if (releases) {
-												harness.rootFocus.requestFocus()
-											}
-										},
-									)
-								}
+								.releaseTextEntryOnPress(harness.controller, harness.overlays, harness.rootFocus)
 								.onPreviewKeyEvent { event ->
 									handleModalKeyLadder(
 										event.toShellKeyStroke(),

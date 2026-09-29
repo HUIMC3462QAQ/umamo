@@ -24,7 +24,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -143,8 +142,7 @@ import org.umamo.ui.workspace.rowdrag.LocalRowDragCancel
 import org.umamo.ui.workspace.rowdrag.RowDragCancelController
 import org.umamo.ui.workspace.shell.ShellModalState
 import org.umamo.ui.workspace.shell.handleModalKeyLadder
-import org.umamo.ui.workspace.shell.observeTextEntryPresses
-import org.umamo.ui.workspace.shell.shouldReleaseTextEntry
+import org.umamo.ui.workspace.shell.releaseTextEntryOnPress
 import org.umamo.ui.workspace.shell.toShellKeyStroke
 import org.umamo.ui.workspace.spaces.keyformsheet.KeyformSheetSpace
 import org.umamo.ui.workspace.spaces.outliner.OutlinerSpace
@@ -812,22 +810,7 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 							.onFocusChanged { focusState -> harness.rootFocused = focusState.isFocused }
 							.focusRequester(harness.rootFocus)
 							.focusable()
-							.pointerInput(Unit) {
-								observeTextEntryPresses(
-									beginPress = { harness.inlineEditController.pressLandedOnTextEditor = false },
-									settlePress = {
-										val releases =
-											shouldReleaseTextEntry(
-												textEntryActive = harness.inlineEditController.cancel != null,
-												pressLandedOnTextEditor = harness.inlineEditController.pressLandedOnTextEditor,
-												selfFocusedOverlayOpen = harness.overlays.selfFocusedOverlayOpen,
-											)
-										if (releases) {
-											harness.rootFocus.requestFocus()
-										}
-									},
-								)
-							}
+							.releaseTextEntryOnPress(harness.inlineEditController, harness.overlays, harness.rootFocus)
 							.onPreviewKeyEvent { event ->
 								handleModalKeyLadder(
 									event.toShellKeyStroke(),

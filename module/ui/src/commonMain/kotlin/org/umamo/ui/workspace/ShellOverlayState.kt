@@ -477,8 +477,8 @@ internal class ShellOverlayState(
 
 	/**
 	 * The arrival the key ladder routes to first: the head of the first non-empty queue, in the ladder's arm
-	 * order.  The order here and the arms in handleModalKeyLadder must agree, and EditorShell paints in the
-	 * reverse, so the dialog taking the keys is the one drawn on top.
+	 * order.  The order here and the arms in handleModalKeyLadder must agree, and ShellModalOverlays paints
+	 * in the reverse, so the dialog taking the keys is the one drawn on top.
 	 *
 	 * @return ModalArrival? The topmost arrival, or null while no modal alert is up.
 	 */

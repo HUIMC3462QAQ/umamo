@@ -123,7 +123,25 @@ internal fun inMemorySettings(): Settings {
  *   no-document tables (every availability then answers for a closed document).
  * @return List<Command> Every command.
  */
-internal fun everyCommandTable(session: EditorSession? = null): List<Command> {
+internal fun everyCommandTable(session: EditorSession? = null): List<Command> =
+	shellCommandTables(session) +
+		viewportChromeCommands(inMemorySettings()) +
+		workspaceFileCommands({}, {}, {}) +
+		logCommands {} +
+		fileCommands({}, {}, {}, {}, { true }, {}, {}, {}, {}) +
+		logFolderCommands {} +
+		updateCommands {} +
+		fileExportCommands({ true }, {}, {})
+
+/**
+ * The command tables the shell itself registers, in its registration order - everything but what the
+ * settings-backed shell and the app add around it.
+ *
+ * @param EditorSession? session The session the document-scoped tables close over, or null for the
+ *   no-document tables.
+ * @return List<Command> The shell's commands.
+ */
+internal fun shellCommandTables(session: EditorSession? = null): List<Command> {
 	val overlays = ShellOverlayState()
 	val workspaces = WorkspaceLayoutController(defaultLayout()) {}
 	val routing = CommandRouting { null }
@@ -131,7 +149,7 @@ internal fun everyCommandTable(session: EditorSession? = null): List<Command> {
 	val sheets = KeyformSheetViews()
 	val handles = session?.let { live -> SessionHandles(live) }
 	return chromeCommands(overlays, AreaDragController(), SplitterDragCancelController(), RowDragCancelController(), workspaces) {} +
-		workspaceCommands(workspaces, overlays, "Workspace") +
+		workspaceCommands(workspaces, overlays) { "Workspace" } +
 		documentCommands(overlays) +
 		viewCommands(AreaCameraHub(), routing, viewportPresent = false) +
 		frameCommands(CommandRegistry(), routing) +
@@ -148,12 +166,5 @@ internal fun everyCommandTable(session: EditorSession? = null): List<Command> {
 		atlasCommands(availability, routing, null) +
 		fileArtworkCommands(routing) { null } +
 		fileImageExportCommands(routing) { null } +
-		keyformCommands(session, { null }, routing, sheets, availability) +
-		viewportChromeCommands(inMemorySettings()) +
-		workspaceFileCommands({}, {}, {}) +
-		logCommands {} +
-		fileCommands({}, {}, {}, {}, { true }, {}, {}, {}, {}) +
-		logFolderCommands {} +
-		updateCommands {} +
-		fileExportCommands({ true }, {}, {})
+		keyformCommands(session, { null }, routing, sheets, availability)
 }

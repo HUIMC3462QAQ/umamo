@@ -17,16 +17,17 @@ import org.umamo.ui.workspace.layout.WorkspaceLayoutController
  *
  * @param WorkspaceLayoutController workspaces The layout state the commands rewrite.
  * @param ShellOverlayState overlays The overlay state the confirms go through.
- * @param String newWorkspaceBaseName The localized base name new workspaces are named from (deduped).
+ * @param Function newWorkspaceBaseName Reads the localized base name new and imported workspaces are named
+ *   from (deduped).  Read when a command runs, so a language switch reaches it without re-registering.
  * @return List<Command> The commands to register.
  */
 internal fun workspaceCommands(
 	workspaces: WorkspaceLayoutController,
 	overlays: ShellOverlayState,
-	newWorkspaceBaseName: String,
+	newWorkspaceBaseName: () -> String,
 ): List<Command> =
 	listOf(
-		Command("workspace.new", title = Res.string.workspace_new) { workspaces.create(newWorkspaceBaseName) },
+		Command("workspace.new", title = Res.string.workspace_new) { workspaces.create(newWorkspaceBaseName()) },
 		Command("workspace.reset", title = Res.string.cmd_workspace_reset) {
 			overlays.pendingConfirm = ConfirmRequest(Res.string.confirm_reset_workspace, confirmLabel = Res.string.dialog_reset) { workspaces.resetActive() }
 		},
@@ -36,7 +37,7 @@ internal fun workspaceCommands(
 			}
 		},
 		Command("workspace.appendWorkspace", title = null) { argument ->
-			(argument as? Workspace)?.let { imported -> workspaces.appendImported(imported, newWorkspaceBaseName) }
+			(argument as? Workspace)?.let { imported -> workspaces.appendImported(imported, newWorkspaceBaseName()) }
 		},
 	)
 

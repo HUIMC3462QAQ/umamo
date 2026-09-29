@@ -173,8 +173,7 @@ See format planning document: docs/plan/uma-format.md
 	* The color-blind-assist first pass — vertex/edge/face gizmo colors plus the selection highlight — already exists in Settings > Colors.
 
 ## Refactor
-* module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/shell/EditorShell.kt
-* `EditorShell.kt` and `ViewportEditGizmoOverlay.kt`.
+* `ViewportEditGizmoOverlay.kt`
 
 ## DRY/Standardization
 * Fields like PropertyFieldRow need to take a key use use that to get the correct resource key automatically instead of passing it.

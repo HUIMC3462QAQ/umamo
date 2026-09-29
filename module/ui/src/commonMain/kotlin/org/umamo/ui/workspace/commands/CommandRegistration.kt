@@ -41,10 +41,10 @@ internal fun CommandRegistry.registerAll(commands: List<Command>): () -> Unit {
 /**
  * The availability tiers the document-scoped command groups share.
  *
- * One instance per registration pass, so the eleven session groups hold the same four
- * [CommandAvailability] objects rather than eleven copies apiece.  Each lambda reads live session state
- * at query time, so the palette's filter and the keymap's dispatch guard always see the current
- * context - the tiers are computed fresh per query, never sampled at registration.
+ * One instance per registration pass, so the session groups hold the same [CommandAvailability] objects
+ * rather than copies apiece.  Each lambda reads live session state at query time, so the palette's filter
+ * and the keymap's dispatch guard always see the current context - the tiers are computed fresh per query,
+ * never sampled at registration.
  *
  * @param EditorSession? session The open document's session, or null when none is open.
  */
