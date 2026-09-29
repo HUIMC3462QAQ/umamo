@@ -23,6 +23,9 @@ import org.umamo.ui.resources.*
  * it gets a sentence - the same compile-time completeness EnumLabels.kt relies on.
  */
 
+/** How many affected entities an export notice spells out before counting the rest. */
+private const val SUBJECTS_SHOWN: Int = 8
+
 /**
  * One localizable sentence: the resource to format, plus the arguments to format it with.
  *
@@ -386,6 +389,3 @@ private fun abbreviatedSubjects(subjects: List<String>): String {
 	}
 	return shown.joinToString() + " " + stringResource(Res.string.export_more_subjects, subjects.size - shown.size)
 }
-
-/** How many affected entities an export notice spells out before counting the rest. */
-private const val SUBJECTS_SHOWN: Int = 8
