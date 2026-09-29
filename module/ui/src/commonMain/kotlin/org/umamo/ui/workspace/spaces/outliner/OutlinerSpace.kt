@@ -57,6 +57,7 @@ import org.umamo.ui.workspace.spaces.zebraFill
  *
  *   OutlinerTree.kt             the unified tree, its filtering, and the Shift range rule
  *   OutlinerRows.kt             the visible rows, the path to a node, and what a click does to the selection
+ *   OutlinerRevealStandDown.kt  which change of the selection is the outliner's own, and so not revealed
  *
  * The row drag kit it drags with is org.umamo.ui.workspace.rowdrag, and the hover preview it pops is
  * org.umamo.ui.workspace.spaces.RowHoverPreview; both are shared with the Sources space.  The drop rules a
@@ -119,8 +120,9 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	// Default collapsed - only the root opens.
 	val expanded = viewState.expanded
 	val query = viewState.query
-	// Set when a click inside the outliner changes the selection, so the reveal effect can skip the scroll.
-	var suppressReveal by remember { mutableStateOf(false) }
+	// Marked by a click inside the outliner with the active target it is about to produce, so the reveal
+	// can tell that change from one made elsewhere and skip the scroll.
+	val revealStandDown = remember { OutlinerRevealStandDown() }
 	val filteredTree =
 		remember(tree, query, viewState.showParts, viewState.showDrawables, viewState.showDeformers) {
 			filterOutliner(tree, query, viewState.showParts, viewState.showDrawables, viewState.showDeformers)
@@ -161,9 +163,7 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	// scrolls to it; a selection made by clicking inside the outliner suppresses the scroll so the list
 	// does not jump under the user's cursor.
 	LaunchedEffect(selection.active) {
-		val wasLocalClick = suppressReveal
-		suppressReveal = false
-		if (wasLocalClick) {
+		if (revealStandDown.claims(selection.active)) {
 			return@LaunchedEffect
 		}
 		val active = selection.active ?: return@LaunchedEffect
@@ -218,9 +218,12 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 						key = { _, row -> row.node.id },
 						contentType = { _, row -> row.node.icon },
 					) { index, row ->
+						// Read where it is used, at a click and while drawing: a row a fold only moved has a new
+						// place and nothing else, and a place handed over as a value would compose it again.
+						val currentIndex = rememberUpdatedState(index)
 						OutlinerRowView(
 							row = row,
-							rowIndex = index,
+							rowIndex = { currentIndex.value },
 							rowWidth = contentWidth,
 							selected = row.node.target != null && row.node.target in selection,
 							ancestorOfSelection = row.node.id in ancestorParts,
@@ -238,13 +241,14 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 								// An armed relation pick (a Properties eyedropper) claims the click.  It claims a
 								// row it will NOT accept too - selecting would record an undo step and swap the
 								// Properties panel, and the arming field with it, out from under the pick.
-								val pickOutcome = target?.let { clicked -> relationPick.click(clicked) } ?: PickClickOutcome.Ignored
-								if (pickOutcome == PickClickOutcome.Resolved) {
-									suppressReveal = true
-								} else if (pickOutcome == PickClickOutcome.Ignored && target != null && handle != null) {
+								val pickOutcome = target?.let { pressed -> relationPick.click(pressed) } ?: PickClickOutcome.Ignored
+								// A resolved or swallowed pick leaves the selection as it was, so there is no change
+								// for the reveal to stand down from.
+								if (pickOutcome == PickClickOutcome.Ignored && target != null && handle != null) {
 									// Selectability gates only viewport picking; the outliner always selects.
-									suppressReveal = true
-									handle.set(selectionAfterClick(currentRows.value, handle.selection, index, target, toggle, extend))
+									val clicked = selectionAfterClick(currentRows.value, handle.selection, currentIndex.value, target, toggle, extend)
+									revealStandDown.clicked(clicked.active)
+									handle.set(clicked)
 								}
 							},
 							onStartRename = { renamingNodeId = row.node.id },

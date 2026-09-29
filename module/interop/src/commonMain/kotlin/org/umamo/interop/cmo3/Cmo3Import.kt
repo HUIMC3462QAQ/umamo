@@ -188,8 +188,8 @@ object Cmo3Import {
 			parameterSources.map { source ->
 				Parameter(
 					id = ParameterId(idStrOf(source.id).orEmpty()),
-					// CMO3: CParameterSource.name is the display label; fall back to the id (ParamAngleX).
-					name = source.name ?: idStrOf(source.id).orEmpty(),
+					// CMO3: CParameterSource.name is the display label; an absent or empty one falls back to the id (ParamAngleX).
+					name = displayNameOf(source.name, source.id),
 					min = source.minValue,
 					max = source.maxValue,
 					default = source.defaultValue,
@@ -330,8 +330,8 @@ object Cmo3Import {
 			userPartSources.map { source ->
 				Part(
 					id = PartId(idStrOf(source.id).orEmpty()),
-					// CMO3: localName is the user-facing part name; fall back to the id.
-					name = source.localName ?: idStrOf(source.id).orEmpty(),
+					// CMO3: localName is the user-facing part name; an absent or empty one falls back to the id.
+					name = displayNameOf(source.localName, source.id),
 					children = orgChildrenOf(source._childGuids),
 					// CMO3: ACParameterControllableSource.isVisible = the Parts-panel eyeball (cascades to children);
 					// CPartSource.isSketch = the Inspector's "Guide Image" checkbox (reference-only, non-export).
@@ -359,8 +359,8 @@ object Cmo3Import {
 		val deformers =
 			deformerSources.mapNotNull { source ->
 				val id = idStrOf(source.id)?.let(::DeformerId) ?: return@mapNotNull null
-				// CMO3: ACParameterControllableSource.localName is the user-facing deformer name; fall back to the id.
-				val name = source.localName ?: idStrOf(source.id).orEmpty()
+				// CMO3: ACParameterControllableSource.localName is the user-facing deformer name; an absent or empty one falls back to the id.
+				val name = displayNameOf(source.localName, source.id)
 				// CMO3: targetDeformerGuid = parent deformer (transform tree); parentGuid = part (org tree).
 				val parent = deformerIdByUuid[uuidOf(source.targetDeformerGuid)]
 				val partId = partIdByUuid[uuidOf(source.parentGuid)]
@@ -435,8 +435,8 @@ object Cmo3Import {
 					}?.fanOutMesh()
 				Drawable(
 					id = DrawableId(idStrOf(source.id).orEmpty()),
-					// CMO3: ACParameterControllableSource.localName is the user-facing drawable name; fall back to the id.
-					name = source.localName ?: idStrOf(source.id).orEmpty(),
+					// CMO3: ACParameterControllableSource.localName is the user-facing drawable name; an absent or empty one falls back to the id.
+					name = displayNameOf(source.localName, source.id),
 					parentDeformerId = deformerIdByUuid[uuidOf(source.targetDeformerGuid)],
 					// CMO3: colorComposition/alphaComposition - the full 5.3 blend surface (bare legacy
 					// tokens on pre-5.3 meshes; every mode token maps, see BlendModeMapping).
@@ -585,9 +585,9 @@ object Cmo3Import {
 					add(
 						ParameterNode.Group(
 							id = ParameterGroupId(idStrOf(childGroup.id).orEmpty()),
-							// CMO3: CParameterGroup.name is the group label; fall back to the id.  Names are
+							// CMO3: CParameterGroup.name is the group label; an absent or empty one falls back to the id.  Names are
 							// not unique (group names can repeat), so identity stays on the id.
-							name = childGroup.name ?: idStrOf(childGroup.id).orEmpty(),
+							name = displayNameOf(childGroup.name, childGroup.id),
 							// CMO3: CParameterGroup.folderIsOpened - the editor's saved expand/collapse state.
 							initiallyOpen = childGroup.folderIsOpened,
 							children = childrenOf(childGroup),
@@ -728,6 +728,17 @@ object Cmo3Import {
 	 * @return String? The idstr (e.g. `ParamAngleX`, `ArtMesh82`), or null.
 	 */
 	internal fun idStrOf(value: Any?): String? = (value as? Id)?.idstr?.takeIf { it.isNotEmpty() }
+
+	/**
+	 * The display name of a CMO3 object: its own name, or its id when it has none.  The editor writes the
+	 * name of an object the rigger never named as an empty string as readily as it leaves the name out, so
+	 * an empty or blank name counts as none.
+	 *
+	 * @param String? name The object's own name field (`localName`, or `name` on a parameter or a group).
+	 * @param Any? id The object's `Id` field.
+	 * @return String The object's own name, or its idstr (e.g. `ArtMesh82`) when it has none.
+	 */
+	internal fun displayNameOf(name: String?, id: Any?): String = name?.takeIf { ownName -> ownName.isNotBlank() } ?: idStrOf(id).orEmpty()
 
 	/**
 	 * Converts a CMO3 `CFloatColor` field to the runtime [ColorRgb].

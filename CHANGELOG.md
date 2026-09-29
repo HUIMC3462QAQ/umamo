@@ -74,11 +74,13 @@ Umamo is early alpha.
 * Outliner: A CTRL+Left Click or Shift+Left Click followed quickly by a plain click on the same row no longer opens rename.
 * Outliner: Clicking a branch's arrow during a search no longer changes its saved fold.
 * Outliner, Sources: The art thumbnail hover preview no longer flickers and blocks clicks when there is not enough room to the left or right.  It now falls back to anchoring to the pointer when it does not have enough room.
+* Outliner: A selection made in the viewport is revealed again after picking a relation from a row or after clicking the row that was already active.
 * Source Artwork: "Show source artwork" no longer draws layers misshaped, misplaced, and cut off on CMO3 models whose drawables use Cubism's reduced resolution texture copies.
 * Source Artwork: Reloading or relinking a layer in a CMO3 whose drawables use Cubism's reduced resolution copies now points them at the new art on export, so Cubism shows the reloaded layer instead of the stale copy.
 * Texture Atlas: Rebuilding the atlas after a reload, Replace Artwork, added artwork, or a repack no longer smears stretched pixels around art that touches the edge of its layer.
 * Texture Atlas: CMO3 models saved in Cubism with "Show source artwork" turned on now load the texture atlas as the atlas pages instead of loading every individual layer as an atlas page.
 * Viewport: Meshes that reach past the edge of their texture no longer smear the edge pixels across the overhang in the atlas display and clicking that overhang no longer selects the drawable.
+* Import: A drawable, part, deformer, parameter, or parameter group saved with an empty name now shows its ID as its name.  This applies to CMO3, MOC3, and artwork imports.  This is to prevent situations where a blank name might result in a blank control surface that can't be edited.
 * Export: A CMO3 or MOC3 export that runs out of memory or fails now shows an alert instead of a Java error that crashes the application.
 * Export: Exporting a CMO3 from a MOC3 model now uses up to 30% less memory by reusing textures from memory instead of decoding the textures again from the source.
 * Export: Exporting a CMO3 from a CMO3 model no longer changes the open document.

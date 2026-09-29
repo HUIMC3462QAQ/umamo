@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
+import org.umamo.ui.workspace.spaces.keyformsheet.shiftClickAt
 import org.umamo.ui.workspace.spaces.parameters.ComposableRunCounter
 import org.umamo.ui.workspace.spaces.parameters.clickAt
 import org.umamo.ui.workspace.spaces.parameters.popupShows
@@ -108,11 +109,12 @@ class OutlinerRecompositionTest {
 		}
 
 	/**
-	 * The rows under an opened branch move down the list, and a row draws its guides by where it sits, so
-	 * they run with the branch; the rows above it still do not.
+	 * The rows under an opened branch move down the list and are not composed again for it.  A row reads
+	 * its place while it draws its guides and when it is clicked, so a new place is a new drawing and
+	 * nothing more.
 	 */
 	@Test
-	fun aFoldRunsTheRowsItMovesAndNoneAbove() =
+	fun aFoldRunsNoRowItOnlyMoves() =
 		counting { counter ->
 			val harness = mountOutliner()
 			counter.reset()
@@ -121,7 +123,46 @@ class OutlinerRecompositionTest {
 			waitForIdle()
 
 			assertTrue(outlinerShows(OutlinerNames.EYE), "the branch must really have opened")
-			assertEquals(5, counter.runsOf("OutlinerRowView"), "the branch's row, the two rows it shows, and the two it moved down")
+			assertEquals(3, counter.runsOf("OutlinerRowView"), "the branch's row and the two rows it shows; the two it moved down skip")
+			assertEquals(3, counter.runsOf("OutlinerRowBody"))
+		}
+
+	/** Closing a branch in the middle of the list runs that branch's row alone: the rows it moves up skip. */
+	@Test
+	fun closingABranchInTheMiddleRunsItsRowAlone() =
+		counting { counter ->
+			val harness = mountOutliner()
+			runOnIdle { harness.outlinerViewState.toggleFold(OutlinerRowKeys.HEAD) }
+			waitForIdle()
+			counter.reset()
+
+			runOnIdle { harness.outlinerViewState.toggleFold(OutlinerRowKeys.HEAD) }
+			waitForIdle()
+
+			assertEquals(1, counter.runsOf("OutlinerRowView"))
+		}
+
+	/** A row a fold moved selects by its new place: a Shift click ranges over the rows as they now stand. */
+	@Test
+	fun aMovedRowSelectsByItsNewPlace() =
+		counting { _ ->
+			val harness = mountOutliner()
+			clickAt(rowBox(OutlinerNames.HEAD).center)
+			runOnIdle { harness.outlinerViewState.toggleFold(OutlinerRowKeys.HEAD) }
+			waitForIdle()
+
+			shiftClickAt(rowBox(OutlinerNames.LIMBS).center)
+
+			assertEquals(
+				setOf(
+					SelectionTarget.Part(OutlinerIds.head),
+					SelectionTarget.Drawable(OutlinerIds.eye),
+					SelectionTarget.Part(OutlinerIds.hair),
+					SelectionTarget.Drawable(OutlinerIds.loose),
+					SelectionTarget.Part(OutlinerIds.limbs),
+				),
+				harness.session.selection.value.targets,
+			)
 		}
 
 	/** Closing a branch at the end of the list runs that branch's row alone. */

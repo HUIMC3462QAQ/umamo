@@ -59,14 +59,14 @@ internal class Moc3ImportContext(
 	/** The px↔model mapping every geometry conversion goes through. */
 	val canvasMapping: MocCanvasMapping = MocCanvasMapping(canvas?.pixelsPerUnit ?: 1f, canvasOriginX, canvasOriginY)
 
-	/** cdi3 parameter id → display label. */
-	val parameterNameById: Map<String, String> = displayInfo?.parameters?.associate { it.id to it.name } ?: emptyMap()
+	/** cdi3 parameter id → display label, for the parameters that have one. */
+	val parameterNameById: Map<String, String> = displayLabelsOf(displayInfo?.parameters?.map { entry -> entry.id to entry.name })
 
-	/** cdi3 part id → display label. */
-	val partNameById: Map<String, String> = displayInfo?.parts?.associate { it.id to it.name } ?: emptyMap()
+	/** cdi3 part id → display label, for the parts that have one. */
+	val partNameById: Map<String, String> = displayLabelsOf(displayInfo?.parts?.map { entry -> entry.id to entry.name })
 
-	/** cdi3 drawable id → display label; the Umamo extension, since a moc alone cannot carry these. */
-	val drawableNameById: Map<String, String> = displayInfo?.drawables?.associate { it.id to it.name } ?: emptyMap()
+	/** cdi3 drawable id → display label, for the drawables that have one; the Umamo extension, since a moc alone cannot carry these. */
+	val drawableNameById: Map<String, String> = displayLabelsOf(displayInfo?.drawables?.map { entry -> entry.id to entry.name })
 
 	/**
 	 * Parameter file index → runtime id, with blank and duplicate slots synthesized.
@@ -279,3 +279,14 @@ private fun synthesizedId(
 	}
 	return candidate
 }
+
+/**
+ * The display labels of a cdi3 list, by id, leaving out every entry whose label is blank.  An object
+ * with no label shows its id, and an importer asks this table first and falls back to the id, so a blank
+ * label has to be absent from the table for the id to be reached.
+ *
+ * @param List<Pair<String, String>>? entries Each entry's id and its label, or null when the file has no such list.
+ * @return Map<String, String> The label per id, for the entries that have one.
+ */
+internal fun displayLabelsOf(entries: List<Pair<String, String>>?): Map<String, String> =
+	entries.orEmpty().filter { (_, label) -> label.isNotBlank() }.toMap()

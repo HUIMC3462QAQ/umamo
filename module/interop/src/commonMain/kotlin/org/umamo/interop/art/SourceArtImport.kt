@@ -452,7 +452,9 @@ object SourceArtImport {
 			drawables.add(
 				Drawable(
 					id = drawableId,
-					name = layer.name,
+					// A layer with no name shows its drawable's id, like an art mesh the rigger never named.  The
+					// tile and the inventory row keep the layer's own name: they mirror the file.
+					name = layer.name.ifBlank { drawableId.raw },
 					parentDeformerId = null,
 					blendMode = blendMapping.blendMode,
 					maskedBy = emptyList(),
@@ -1022,7 +1024,7 @@ object SourceArtImport {
 					minter.nextPart++
 					// Reserve the slot before descending so a parent's id precedes its children's.
 					val slot = parts.size
-					parts.add(Part(partId, node.name, emptyList()))
+					parts.add(Part(partId, node.name.ifBlank { partId.raw }, emptyList()))
 					val nestedChildren = orgChildrenOf(node.children, parts, minter, notices)
 					val blendMapping = mapLayerBlend(node.blend)
 					if (blendMapping == LayerBlendMapping.Unsupported) {
@@ -1035,7 +1037,8 @@ object SourceArtImport {
 					parts[slot] =
 						Part(
 							id = partId,
-							name = node.name,
+							// A folder with no name shows its part's id.
+							name = node.name.ifBlank { partId.raw },
 							children = nestedChildren,
 							isVisible = node.visible,
 							groupMode = if (composites) PartGroupMode.Isolated else PartGroupMode.PassThrough,

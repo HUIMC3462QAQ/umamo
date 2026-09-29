@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
+import org.umamo.ui.workspace.PickKind
 import org.umamo.ui.workspace.spaces.parameters.PANEL_OUTLINER_HEIGHT_SCROLLING
 import org.umamo.ui.workspace.spaces.parameters.clickAt
 import kotlin.test.Test
@@ -42,6 +43,43 @@ class OutlinerRevealTest {
 				harness.outlinerViewState.expanded.toMap(),
 				"only the closed branches had a fold written",
 			)
+		}
+
+	/**
+	 * A relation pick resolved from a row changes no selection, so it leaves the reveal as it was: the
+	 * next selection made elsewhere is revealed.
+	 */
+	@Test
+	fun aSelectionFromOutsideIsRevealedAfterAResolvedPick() =
+		runComposeUiTest {
+			val harness = mountOutliner(height = PANEL_OUTLINER_HEIGHT_SCROLLING)
+			runOnIdle { harness.relationPick.arm(setOf(PickKind.Part)) {} }
+			clickAt(rowBox(OutlinerNames.HEAD).center)
+			assertTrue(harness.session.selection.value.isEmpty, "the pick took the click")
+
+			runOnIdle { harness.session.setSelection(Selection(setOf(bang), bang)) }
+			waitForIdle()
+
+			assertTrue(harness.outlinerViewState.isOpen(OutlinerRowKeys.HAIR))
+			assertTrue(outlinerDisplays(OutlinerNames.BANG))
+		}
+
+	/**
+	 * A click on the row that is active already changes no selection either, and the next selection made
+	 * elsewhere is revealed.
+	 */
+	@Test
+	fun aSelectionFromOutsideIsRevealedAfterAClickOnTheActiveRow() =
+		runComposeUiTest {
+			val harness = mountOutliner(height = PANEL_OUTLINER_HEIGHT_SCROLLING)
+			clickAt(rowBox(OutlinerNames.HEAD).center)
+			clickAt(rowBox(OutlinerNames.HEAD).center)
+
+			runOnIdle { harness.session.setSelection(Selection(setOf(bang), bang)) }
+			waitForIdle()
+
+			assertTrue(harness.outlinerViewState.isOpen(OutlinerRowKeys.HAIR))
+			assertTrue(outlinerDisplays(OutlinerNames.BANG))
 		}
 
 	/** A reveal of a row whose branches are all open records no fold: the root is open by default. */

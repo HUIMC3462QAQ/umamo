@@ -219,6 +219,59 @@ class Cmo3ImportTest {
 	}
 
 	/**
+	 * Corpus-free check that a name written as an empty string is no name.  The editor writes
+	 * `<s xs.n="localName" />` for an art mesh the rigger never named, which reads as an empty string and
+	 * not as an absent one, and a row labelled with nothing cannot be read or told from its neighbours.
+	 */
+	@Test
+	fun anEmptyOrBlankNameFallsBackToTheId() {
+		fun makeId(value: String) = Id("").apply { idstr = value }
+
+		val emptyNamedMesh =
+			CArtMeshSource().apply {
+				id = makeId("ArtMesh7")
+				localName = ""
+			}
+		val spacedMesh =
+			CArtMeshSource().apply {
+				id = makeId("ArtMesh8")
+				localName = " Eye L "
+			}
+		val blankNamedWarp =
+			CWarpDeformerSource().apply {
+				id = makeId("Warp7")
+				localName = "   "
+			}
+
+		val model =
+			CModelSource().apply {
+				drawableSourceSet = CDrawableSourceSet().apply { _sources = arrayListOf(emptyNamedMesh, spacedMesh) }
+				deformerSourceSet = CDeformerSourceSet().apply { _sources = arrayListOf(blankNamedWarp) }
+			}
+
+		val puppet = Cmo3Import.fromModelSource(model)
+
+		assertEquals("ArtMesh7", puppet.drawables.first { it.id.raw == "ArtMesh7" }.name, "an empty name falls back to the id")
+		assertEquals("Warp7", puppet.deformers.first { it.id.raw == "Warp7" }.name, "a blank name falls back to the id")
+		assertEquals(" Eye L ", puppet.drawables.first { it.id.raw == "ArtMesh8" }.name, "a name with text in it is kept as written")
+	}
+
+	/**
+	 * The one rule every named CMO3 object takes its display name by: parameters, parameter groups, parts,
+	 * deformers, and drawables alike.
+	 */
+	@Test
+	fun theDisplayNameIsTheObjectsOwnOrItsId() {
+		val id = Id("").apply { idstr = "ParamAngleX" }
+
+		assertEquals("Angle X", Cmo3Import.displayNameOf("Angle X", id))
+		assertEquals("ParamAngleX", Cmo3Import.displayNameOf(null, id), "absent")
+		assertEquals("ParamAngleX", Cmo3Import.displayNameOf("", id), "empty")
+		assertEquals("ParamAngleX", Cmo3Import.displayNameOf(" \t", id), "blank")
+		assertEquals("", Cmo3Import.displayNameOf("", null), "with neither a name nor an id there is nothing to show")
+	}
+
+	/**
 	 * Corpus-free check that the CMO3 editor lock maps inverted onto the runtime selectable flag: a locked
 	 * source ingests as isSelectable = false and an unlocked one as isSelectable = true, for drawables and
 	 * both deformer kinds alike (Cubism lock = not selectable).

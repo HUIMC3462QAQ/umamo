@@ -73,7 +73,8 @@ import org.umamo.ui.workspace.spaces.RowHoverPreviewState
  * reveal to stand down), the rename state, and the drop.
  *
  * @param OutlinerRow row The node and its depth.
- * @param Int rowIndex The visible-row index, for the ancestry-guide dash phase.
+ * @param Function rowIndex The row's place among the visible rows, read while drawing: the ancestry guides'
+ *   dash phase follows it, and a row that only moved is drawn again, not composed again.
  * @param Dp rowWidth The fixed width shared by every row.
  * @param Boolean selected Whether the node is in the current selection.
  * @param Boolean ancestorOfSelection Whether this part folder contains the selection.
@@ -96,7 +97,7 @@ import org.umamo.ui.workspace.spaces.RowHoverPreviewState
 @Composable
 internal fun OutlinerRowView(
 	row: OutlinerRow,
-	rowIndex: Int,
+	rowIndex: () -> Int,
 	rowWidth: Dp,
 	selected: Boolean,
 	ancestorOfSelection: Boolean,
@@ -219,7 +220,8 @@ internal fun OutlinerRowView(
  * search hit is tinted too, so found rows stand out along the path the filter kept.
  *
  * @param OutlinerRow row The node and its depth.
- * @param Int rowIndex The visible-row index, for the ancestry-guide dash phase.
+ * @param Function rowIndex The row's place among the visible rows, read while drawing: the ancestry guides'
+ *   dash phase follows it, and a row that only moved is drawn again, not composed again.
  * @param Dp rowWidth The fixed width shared by every row (the wider of the viewport and the longest row).
  * @param Boolean selected Whether the node is in the current selection.
  * @param Boolean ancestorOfSelection Whether this part folder contains the selection (tinted to signal it).
@@ -244,7 +246,7 @@ internal fun OutlinerRowView(
 @Composable
 private fun OutlinerRowBody(
 	row: OutlinerRow,
-	rowIndex: Int,
+	rowIndex: () -> Int,
 	rowWidth: Dp,
 	selected: Boolean,
 	ancestorOfSelection: Boolean,
@@ -461,11 +463,11 @@ private fun OutlinerRowBody(
  * instead of resetting every row.  Muted so the lines stay subordinate to the labels in both themes.
  *
  * @param Int depth The row's depth: how many ancestor columns to draw.
- * @param Int rowIndex The visible-row index, for the dash phase.
+ * @param Function rowIndex The row's place among the visible rows, read inside the draw for the dash phase.
  * @param Color color The guide line color.
  * @return Modifier This modifier drawing the guides behind the row.
  */
-private fun Modifier.outlinerAncestryGuides(depth: Int, rowIndex: Int, color: Color): Modifier =
+private fun Modifier.outlinerAncestryGuides(depth: Int, rowIndex: () -> Int, color: Color): Modifier =
 	this.drawBehind {
 		if (depth == 0) {
 			return@drawBehind
@@ -479,7 +481,7 @@ private fun Modifier.outlinerAncestryGuides(depth: Int, rowIndex: Int, color: Co
 		val dashEffect =
 			PathEffect.dashPathEffect(
 				floatArrayOf(dashOnPx, dashOffPx),
-				(rowIndex * size.height) % dashPeriodPx,
+				(rowIndex() * size.height) % dashPeriodPx,
 			)
 		var ancestorLevel = 0
 		while (ancestorLevel < depth) {
