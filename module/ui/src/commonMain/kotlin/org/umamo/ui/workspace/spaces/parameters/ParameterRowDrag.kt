@@ -63,7 +63,7 @@ internal fun ParameterGripHandle(
 	val touchSlop = LocalViewConfiguration.current.touchSlop
 	// Read at gesture time, not keyed into pointerInput: the callbacks are rebuilt on every recomposition
 	// of the panel, and keying the gesture to them would cancel an in-flight drag the moment anything
-	// upstream recomposed - which a drag, by moving the drop indicator, does constantly.
+	// upstream recomposed.
 	val latestSelect by rememberUpdatedState(onSelect)
 	val latestDrop by rememberUpdatedState(onDrop)
 	// Tooltipped as well as named, unlike the disclosure chevrons: a grip's two jobs (drag to reorder, click

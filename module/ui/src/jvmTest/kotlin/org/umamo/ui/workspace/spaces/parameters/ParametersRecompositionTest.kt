@@ -11,6 +11,8 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.DpSize
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
+import org.umamo.edit.rename
+import org.umamo.edit.renameParameter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -296,20 +298,91 @@ class ParametersRecompositionTest {
 			assertEquals(0, counter.runsOf("ParameterPad2D"))
 		}
 
-	/** A row drag moves the drop line on every pointer move, which is the frame's business and no control's. */
+	/** An edit that changes nothing the panel shows runs the panel, which is handed the new model, and no control. */
+	@Test
+	fun anEditThePanelDoesNotShowRunsNoControl() =
+		counting { counter ->
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			counter.reset()
+
+			runOnIdle { harness.session.rename(SelectionTarget.Drawable(PanelIds.drawable), RENAMED) }
+			waitForIdle()
+
+			assertTrue(counter.runsOf("ParametersSpace") >= 1, "the panel must really have been handed the model")
+			assertEquals(0, counter.runsOf("ParameterGripHandle"))
+			assertEquals(0, counter.runsOf("ParameterIsland"))
+			assertEquals(0, counter.runsOf("ParameterSlider"))
+			assertEquals(0, counter.runsOf("ParameterPad2D"))
+			assertEquals(0, counter.runsOf("ParameterValueRow"))
+		}
+
+	/**
+	 * An edit to one parameter runs that parameter's controls, and no other row's.  Its island is handed
+	 * what it was handed before, so what runs is the island's content and not the island.
+	 */
+	@Test
+	fun anEditToOneParameterRunsItsControlsAlone() =
+		counting { counter ->
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			counter.reset()
+
+			runOnIdle { harness.session.renameParameter(PanelIds.breath, RENAMED) }
+			waitForIdle()
+
+			assertTrue(showsText(RENAMED), "the edit must really have reached the panel")
+			assertEquals(0, counter.runsOf("ParameterIsland"))
+			assertEquals(1, counter.runsOf("ParameterSlider"))
+			assertEquals(1, counter.runsOf("ParameterValueRow"))
+			assertEquals(0, counter.runsOf("ParameterPad2D"))
+			assertEquals(0, counter.runsOf("ParameterGripHandle"))
+		}
+
+	/**
+	 * Picks the Breath row up by its grip and carries it to [target], leaving the button held.  The first
+	 * move goes past the touch slop, so the drag has started by the time it arrives: the pick-up is over
+	 * before anything is counted.
+	 *
+	 * @param ComposeUiTest test The running UI test.
+	 * @param ParametersPanelHarness harness The mounted harness.
+	 * @param Offset target Where the drag rests, in the panel body's pixels.
+	 */
+	private fun carryBreathTo(test: ComposeUiTest, harness: ParametersPanelHarness, target: Offset) {
+		val grip = test.gripBounds(harness, PanelRows.BREATH).center
+		test.pressAndMove(grip, listOf(Offset(grip.x + 4f, grip.y + PAST_THE_TOUCH_SLOP), target))
+		assertTrue(test.popupShows(PanelNames.BREATH), "the drag must really be in flight")
+	}
+
+	/**
+	 * A point over a row, by how far its grip's center it sits above (negative) or below.  A grip sits at
+	 * its row's middle, which is where a slider row's upper band ends and its lower one begins.
+	 *
+	 * @param ComposeUiTest test The running UI test.
+	 * @param ParametersPanelHarness harness The mounted harness.
+	 * @param Int rowIndex The row, 0 for the first composed row.
+	 * @param Float below How far under the grip's center, in pixels.
+	 * @return Offset The point, in the panel body's pixels.
+	 */
+	private fun byGrip(test: ComposeUiTest, harness: ParametersPanelHarness, rowIndex: Int, below: Float): Offset {
+		val grip = test.gripBounds(harness, rowIndex).center
+		return Offset(grip.x, grip.y + below)
+	}
+
+	/** A row drag moves the drop line, which is the frame's business and no control's. */
 	@Test
 	fun aRowDragRunsNoControl() =
 		counting { counter ->
 			val harness = ParametersPanelHarness()
 			mountParametersPanel(harness)
-			val grip = gripBounds(harness, PanelRows.BREATH)
 			val target = gripBounds(harness, PanelRows.BODY_X)
-			pressAndMove(grip.center, listOf(Offset(grip.center.x, grip.center.y - 12f)))
+			carryBreathTo(this, harness, Offset(target.center.x, target.bottom - 2f))
 			counter.reset()
 
-			moveOn(listOf(Offset(target.center.x, target.bottom - 2f), Offset(target.center.x, target.center.y), Offset(target.center.x, target.top + 2f)))
+			moveOn(listOf(Offset(target.center.x, target.center.y), Offset(target.center.x, target.top + 2f)))
 
 			assertTrue(counter.runsOf("ParameterRowView") > 0, "the drag must really have moved the drop line")
+			assertEquals(0, counter.runsOf("ParameterGripHandle"))
 			assertEquals(0, counter.runsOf("ParameterSlider"))
 			assertEquals(0, counter.runsOf("ParameterPad2D"))
 			assertEquals(0, counter.runsOf("ParameterValueRow"))
@@ -318,7 +391,62 @@ class ParametersRecompositionTest {
 			releasePress()
 		}
 
+	/** A pointer moving inside one band of one row changes no row's part in the drag, and runs nothing at all. */
+	@Test
+	fun aDragMovingInsideOneBandRunsNothing() =
+		counting { counter ->
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			carryBreathTo(this, harness, byGrip(this, harness, PanelRows.BODY_X, below = -9f))
+			counter.reset()
+
+			moveOn(listOf(byGrip(this, harness, PanelRows.BODY_X, below = -7f), byGrip(this, harness, PanelRows.BODY_X, below = -5f), byGrip(this, harness, PanelRows.BODY_X, below = -3f)))
+
+			assertEquals(emptyMap(), counter.namedRuns())
+			assertEquals(0, counter.lambdaRuns())
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
+	/** A pointer crossing a row's middle runs that row's frame, which draws the line, and none of its controls. */
+	@Test
+	fun aDragCrossingABandRunsTheTargetRowsFrameAlone() =
+		counting { counter ->
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			carryBreathTo(this, harness, byGrip(this, harness, PanelRows.BODY_X, below = -4f))
+			counter.reset()
+
+			moveOn(listOf(byGrip(this, harness, PanelRows.BODY_X, below = 4f)))
+
+			assertEquals(mapOf("ParameterRowView" to 1), counter.namedRuns(), "the line above gives way to the line below")
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
+	/** A pointer crossing from one row to another runs the frame of the row it left and of the row it reached. */
+	@Test
+	fun aDragCrossingToAnotherRowRunsTheTwoFrames() =
+		counting { counter ->
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			carryBreathTo(this, harness, byGrip(this, harness, PanelRows.BODY_X, below = -4f))
+			counter.reset()
+
+			moveOn(listOf(byGrip(this, harness, PanelRows.SMILE, below = 4f)))
+
+			assertEquals(mapOf("ParameterRowView" to 2), counter.namedRuns(), "the row the line left and the row it reached")
+			pressKey(Key.Escape)
+			releasePress()
+		}
+
 	private companion object {
+		/** A name nothing in the rig carries. */
+		const val RENAMED = "Renamed"
+
+		/** A first move longer than the touch slop (18 pixels), which is what starts a grip's drag. */
+		const val PAST_THE_TOUCH_SLOP = 24f
+
 		/** The slider rows the fixture's list shows: Eye Open, Smile Shape, Smile, Body X, and Breath. */
 		const val SLIDER_ROWS = 5
 

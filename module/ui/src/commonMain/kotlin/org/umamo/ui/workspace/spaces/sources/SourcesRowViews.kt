@@ -46,7 +46,9 @@ import org.umamo.ui.theme.LocalUmamoShapes
 import org.umamo.ui.workspace.commands.DeleteArtRequest
 import org.umamo.ui.workspace.rowdrag.RowCoordinatesHolder
 import org.umamo.ui.workspace.rowdrag.RowDragController
+import org.umamo.ui.workspace.rowdrag.RowDragRole
 import org.umamo.ui.workspace.rowdrag.dragRowOnLongPress
+import org.umamo.ui.workspace.rowdrag.rememberRowDragRole
 import org.umamo.ui.workspace.rowdrag.rowDropHighlight
 import org.umamo.ui.workspace.spaces.ReportRowHover
 import org.umamo.ui.workspace.spaces.RowHoverPreviewState
@@ -138,8 +140,8 @@ internal fun SourcesRowView(
 }
 
 /**
- * The row itself, laid out inside whatever wraps it: the one place the row's hover and the drag in
- * flight are read, so either runs this body and nothing above it.
+ * The row itself, laid out inside whatever wraps it: the one place the row's hover and its part in a
+ * drag are read, so either runs this body and nothing above it.
  *
  * @param SourcesRow    row            The row.
  * @param Boolean       expanded       Whether the row's children are shown.
@@ -194,14 +196,13 @@ private fun SourcesRowBody(
 	// drop closes over live state; this keeps the drag's release pointed at the latest callback.
 	val currentOnDrop by rememberUpdatedState(onDrop)
 	val payload = sourcesDragPayload(node)
-	val isDragged = dragController.draggingKey == node.id
 	// A valid target (a layer under a dragged tile, a tile under a dragged layer) takes the shared drop ring;
-	// anything else under the pointer shows nothing, so the rigger sees where a release would bind.
-	val isDropTarget =
-		dragController.isDragging &&
-			!isDragged &&
-			dragController.dropTargetKey == node.id &&
-			dragController.draggedPayload?.let { dragged -> relinkFor(dragged, node) } != null
+	// anything else under the pointer shows nothing, so the rigger sees where a release would bind.  Read as
+	// the row's part in the drag, which changes when this row's part does, so a pointer moving over other
+	// rows, or over this one, runs nothing here.
+	val dragRole by dragController.rememberRowDragRole(node.id) { dragged, _ -> relinkFor(dragged, node) }
+	val isDragged = dragRole == RowDragRole.Dragged
+	val isDropTarget = dragRole is RowDragRole.Target
 	val background =
 		when {
 			selected -> colors.selection.copy(alpha = 0.75f)

@@ -5,6 +5,8 @@ import androidx.compose.runtime.InternalComposeTracingApi
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
+import org.umamo.edit.SelectionTarget
+import org.umamo.edit.rename
 import org.umamo.ui.workspace.spaces.parameters.ComposableRunCounter
 import org.umamo.ui.workspace.spaces.parameters.PanelIds
 import kotlin.test.Test
@@ -80,7 +82,40 @@ class KeyformSheetRecompositionTest {
 			assertEquals(0, counter.runsOf("KeyformSheetSection"))
 		}
 
+	/** An edit to an object no section lists runs the sheet, which is handed the new model, and no section. */
+	@Test
+	fun anEditNoSectionShowsRunsNoSection() =
+		counting { counter ->
+			val harness = mountSheet(listOf(PanelIds.bodyX))
+			counter.reset()
+
+			// Keyed on the pad's two parameters and on nothing else, so Body X's section does not list it.
+			runOnIdle { harness.session.rename(SelectionTarget.Drawable(SheetIds.padDrawable), RENAMED) }
+			waitForIdle()
+
+			assertTrue(counter.runsOf("KeyformSheetSpace") >= 1, "the sheet must really have been handed the model")
+			assertEquals(0, counter.runsOf("KeyformSheetSection"))
+		}
+
+	/** An edit to an object one section lists runs that section, and not the section beside it. */
+	@Test
+	fun anEditToOneSectionsObjectRunsThatSectionAlone() =
+		counting { counter ->
+			val harness = mountSheet(listOf(PanelIds.angleX, PanelIds.bodyX))
+			counter.reset()
+
+			// Keyed on Body X alone.
+			runOnIdle { harness.session.rename(SelectionTarget.Drawable(PanelIds.drawable), RENAMED) }
+			waitForIdle()
+
+			assertTrue(sheetCountOfText(RENAMED) >= 1, "the edit must really have reached the sheet")
+			assertEquals(1, counter.runsOf("KeyformSheetSection"), "Body X's section, and not Angle X's")
+		}
+
 	private companion object {
+		/** A name nothing in the rig carries. */
+		const val RENAMED = "Renamed"
+
 		const val SHEET_PACKAGE_PREFIX = "org.umamo.ui.workspace.spaces.keyformsheet."
 	}
 }

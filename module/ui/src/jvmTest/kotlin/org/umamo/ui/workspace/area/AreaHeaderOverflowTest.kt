@@ -3,6 +3,9 @@ package org.umamo.ui.workspace.area
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -11,11 +14,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.umamo.edit.EditorSession
+import org.umamo.runtime.model.AtlasTile
+import org.umamo.runtime.model.AtlasTileId
+import org.umamo.runtime.model.PuppetAtlas
 import org.umamo.runtime.model.PuppetModel
 import org.umamo.ui.action.CommandRegistry
 import org.umamo.ui.action.LocalCommands
 import org.umamo.ui.action.LocalKeymap
 import org.umamo.ui.action.defaultKeymap
+import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.theme.UmamoTheme
 import org.umamo.ui.workspace.AreaScope
@@ -83,9 +91,28 @@ class AreaHeaderOverflowTest {
 	@Test
 	fun theOutlinerKeepsItsSearchAndFilterOnATightStrip() {
 		runComposeUiTest {
-			setHeader(kind = SpaceKind.Outliner, headerWidth = 260.dp, puppet = emptyPuppet())
+			setHeader(kind = SpaceKind.Outliner, headerWidth = 260.dp, puppet = mutableStateOf(emptyPuppet()))
 			onNodeWithContentDescription(FILTERS_LABEL, useUnmergedTree = true).assertExists()
 			onNodeWithContentDescription(MORE_LABEL, useUnmergedTree = true).assertDoesNotExist()
+		}
+	}
+
+	/**
+	 * The UV editor's layer picker is offered from the moment the document holds artwork: it reads the
+	 * model itself, not whether one is open, so it has to be handed each model an edit publishes.
+	 */
+	@OptIn(ExperimentalTestApi::class)
+	@Test
+	fun theUvHeadersLayerPickerAppearsWithTheFirstArtwork() {
+		runComposeUiTest {
+			val puppet = mutableStateOf<PuppetModel?>(emptyPuppet())
+			setHeader(kind = SpaceKind.UvEditor, headerWidth = 900.dp, puppet = puppet)
+			onNodeWithContentDescription(LAYER_PICKER_LABEL, useUnmergedTree = true).assertDoesNotExist()
+
+			puppet.value = emptyPuppet().copy(atlas = PuppetAtlas(tiles = listOf(AtlasTile(AtlasTileId("tile-0"), "Art", 4, 4))))
+			waitForIdle()
+
+			onNodeWithContentDescription(LAYER_PICKER_LABEL, useUnmergedTree = true).assertExists()
 		}
 	}
 
@@ -121,22 +148,26 @@ class AreaHeaderOverflowTest {
 	/**
 	 * Mounts one space's real header, with the command registry and keymap its controls read.
 	 *
-	 * No puppet and no session are provided, which is the no-document state every header already handles -
-	 * the viewport chips render disabled and the panel headers render nothing.
+	 * By default no puppet and no session are provided, which is the no-document state every header already
+	 * handles - the viewport chips render disabled and the panel headers render nothing.  A puppet comes
+	 * with a session over it, as the app provides the two together.
 	 *
 	 * @param SpaceKind    kind        The space whose header strip to mount.
 	 * @param Dp           headerWidth The width the header is given.
-	 * @param PuppetModel? puppet      The open document, or null for the no-document state.
+	 * @param State        puppet      The open document, or null for the no-document state; a case that
+	 *   writes it publishes a model, as an edit does.
 	 */
 	@OptIn(ExperimentalTestApi::class)
-	private fun ComposeUiTest.setHeader(kind: SpaceKind, headerWidth: Dp, puppet: PuppetModel? = null) {
+	private fun ComposeUiTest.setHeader(kind: SpaceKind, headerWidth: Dp, puppet: State<PuppetModel?> = mutableStateOf(null)) {
 		setContent {
+			val session = remember { puppet.value?.let { model -> EditorSession(model) } }
 			UmamoTheme {
 				CompositionLocalProvider(
 					LocalSpaceRegistry provides defaultSpaceRegistry(),
 					LocalCommands provides CommandRegistry(),
 					LocalKeymap provides defaultKeymap(),
-					LocalPuppet provides puppet,
+					LocalPuppet provides puppet.value,
+					LocalEditorSession provides session,
 				) {
 					Box(modifier = Modifier.width(headerWidth)) {
 						AreaHeader(area = LeafArea("area-1", kind), scope = AreaScope("area-1"), onCommand = {})
@@ -159,5 +190,8 @@ class AreaHeaderOverflowTest {
 
 		/** The filter chip's English name; it doubles as its accessible label. */
 		const val FILTERS_LABEL = "Filters"
+
+		/** The UV editor's layer picker's English name; it doubles as its accessible label. */
+		const val LAYER_PICKER_LABEL = "Find by Artwork"
 	}
 }

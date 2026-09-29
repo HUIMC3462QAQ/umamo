@@ -21,6 +21,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,8 +48,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.edit.EditorMode
 import org.umamo.edit.EditorSession
@@ -462,7 +466,8 @@ internal class ArtworkRequests(
  * The state one case shares between its composition and its assertions.
  *
  * @property Boolean provideLiveParams Whether the composition gets a live-parameter handle at all.
- * @property Boolean provideSession Whether the composition gets an editing session at all.
+ * @property Boolean provideSession Whether the composition gets an editing session at all.  A rig with no
+ *   document gets none whatever this says: a session is its document's, and the app provides the two together.
  * @property Boolean showHeader Whether the panel's header strip is mounted above the body.
  * @property Boolean provideDocument Whether the composition gets an open document at all.
  * @property Boolean showKeyformSheet Whether a keyform sheet is mounted beside the panel, over the same
@@ -478,6 +483,7 @@ internal class ArtworkRequests(
  *   and the artwork commands, whose requests are recorded.
  * @property SourceArtRasters? sourceArt The document's source-art pixels, which a Sources tile row previews,
  *   or null for a document that holds none.
+ * @property Function onSourcePresenceAsked Told the path each time the file-presence probe is asked, as it is asked.
  */
 internal class ParametersPanelHarness(
 	runtimeTarget: RuntimeTarget = RuntimeTarget.NoTarget,
@@ -491,6 +497,7 @@ internal class ParametersPanelHarness(
 	val model: PuppetModel = panelFixtureModel(runtimeTarget),
 	val showSources: Boolean = false,
 	val sourceArt: SourceArtRasters? = null,
+	val onSourcePresenceAsked: (path: String) -> Unit = {},
 ) {
 	val session = EditorSession(model, PANEL_FIXTURE_POSE)
 	val liveParams: LiveParams = initialLiveParams(session.model.value, PANEL_FIXTURE_POSE)
@@ -516,8 +523,23 @@ internal class ParametersPanelHarness(
 	 */
 	val sourcePresenceByPath: MutableMap<String, Boolean?> = HashMap()
 
-	/** The probe itself.  One instance for the harness's life: the Sources space remembers its answers on it. */
-	val sourcePresence: SourceFilePresence = { path -> if (sourcePresenceByPath.containsKey(path)) sourcePresenceByPath[path] else true }
+	/**
+	 * Holds every answer of the probe back until it completes, or null to answer at once.  A probe held
+	 * here has taken its answer already and gives it however long it waits, even once the round that asked
+	 * was overtaken: a look at the disk that is under way finishes whatever became of whoever asked.
+	 */
+	var sourcePresenceGate: CompletableDeferred<Unit>? = null
+
+	/** The probe itself.  One instance for the harness's life: the Sources space keys its asking on it. */
+	val sourcePresence: SourceFilePresence = { path ->
+		onSourcePresenceAsked(path)
+		val answer = if (sourcePresenceByPath.containsKey(path)) sourcePresenceByPath[path] else true
+		val gate = sourcePresenceGate
+		if (gate != null) {
+			withContext(NonCancellable) { gate.await() }
+		}
+		answer
+	}
 
 	/** The files the watcher reports changed on disk. */
 	val sourceWatchPending = MutableStateFlow<Set<ArtSourceId>>(emptySet())
@@ -738,7 +760,9 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 			)
 		// Collected, not read once: an edit publishes a new model, and the panel has to be handed it.
 		val puppet by harness.session.model.collectAsState()
-		val session = if (harness.provideSession) harness.session else null
+		// A session is the document's: the app provides the two together, so a rig with no document has
+		// no session either, whatever it was asked for.
+		val session = if (harness.provideSession && harness.provideDocument) harness.session else null
 		UmamoTheme {
 			CompositionLocalProvider(
 				LocalInlineEditController provides harness.inlineEditController,
@@ -1204,6 +1228,16 @@ internal fun ComposeUiTest.hoverMenuEntry(label: String) {
 @OptIn(ExperimentalTestApi::class)
 internal fun ComposeUiTest.popupShows(label: String): Boolean =
 	onAllNodes(hasText(label) and hasAnyAncestor(isPopup()), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+/**
+ * Where an open popup shows the text [label], in window pixels.
+ *
+ * @param String label The text.
+ * @return Rect The text's bounds.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.popupTextInWindow(label: String): Rect =
+	onNode(hasText(label) and hasAnyAncestor(isPopup()), useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
 
 /**
  * Clicks the control whose accessible name is [description].

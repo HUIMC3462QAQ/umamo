@@ -12,8 +12,8 @@ import org.umamo.ui.kit.container.OverflowRowScope
 import org.umamo.ui.kit.field.Checkbox
 import org.umamo.ui.kit.field.SEARCH_FIELD_MIN_WIDTH
 import org.umamo.ui.kit.field.SearchField
-import org.umamo.ui.model.LocalPuppet
 import org.umamo.ui.model.artwork.LocalSourceWatch
+import org.umamo.ui.model.documentIsOpen
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.LocalUmamoShapes
@@ -31,7 +31,7 @@ import org.umamo.ui.workspace.AreaScope
 internal fun OverflowRowScope.sourcesHeaderControls(scope: AreaScope) {
 	val viewState = scope.spaceState(SOURCES_VIEW_STATE_KEY) { SourcesViewState() }
 	item("add") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			val commands = LocalCommands.current
 			IconButton(
 				icon = LocalUmamoIcons.addFile,
@@ -43,13 +43,13 @@ internal fun OverflowRowScope.sourcesHeaderControls(scope: AreaScope) {
 	}
 	flexibleSpace()
 	item("search", minWidth = SEARCH_FIELD_MIN_WIDTH) {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			SearchField(value = viewState.query, onValueChange = { newQuery -> viewState.query = newQuery })
 		}
 	}
 	flexibleSpace()
 	item("match") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			// Every file is read and the bindings the files no longer resolve move to their confident
 			// matches as one step; the rest keep their proposals on the rows that need review.
 			val commands = LocalCommands.current
@@ -62,7 +62,7 @@ internal fun OverflowRowScope.sourcesHeaderControls(scope: AreaScope) {
 		}
 	}
 	item("reload") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			// One button: re-probe every file's presence, then reload the present ones as one undo step
 			// (the command itself says when nothing changed).  The alert glyph is the watcher's: files
 			// changed on disk and await this press (notify mode, or a file edited while the document was closed).
@@ -80,7 +80,7 @@ internal fun OverflowRowScope.sourcesHeaderControls(scope: AreaScope) {
 		}
 	}
 	item("filter") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			FilterDropdownButton(viewState)
 		}
 	}

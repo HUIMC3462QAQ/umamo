@@ -12,6 +12,7 @@ import org.umamo.runtime.model.SourceLayerRef
 import org.umamo.runtime.model.drawableIdsByAtlasTile
 import org.umamo.runtime.model.originRelativeX
 import org.umamo.runtime.model.originRelativeZ
+import org.umamo.ui.model.artwork.SourceFilePresence
 
 /*
  * The Sources table as a tree: artwork file -> its layers (the inventory as of the last read) -> the
@@ -20,7 +21,7 @@ import org.umamo.runtime.model.originRelativeZ
  */
 
 /** Whether an artwork file is still where the document last read it. */
-enum class SourcePresence {
+internal enum class SourcePresence {
 	Present,
 	Missing,
 	Unknown,
@@ -31,7 +32,7 @@ enum class SourcePresence {
  * rows of every enabled kind, with their descendants and the ancestors that give them context.  With
  * every kind enabled nothing is hidden at all.
  */
-enum class SourcesFilter {
+internal enum class SourcesFilter {
 	/** Layers some tile is bound to, by a stable key or by name. */
 	Bound,
 
@@ -46,7 +47,7 @@ enum class SourcesFilter {
 }
 
 /** The status a row shows at its right edge. */
-enum class SourcesStatus {
+internal enum class SourcesStatus {
 	Present,
 	Missing,
 	Unknown,
@@ -92,7 +93,7 @@ enum class SourcesStatus {
 }
 
 /** What a row stands for, and the identity a click or a drop acts on. */
-sealed interface SourcesNodeKind {
+internal sealed interface SourcesNodeKind {
 	/** An artwork file the document lists. */
 	data class Source(val sourceId: ArtSourceId) : SourcesNodeKind
 
@@ -110,7 +111,7 @@ sealed interface SourcesNodeKind {
 }
 
 /** The secondary text a row shows after its label, as data so the space localizes it. */
-sealed interface SourcesDetail {
+internal sealed interface SourcesDetail {
 	/** A file's format and inventory size, and whether a path is recorded. */
 	data class Source(val format: String, val layerCount: Int, val hasPath: Boolean) : SourcesDetail
 
@@ -147,7 +148,7 @@ sealed interface SourcesDetail {
  *   with their drawables - a fresh, untouched drawable a reload minted for the layer - so the chip can
  *   say so; empty when the layer is unbound.
  */
-data class LayerSuggestion(
+internal data class LayerSuggestion(
 	val candidateKey: String,
 	val candidateName: String,
 	val score: Float,
@@ -177,7 +178,7 @@ data class LayerSuggestion(
  *   empty on every other row.  What a review moves and a hover previews, whatever a search leaves listed.
  */
 @Immutable
-data class SourcesNode(
+internal data class SourcesNode(
 	val id: String,
 	val label: String,
 	val detail: SourcesDetail,
@@ -190,8 +191,43 @@ data class SourcesNode(
 	val tileIds: List<AtlasTileId> = emptyList(),
 )
 
+/**
+ * Asks where each artwork file stands: present, missing, or unknown.  A file with no recorded path, a
+ * platform with no probe, and a path the probe cannot answer for all read unknown, never missing - the
+ * table must not accuse a file it could not check.
+ *
+ * @param List<ArtSource>     sources The document's artwork files.
+ * @param SourceFilePresence? probe   The platform's probe, or null when it has none.
+ * @return Map<ArtSourceId, SourcePresence> Every file's answer, by file.
+ */
+internal suspend fun probeSourcePresence(sources: List<ArtSource>, probe: SourceFilePresence?): Map<ArtSourceId, SourcePresence> {
+	val answers = LinkedHashMap<ArtSourceId, SourcePresence>()
+	for (source in sources) {
+		val path = source.path
+		val present = if (path == null || probe == null) null else probe(path)
+		answers[source.id] =
+			when (present) {
+				null -> SourcePresence.Unknown
+				true -> SourcePresence.Present
+				false -> SourcePresence.Missing
+			}
+	}
+	return answers
+}
+
+/**
+ * The id of the row a layer's binding is listed under: the file and the reader's key, which is what a
+ * tile bound to the layer carries.  The tree names the row by it and a drop opens the row by it, so the
+ * row opened is the row the art lands under.
+ *
+ * @param ArtSourceId sourceId The file the layer belongs to.
+ * @param String      layerKey The reader's key for the layer.
+ * @return String The row's node id.
+ */
+internal fun sourcesLayerRowId(sourceId: ArtSourceId, layerKey: String): String = "layer:${sourceId.raw}/$layerKey"
+
 /** The id of the synthetic unbound-art group row. */
-const val SOURCES_UNBOUND_GROUP_ID: String = "unbound"
+internal const val SOURCES_UNBOUND_GROUP_ID: String = "unbound"
 
 /**
  * Builds the Sources tree from a puppet: one node per artwork file in document order, each holding
@@ -214,7 +250,7 @@ const val SOURCES_UNBOUND_GROUP_ID: String = "unbound"
  *   tiles accepting it retires.
  * @return List<SourcesNode> The top-level rows.
  */
-fun buildSourcesTree(
+internal fun buildSourcesTree(
 	puppet: PuppetModel,
 	presenceOf: (ArtSource) -> SourcePresence,
 	unboundGroupLabel: String,
@@ -290,7 +326,7 @@ fun buildSourcesTree(
 				null
 			}
 		return SourcesNode(
-			id = "layer:${sourceId.raw}/$key",
+			id = sourcesLayerRowId(sourceId, key),
 			label = label,
 			detail = detail,
 			kind = SourcesNodeKind.Layer(relinkTargetRef(bound, sourceId, key)),
@@ -389,7 +425,7 @@ fun buildSourcesTree(
  * @param String key The reader's layer key.
  * @return Boolean True when the key looks stable.
  */
-fun layerKeyLooksStable(key: String): Boolean = !key.startsWith("name:") && !key.contains('#')
+internal fun layerKeyLooksStable(key: String): Boolean = !key.startsWith("name:") && !key.contains('#')
 
 /**
  * Prunes the tree to [filters] and [query]: a row survives when it is of an enabled kind (or sits
@@ -402,7 +438,7 @@ fun layerKeyLooksStable(key: String): Boolean = !key.startsWith("name:") && !key
  * @param Set<SourcesFilter> filters The kinds of row to show.
  * @return List<SourcesNode> The surviving rows.
  */
-fun filterSourcesTree(nodes: List<SourcesNode>, query: String, filters: Set<SourcesFilter>): List<SourcesNode> {
+internal fun filterSourcesTree(nodes: List<SourcesNode>, query: String, filters: Set<SourcesFilter>): List<SourcesNode> {
 	val trimmed = query.trim()
 	val unfiltered = filters.size == SourcesFilter.entries.size
 

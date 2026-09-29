@@ -187,9 +187,12 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	}
 
 	// One release handler for every row's drag: a drop reads the space's drag state, not the row it began
-	// on, and expands the destination of a nest-inside drop.
+	// on, and expands the destination of a nest-inside drop.  The model is read through state at the
+	// release, like the rows: a handler holding the model itself would be a new handler after every edit,
+	// for every row.
+	val currentPuppet = rememberUpdatedState(puppet)
 	val onDrop = {
-		performOutlinerDrop(dragController, currentRows.value, puppet, editorSession) { nodeId -> viewState.open(nodeId) }
+		performOutlinerDrop(dragController, currentRows.value, currentPuppet.value, editorSession) { nodeId -> viewState.open(nodeId) }
 	}
 
 	Column(modifier = modifier.fillMaxSize().trackRowHoverPointer(hoverPreview, enabled = thumbnails != null)) {
@@ -284,15 +287,13 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 				pointerInWindow = { hoverPreview.pointerInWindow },
 			)
 		}
-		// A name chip follows the cursor while dragging, so there is something clearly "in hand".
+		// A name chip follows the cursor while dragging, so there is something clearly "in hand".  The space
+		// reads which row is in hand, which a drag changes as it starts and as it ends; where the pointer
+		// is, the chip asks for itself.
 		val draggingLabel =
 			dragController.draggingKey?.let { id -> rows.firstOrNull { row -> row.node.id == id }?.node?.label }
-		if (dragController.isDragging && draggingLabel != null) {
-			RowDragLabel(
-				label = draggingLabel,
-				cursorX = dragController.dragWindowX,
-				cursorY = dragController.dragWindowY,
-			)
+		if (draggingLabel != null) {
+			RowDragLabel(label = draggingLabel, pointerInWindow = { dragController.pointerInWindow })
 		}
 	}
 }

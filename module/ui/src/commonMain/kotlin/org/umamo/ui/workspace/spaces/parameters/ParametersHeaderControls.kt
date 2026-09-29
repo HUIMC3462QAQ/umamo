@@ -20,6 +20,7 @@ import org.umamo.ui.kit.menu.Menu
 import org.umamo.ui.model.LocalEditorSession
 import org.umamo.ui.model.LocalLiveParams
 import org.umamo.ui.model.LocalPuppet
+import org.umamo.ui.model.documentIsOpen
 import org.umamo.ui.resources.*
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.LocalUmamoShapes
@@ -44,31 +45,31 @@ internal fun OverflowRowScope.parametersHeaderControls(scope: AreaScope) {
 	val viewState = scope.spaceState(PARAMETERS_VIEW_STATE_KEY) { ParametersViewState() }
 	// Add Parameter and New Group are items of their own, like every control on the strip, so a strip too
 	// narrow for them folds each into the overflow panel on its own.
-	// I know this looks like duplicate `LocalPuppet.current != null`, but it is not.  They are still added, but only show if a document is open.
+	// I know this looks like duplicate `documentIsOpen()`, but it is not.  They are still added, but only show if a document is open.
 	item("add") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			AddParameterChip(viewState)
 		}
 	}
 	item("new") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			NewParameterGroupButton(viewState)
 		}
 	}
 	flexibleSpace()
 	item("search", minWidth = SEARCH_FIELD_MIN_WIDTH) {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			SearchField(value = viewState.query, onValueChange = { newQuery -> viewState.query = newQuery })
 		}
 	}
 	flexibleSpace()
 	item("resetAll") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			ResetAllParametersButton()
 		}
 	}
 	item("filter") {
-		if (LocalPuppet.current != null) {
+		if (documentIsOpen()) {
 			ParametersFilterChip(viewState)
 		}
 	}
