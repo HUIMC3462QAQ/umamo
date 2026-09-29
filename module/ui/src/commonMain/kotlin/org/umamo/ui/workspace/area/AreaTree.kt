@@ -37,12 +37,9 @@ import org.umamo.ui.workspace.layout.SplitOrientation
  * Renders an area tree recursively: a [LeafArea] becomes an [AreaLeaf]; a [SplitNode] becomes a
  * [SplitContainer]. Two callbacks flow down: [onNodeChange] threads a rewritten subtree back up to the
  * root (used by splitter ratio drags), and [onCommand] carries structural edits (split / close /
- * switch) to the shell's reducer. A leaf is wrapped in `key(id)` so its composition identity follows
- * the stable area id, not its position - the basis for keeping a hosted GL surface alive across
- * unrelated tree mutations.
- *
- * エリアツリーを再帰的に描画する。葉は AreaLeaf、分割は SplitContainer。onNodeChange は書き換えた部分木を
- * 上へ、onCommand は構造的編集を伝える。葉は key(id) で同一性を位置でなく安定 id に固定する。
+ * switch) to the shell's reducer. A leaf is wrapped in key(id) so its composition identity follows the
+ * stable area id rather than its position: an area that takes another's place starts fresh instead of
+ * inheriting the other's remembered state.
  *
  * @param AreaNode node The node to render.
  * @param Function onNodeChange Receives a rewritten replacement for this node (ratio edits).

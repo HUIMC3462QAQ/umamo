@@ -18,8 +18,6 @@ import org.umamo.ui.workspace.SpaceKind
  * a vertical bar you drag left/right); Vertical stacks them top over bottom (a horizontal divider).
  * Named for the axis the children occupy, and labelled in the UI by the visual result
  * ("Split Left/Right" vs "Split Top/Bottom") to avoid Blender's inverse "split horizontally" wording.
- *
- * 分割の向き。Horizontal は左右に並べ（縦の仕切り）、Vertical は上下に積む（横の仕切り）。
  */
 @Serializable
 enum class SplitOrientation {
@@ -33,8 +31,6 @@ enum class SplitOrientation {
  * exhaustively (the compiler enforces both cases are handled), and `@Serializable` so the whole tree
  * round-trips through the interface.layout settings key. Polymorphism uses a "type" discriminator
  * with the per-subtype [SerialName] (see LayoutJson).
- *
- * ワークスペースの再帰的エリアツリーのノード。分割 (SplitNode) か葉 (LeafArea) のどちらか。
  */
 @Serializable
 sealed interface AreaNode
@@ -48,8 +44,6 @@ internal const val MIN_RATIO = 0.05f
  * SplitNodes. A SplitNode has no stable id - only leaves do - because a split is addressed
  * structurally (by the leaves it contains), and ratio edits thread up through the tree, not through
  * an id lookup.
- *
- * 内部分割ノード。orientation 方向に 2 子を ratio（最初の子の割合）で分ける。任意に入れ子可能。
  *
  * @property SplitOrientation orientation The division axis.
  * @property Float ratio The first child's fraction of the axis (0..1).
@@ -67,12 +61,10 @@ data class SplitNode(
 
 /**
  * A leaf area hosting exactly one editor [space], identified by a stable, position-independent [id].
- * The id is the linchpin of GL viewport identity: it is minted once, never reused, and never derived
- * from tree position, so a leaf keeps the same id when an unrelated area splits - which lets the
- * viewport host keep the same GL surface alive (via key(id) + movableContentOf) instead of tearing it
- * down and recreating it.
- *
- * 葉エリア。1 つのエディタ空間を表示し、安定で位置非依存の id を持つ。id は GL ビューポートの同一性の要。
+ * The id is the linchpin of an area's identity: it is minted once, never reused, and never derived
+ * from tree position, so a leaf keeps its id when an unrelated area splits. A split or a close
+ * rebuilds the leaf's composition, so what an area keeps across a layout change is keyed on this id:
+ * its view state, and the render service's slot and camera.
  *
  * @property String id The stable, never-reused area identity.
  * @property SpaceKind space The editor space currently shown here.

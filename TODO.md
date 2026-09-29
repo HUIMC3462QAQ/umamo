@@ -107,8 +107,9 @@ https://hollisbrown.github.io/blendershortcuts/ - I should make a page like this
 * Improvements
 	* Parts and deformers still have no editable transform — needs the deformer → part → mesh cascade.
 	* Do another pass on the keyed parameter/property highlight colors.  Why does off key filled color appear as grey over green?
-	* Transform Position and Size should update the render while scrubbing.
+	* Transform Position and Size should update the render while scrubbing.  They should also show the rest pose data after changing to edit mode.
 	* Aspect locked properties(Size) should update the other control while one is being scrubbed.
+* Changing keyed properties outside of object mode: QA testing to determine if this breaks anything.
 * Single/multiple relation pickers.
 	* Improvements
 		* Persist list height.(Stored in UMA format, maybe?)
@@ -172,8 +173,8 @@ See format planning document: docs/plan/uma-format.md
 	* The color-blind-assist first pass — vertex/edge/face gizmo colors plus the selection highlight — already exists in Settings > Colors.
 
 ## Refactor
-* module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/EditorShell.kt
-	* Also reorganize the workspace folder.
+* module/ui/src/commonMain/kotlin/org/umamo/ui/workspace/shell/EditorShell.kt
+* `OutlinerSpace.kt`(The pure helpers sit naturally beside `OutlinerTree.kt`.), `KeyformSheetSpace.kt`(About 175 lines of pure selection and marquee math.), `SourcesSpace.kt`(The relink UI and the tested pure logic.), `EditorShell.kt`, and `ViewportEditGizmoOverlay.kt`.
 
 ## DRY/Standardization
 * Fields like PropertyFieldRow need to take a key use use that to get the correct resource key automatically instead of passing it.
