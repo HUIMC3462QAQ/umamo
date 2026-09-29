@@ -37,7 +37,7 @@ internal fun Modifier.outlinerDropLine(band: RowDropBand?, depth: Int, accentCol
 				RowDropBand.After -> size.height - strokeWidth / 2f
 				RowDropBand.Into, null -> return@drawBehind
 			}
-		val startX = 4.dp.toPx() + 4.dp.toPx() + OUTLINER_INDENT_PER_DEPTH.toPx() * depth
+		val startX = OUTLINER_CONTENT_START.toPx() + OUTLINER_INDENT_PER_DEPTH.toPx() * depth
 		drawLine(
 			color = accentColor,
 			start = Offset(startX, edgeY),

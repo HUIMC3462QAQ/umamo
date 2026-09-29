@@ -10,7 +10,8 @@ import org.umamo.edit.SelectionTarget
 /*
  * The measurements every outliner row shares.  The row body lays its slots out by these, and
  * outlinerContentWidth adds the same slots up to fix every row to one width, so the two must agree: a
- * slot added to the row is a term added to the sum here.
+ * slot added to the row is a term added to the sum here.  Every gap and padding the two share is named
+ * here, so neither holds a number of its own to fall out of step with.
  */
 
 /** Per-depth indentation, matching the Parameters space's folder indent. */
@@ -27,6 +28,24 @@ internal val OUTLINER_ROW_HEIGHT = 22.dp
 
 /** Fixed width of the trailing restriction indicator slot. */
 internal val OUTLINER_RESTRICTION_SLOT_WIDTH = 16.dp
+
+/** The padding on each side of a row, left and right of its content. */
+internal val OUTLINER_ROW_PADDING_HORIZONTAL = 4.dp
+
+/** The padding above and below a row's content. */
+internal val OUTLINER_ROW_PADDING_VERTICAL = 2.dp
+
+/** The inset before the chevron of a row at depth 0, inside the row's padding. */
+internal val OUTLINER_INDENT_BASE = 4.dp
+
+/** Where a row's content starts, before any indent: past its padding and the base inset. */
+internal val OUTLINER_CONTENT_START = OUTLINER_ROW_PADDING_HORIZONTAL + OUTLINER_INDENT_BASE
+
+/** The gap between the type icon and the label. */
+internal val OUTLINER_ICON_LABEL_GAP = 4.dp
+
+/** The gap a real row keeps after its last trailing slot. */
+internal val OUTLINER_TRAILING_GAP = 6.dp
 
 /**
  * Measures the single width every row is fixed to: the wider of the viewport and the longest row (its
@@ -56,12 +75,13 @@ internal fun outlinerContentWidth(
 	showVisibilityColumn: Boolean,
 ): Dp =
 	with(density) {
-		val basePx = 4.dp.toPx()
+		val basePx = OUTLINER_INDENT_BASE.toPx()
 		val perDepthPx = OUTLINER_INDENT_PER_DEPTH.toPx()
-		val fixedPx = OUTLINER_CHEVRON_WIDTH.toPx() + OUTLINER_ICON_WIDTH.toPx() + 4.dp.toPx()
+		val fixedPx = OUTLINER_CHEVRON_WIDTH.toPx() + OUTLINER_ICON_WIDTH.toPx() + OUTLINER_ICON_LABEL_GAP.toPx()
 		val restrictionSlotPx = OUTLINER_RESTRICTION_SLOT_WIDTH.toPx()
-		val trailingSpacerPx = 6.dp.toPx()
-		val trailingPx = 8.dp.toPx()
+		val trailingSpacerPx = OUTLINER_TRAILING_GAP.toPx()
+		// The row's padding, on both of its sides.
+		val trailingPx = OUTLINER_ROW_PADDING_HORIZONTAL.toPx() * 2f
 		var maxPx = viewportWidth.toPx()
 		for (row in rows) {
 			val style = if (row.node.target is SelectionTarget.Drawable) drawableStyle else bodyStyle

@@ -399,13 +399,13 @@ private fun OutlinerRowBody(
 						}
 					},
 				)
-				.padding(horizontal = 4.dp, vertical = 2.dp),
+				.padding(horizontal = OUTLINER_ROW_PADDING_HORIZONTAL, vertical = OUTLINER_ROW_PADDING_VERTICAL),
 		verticalAlignment = Alignment.CenterVertically,
 	) {
-		Spacer(modifier = Modifier.width(4.dp + OUTLINER_INDENT_PER_DEPTH * row.depth))
+		Spacer(modifier = Modifier.width(OUTLINER_INDENT_BASE + OUTLINER_INDENT_PER_DEPTH * row.depth))
 		ChevronSlot(visible = hasChildren, expanded = expanded, labels = labels, onToggle = onToggle, tint = colors.textMuted)
 		OutlinerIconSlot(icon = node.icon, dimmed = node.dimmed)
-		Spacer(modifier = Modifier.width(4.dp))
+		Spacer(modifier = Modifier.width(OUTLINER_ICON_LABEL_GAP))
 		val labelStyle =
 			if (node.target is SelectionTarget.Drawable) LocalUmamoTypography.current.labelSmall else LocalUmamoTypography.current.bodySmall
 		Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
@@ -449,7 +449,7 @@ private fun OutlinerRowBody(
 			)
 		}
 		if (node.target != null) {
-			Spacer(modifier = Modifier.width(6.dp))
+			Spacer(modifier = Modifier.width(OUTLINER_TRAILING_GAP))
 		}
 	}
 }
@@ -470,8 +470,7 @@ private fun Modifier.outlinerAncestryGuides(depth: Int, rowIndex: Int, color: Co
 		if (depth == 0) {
 			return@drawBehind
 		}
-		val leftEdgePx =
-			4.dp.toPx() + 4.dp.toPx() // the row's horizontal padding plus the Spacer's base inset
+		val leftEdgePx = OUTLINER_CONTENT_START.toPx()
 		val indentPx = OUTLINER_INDENT_PER_DEPTH.toPx()
 		val chevronHalfPx = OUTLINER_CHEVRON_WIDTH.toPx() / 2f
 		val dashOnPx = 2.dp.toPx()

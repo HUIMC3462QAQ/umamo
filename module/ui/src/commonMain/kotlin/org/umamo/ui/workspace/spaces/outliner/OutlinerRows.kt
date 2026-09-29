@@ -1,5 +1,6 @@
 package org.umamo.ui.workspace.spaces.outliner
 
+import androidx.compose.runtime.Immutable
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionOps
 import org.umamo.edit.SelectionTarget
@@ -8,9 +9,13 @@ import org.umamo.edit.SelectionTarget
  * One outliner node paired with its tree depth: the unit the body's list renders, and the row a drop, a
  * reveal, and a range selection count over.
  *
+ * Immutable, as its node is: the rows are built again on every fold, and a row built again for the same
+ * node at the same depth equals the one before it, so its composable skips.
+ *
  * @property OutlinerNode node The node.
  * @property Int depth The node's depth below the root, 0 for the root itself.
  */
+@Immutable
 internal data class OutlinerRow(val node: OutlinerNode, val depth: Int)
 
 /**

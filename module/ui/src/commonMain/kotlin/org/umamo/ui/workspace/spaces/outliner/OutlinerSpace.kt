@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -52,7 +53,7 @@ import org.umamo.ui.workspace.spaces.zebraFill
  *   OutlinerMenus.kt            the entries of a row's context menu
  *   OutlinerLabels.kt           the localized chrome
  *
- * and, free of Compose so commonTest pins them directly:
+ * and, holding no composable so commonTest pins them directly:
  *
  *   OutlinerTree.kt             the unified tree, its filtering, and the Shift range rule
  *   OutlinerRows.kt             the visible rows, the path to a node, and what a click does to the selection
@@ -131,6 +132,9 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	// Memoise the visible rows on what actually changes them, so the width measurement below is stable
 	// across recompositions (and unaffected by vertical scrolling).
 	val rows = remember(filteredTree, expanded.toMap(), searching) { flattenOutliner(filteredTree, isOpen) }
+	// What a click and a drop read the rows through.  The list is a new object after every fold, and a
+	// callback holding the list itself would be a new callback for every row, which would run them all.
+	val currentRows = rememberUpdatedState(rows)
 	val listState = rememberLazyListState()
 	val horizontalScroll = rememberScrollState()
 	val density = LocalDensity.current
@@ -163,7 +167,7 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 			return@LaunchedEffect
 		}
 		val active = selection.active ?: return@LaunchedEffect
-		revealOutlinerTarget(active, filteredTree, expanded, isOpen, listState)
+		revealOutlinerTarget(active, filteredTree, viewState, isOpen, listState)
 	}
 
 	// Reveal-on-search-cleared: a search opens every branch, so a row clicked out of the results sits in a
@@ -179,13 +183,13 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 			return@LaunchedEffect
 		}
 		val active = selection.active ?: return@LaunchedEffect
-		revealOutlinerTarget(active, filteredTree, expanded, isOpen, listState)
+		revealOutlinerTarget(active, filteredTree, viewState, isOpen, listState)
 	}
 
 	// One release handler for every row's drag: a drop reads the space's drag state, not the row it began
 	// on, and expands the destination of a nest-inside drop.
 	val onDrop = {
-		performOutlinerDrop(dragController, rows, puppet, editorSession) { nodeId -> expanded[nodeId] = true }
+		performOutlinerDrop(dragController, currentRows.value, puppet, editorSession) { nodeId -> viewState.open(nodeId) }
 	}
 
 	Column(modifier = modifier.fillMaxSize().trackRowHoverPointer(hoverPreview, enabled = thumbnails != null)) {
@@ -240,7 +244,7 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 								} else if (pickOutcome == PickClickOutcome.Ignored && target != null && handle != null) {
 									// Selectability gates only viewport picking; the outliner always selects.
 									suppressReveal = true
-									handle.set(selectionAfterClick(rows, handle.selection, index, target, toggle, extend))
+									handle.set(selectionAfterClick(currentRows.value, handle.selection, index, target, toggle, extend))
 								}
 							},
 							onStartRename = { renamingNodeId = row.node.id },
@@ -290,25 +294,25 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 }
 
 /**
- * Reveals [target]'s row: opens every ancestor of it in the tree, then brings the row into view.  The one
+ * Reveals [target]'s row: opens every closed ancestor of it in the tree, then brings the row into view.  The one
  * body both reveal effects share, so the two entry points cannot drift into revealing a row differently.
  * Every read here runs in the effect's coroutine, never under composition.
  *
  * @param SelectionTarget target The entity whose row to reveal.
  * @param OutlinerNode filteredTree The tree as filtered, whose rows the list shows.
- * @param MutableMap expanded The view state's fold map, written for each ancestor.
+ * @param OutlinerViewState viewState The area's view state, which opens each ancestor that is closed.
  * @param Function isOpen Reports whether a node id is open, after the ancestors are.
  * @param LazyListState listState The list to scroll.
  */
 private suspend fun revealOutlinerTarget(
 	target: SelectionTarget,
 	filteredTree: OutlinerNode,
-	expanded: MutableMap<String, Boolean>,
+	viewState: OutlinerViewState,
 	isOpen: (String) -> Boolean,
 	listState: LazyListState,
 ) {
 	val path = pathTo(filteredTree, target) ?: return
-	path.dropLast(1).forEach { ancestorId -> expanded[ancestorId] = true }
+	path.dropLast(1).forEach { ancestorId -> viewState.open(ancestorId) }
 	val index = flattenOutliner(filteredTree, isOpen).indexOfFirst { row -> row.node.id == path.last() }
 	if (index >= 0) {
 		listState.animateScrollToItem(index)

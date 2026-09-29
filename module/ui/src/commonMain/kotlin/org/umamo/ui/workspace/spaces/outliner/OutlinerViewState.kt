@@ -78,6 +78,22 @@ internal class OutlinerViewState : PersistentSpaceState {
 	}
 
 	/**
+	 * Opens the branch [nodeId] when it is closed, and writes nothing when it is open already.  A fold
+	 * written for a branch that is open by default adds a key the map did not hold, and everything keyed
+	 * on the map is built again for a tree that looks the same.
+	 *
+	 * Unlike [toggleFold] this writes during a search too.  It is what a reveal and a drop open a branch
+	 * with, and the branch has to be open once the search is gone.
+	 *
+	 * @param String nodeId The outliner node id.
+	 */
+	fun open(nodeId: String) {
+		if (!isOpen(nodeId)) {
+			expanded[nodeId] = true
+		}
+	}
+
+	/**
 	 * The outliner's member of its area block.
 	 *
 	 * @return JsonObject The member, every known key named.

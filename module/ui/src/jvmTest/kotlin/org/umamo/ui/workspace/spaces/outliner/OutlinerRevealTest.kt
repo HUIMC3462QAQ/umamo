@@ -7,6 +7,7 @@ import org.umamo.edit.SelectionTarget
 import org.umamo.ui.workspace.spaces.parameters.PANEL_OUTLINER_HEIGHT_SCROLLING
 import org.umamo.ui.workspace.spaces.parameters.clickAt
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -36,6 +37,25 @@ class OutlinerRevealTest {
 			assertTrue(harness.outlinerViewState.isOpen(OutlinerRowKeys.HAIR))
 			assertTrue(outlinerDisplays(OutlinerNames.BANG))
 			assertFalse(outlinerDisplays(harness.text.outlinerRoot), "the list scrolled to reach the row")
+			assertEquals(
+				mapOf(OutlinerRowKeys.HEAD to true, OutlinerRowKeys.HAIR to true),
+				harness.outlinerViewState.expanded.toMap(),
+				"only the closed branches had a fold written",
+			)
+		}
+
+	/** A reveal of a row whose branches are all open records no fold: the root is open by default. */
+	@Test
+	fun aRevealRecordsNoFoldForAnOpenBranch() =
+		runComposeUiTest {
+			val harness = mountOutliner(height = PANEL_OUTLINER_HEIGHT_SCROLLING)
+			val loose = SelectionTarget.Drawable(OutlinerIds.loose)
+
+			runOnIdle { harness.session.setSelection(Selection(setOf(loose), loose)) }
+			waitForIdle()
+
+			assertTrue(harness.outlinerViewState.expanded.isEmpty())
+			assertTrue(outlinerDisplays(OutlinerNames.LOOSE))
 		}
 
 	/** A click inside the outliner selects without scrolling, so the list does not jump under the pointer. */
