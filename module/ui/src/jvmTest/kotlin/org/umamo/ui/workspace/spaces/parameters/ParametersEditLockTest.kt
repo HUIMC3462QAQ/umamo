@@ -14,10 +14,14 @@ import kotlin.test.assertTrue
 
 /**
  * Pins the Edit-mode lock.  Edit mode edits the neutral base mesh and is pinned to the neutral pose, so
- * no pose write may move the session out from under it; the viewport relies on the panel for that.
+ * no pose write may move the session out from under it.  The panel shows the rest pose there, as the
+ * viewport does, and the pose Object mode left returns when Edit mode is left.
  *
  * What the lock covers is pose writes only.  A range, a link, a name, a create, and a delete are
  * document edits, and stay available.
+ *
+ * A control is found by the value it shows, and in Edit mode most rows show the same default, so a case
+ * locates its control before it locks the panel.
  */
 @OptIn(ExperimentalTestApi::class)
 class ParametersEditLockTest {
@@ -31,9 +35,40 @@ class ParametersEditLockTest {
 	private fun lockedPanel(test: ComposeUiTest, showHeader: Boolean = false): ParametersPanelHarness {
 		val harness = ParametersPanelHarness(showHeader = showHeader)
 		test.mountParametersPanel(harness)
+		lock(test, harness)
+		return harness
+	}
+
+	/**
+	 * Puts a mounted harness in Edit mode.
+	 *
+	 * @param ComposeUiTest test The running UI test.
+	 * @param ParametersPanelHarness harness The mounted harness.
+	 */
+	private fun lock(test: ComposeUiTest, harness: ParametersPanelHarness) {
 		test.runOnIdle { harness.enterEditMode() }
 		test.waitForIdle()
-		return harness
+	}
+
+	/**
+	 * Whether any row shows a value of the pose Object mode left, other than one that sits on its default.
+	 *
+	 * @param ComposeUiTest test The running UI test.
+	 * @return Boolean True when one of those values shows.
+	 */
+	private fun showsTheObjectModePose(test: ComposeUiTest): Boolean =
+		OBJECT_MODE_VALUES.any { valueText -> test.showsText(valueText) }
+
+	/**
+	 * Asserts the rows show the rest pose: no value of the pose Object mode left, and no reset glyph, since
+	 * every row is on its default.
+	 *
+	 * @param ComposeUiTest test The running UI test.
+	 * @param ParametersPanelHarness harness The mounted harness.
+	 */
+	private fun assertRowsShowRest(test: ComposeUiTest, harness: ParametersPanelHarness) {
+		assertFalse(showsTheObjectModePose(test), "a locked panel shows the rest pose, as the viewport does")
+		assertEquals(0, test.countOfDescription(harness.text.reset), "at rest every row is on its default")
 	}
 
 	/**
@@ -49,16 +84,34 @@ class ParametersEditLockTest {
 		assertNull(harness.live(PanelIds.bodyX), "a locked panel must not preview")
 		assertNull(harness.live(PanelIds.angleX))
 		assertEquals(cursorBefore, harness.historyCursor, "a locked panel must not record a step")
-		assertTrue(test.showsText(PanelValues.BODY_X), "the rows keep showing the pose Object mode left")
-		assertTrue(test.showsText(PanelValues.ANGLE_X))
+		assertRowsShowRest(test, harness)
 	}
+
+	/** Locked, the rows show the rest pose; unlocked, the pose Object mode left is back. */
+	@Test
+	fun editModeShowsTheRestPoseAndGivesTheObjectPoseBack() =
+		runComposeUiTest {
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			assertTrue(OBJECT_MODE_VALUES.all { valueText -> showsText(valueText) }, "the fixture must open on the Object-mode values")
+
+			lock(this, harness)
+			assertRowsShowRest(this, harness)
+
+			runOnIdle { harness.leaveEditMode() }
+			waitForIdle()
+			assertTrue(OBJECT_MODE_VALUES.all { valueText -> showsText(valueText) }, "leaving Edit mode shows the pose Object mode left")
+			assertEquals(PANEL_FIXTURE_POSE, harness.session.pose.value)
+		}
 
 	/** A slider scrub does nothing. */
 	@Test
 	fun editModeLocksASliderScrub() =
 		runComposeUiTest {
-			val harness = lockedPanel(this)
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
 			val slider = sliderBox(harness, PanelRows.BODY_X, PanelValues.BODY_X)
+			lock(this, harness)
 			val cursorBefore = harness.historyCursor
 
 			drag(slider.at(0.6f), listOf(slider.at(0.8f), Offset(slider.right + 40f, slider.center.y)))
@@ -70,8 +123,10 @@ class ParametersEditLockTest {
 	@Test
 	fun editModeLocksAPadDrag() =
 		runComposeUiTest {
-			val harness = lockedPanel(this)
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
 			val pad = padBox(harness, PanelRows.ANGLE_PAD, PanelValues.ANGLE_X, PanelValues.ANGLE_Y)
+			lock(this, harness)
 			val cursorBefore = harness.historyCursor
 
 			drag(pad.center, listOf(pad.at(0.7f, 0.3f), Offset(pad.right + 40f, pad.top - 40f)))
@@ -79,28 +134,30 @@ class ParametersEditLockTest {
 			assertPoseUntouched(this, harness, cursorBefore)
 		}
 
-	/** A typed value does nothing. */
+	/** A typed value does nothing.  Typed into Eye Open, the one row whose rest value is not 0. */
 	@Test
 	fun editModeLocksATypedValue() =
 		runComposeUiTest {
 			val harness = lockedPanel(this)
 			val cursorBefore = harness.historyCursor
 
-			typeIntoNumberField(PanelValues.BODY_X, "7")
+			typeIntoNumberField(PanelValues.EYE_OPEN, "0.5")
 
 			assertPoseUntouched(this, harness, cursorBefore)
+			assertTrue(showsText(PanelValues.EYE_OPEN), "the row still shows its rest value")
 		}
 
-	/** The reset glyph does nothing. */
+	/** Every row shows its default in Edit mode, so no row offers a reset to press. */
 	@Test
-	fun editModeLocksTheResetGlyph() =
+	fun editModeOffersNoReset() =
 		runComposeUiTest {
-			val harness = lockedPanel(this)
-			val cursorBefore = harness.historyCursor
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			assertTrue(countOfDescription(harness.text.reset) > 0, "the fixture must open with rows off their defaults")
 
-			clickDescribed(harness.text.reset, index = 4)
+			lock(this, harness)
 
-			assertPoseUntouched(this, harness, cursorBefore)
+			assertEquals(0, countOfDescription(harness.text.reset))
 		}
 
 	/** The header's Reset All does nothing: a locked panel must not be writable from its own header. */
@@ -177,17 +234,17 @@ class ParametersEditLockTest {
 			runOnIdle { harness.enterEditMode() }
 			waitForIdle()
 			val cursorLocked = harness.historyCursor
-			assertTrue(showsText(PanelValues.BODY_X), "the row must go back to the committed pose the moment it locks")
+			assertRowsShowRest(this, harness)
 
 			moveOn(listOf(slider.at(0.9f)))
 			releasePress()
-			assertTrue(showsText(PanelValues.BODY_X), "and the rest of the drag must move nothing")
-			assertEquals(2f, harness.committed(PanelIds.bodyX))
+			assertRowsShowRest(this, harness)
+			assertEquals(2f, harness.committed(PanelIds.bodyX), "the rest of the drag must move nothing")
 			assertEquals(cursorLocked, harness.historyCursor, "a dropped drag records no step")
 
 			runOnIdle { harness.leaveEditMode() }
 			waitForIdle()
-			assertTrue(showsText(PanelValues.BODY_X))
+			assertTrue(showsText(PanelValues.BODY_X), "the row shows the committed pose, not the dropped drag")
 			assertEquals(2f, harness.live(PanelIds.bodyX), "the renderer is handed the committed pose back")
 		}
 
@@ -204,11 +261,15 @@ class ParametersEditLockTest {
 			runOnIdle { harness.enterEditMode() }
 			waitForIdle()
 
-			assertTrue(showsText(PanelValues.ANGLE_X))
-			assertTrue(showsText(PanelValues.ANGLE_Y))
+			assertRowsShowRest(this, harness)
 			releasePress()
 			assertEquals(3f, harness.committed(PanelIds.angleX))
 			assertEquals(-4f, harness.committed(PanelIds.angleY))
+
+			runOnIdle { harness.leaveEditMode() }
+			waitForIdle()
+			assertTrue(showsText(PanelValues.ANGLE_X), "both axes show the committed pose, not the dropped drag")
+			assertTrue(showsText(PanelValues.ANGLE_Y))
 		}
 
 	/** A range is the document's, not the pose's, so Edit mode leaves it editable. */
@@ -275,4 +336,10 @@ class ParametersEditLockTest {
 			clickMenuEntry(harness.text.deleteParameter)
 			assertTrue(harness.session.model.value.parameters.none { parameter -> parameter.id == PanelIds.breath })
 		}
+
+	private companion object {
+		/** The values of the pose the fixture opens on that differ from their defaults, so rest shows none of them. */
+		val OBJECT_MODE_VALUES =
+			listOf(PanelValues.SMILE_SHAPE, PanelValues.SMILE, PanelValues.ANGLE_X, PanelValues.ANGLE_Y, PanelValues.BODY_X, PanelValues.BREATH)
+	}
 }

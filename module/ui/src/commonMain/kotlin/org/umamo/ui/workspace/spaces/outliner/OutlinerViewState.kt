@@ -27,6 +27,12 @@ internal class OutlinerViewState : PersistentSpaceState {
 	var query by mutableStateOf("")
 
 	/**
+	 * Whether a search is running.  While one is, every branch shows open and a press on a chevron folds
+	 * nothing.
+	 */
+	val searching: Boolean get() = query.isNotBlank()
+
+	/**
 	 * Each branch's open state by stable node id; an absent id follows [outlinerOpensByDefault].  Not keyed on
 	 * the puppet: the model changes identity on every edit and undo, and a rename must not fold the tree.
 	 */
@@ -56,6 +62,20 @@ internal class OutlinerViewState : PersistentSpaceState {
 	 * @return Boolean True when open.
 	 */
 	fun isOpen(nodeId: String): Boolean = expanded[nodeId] ?: outlinerOpensByDefault(nodeId)
+
+	/**
+	 * Opens the branch [nodeId] if it is closed, and closes it if it is open.  Does nothing while a search
+	 * runs: every branch shows open then, so a press has nothing to fold and must not write a fold the
+	 * rigger cannot see change.
+	 *
+	 * @param String nodeId The outliner node id.
+	 */
+	fun toggleFold(nodeId: String) {
+		if (searching) {
+			return
+		}
+		expanded[nodeId] = !isOpen(nodeId)
+	}
 
 	/**
 	 * The outliner's member of its area block.

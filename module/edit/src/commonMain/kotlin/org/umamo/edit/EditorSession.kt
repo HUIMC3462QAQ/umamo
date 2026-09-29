@@ -525,6 +525,19 @@ class EditorSession(
 	val posePinned: Boolean get() = mutableMode.value.pinsPose
 
 	/**
+	 * The pose the editor shows, and so where an edit aimed at "the pose" acts: the rig's pose, and while it
+	 * is pinned, every parameter at its default.  Edit mode shows the rig at rest, so a key inserted "at the
+	 * pose" there lands where the rigger is looking, not at a pose that returns only when Edit mode is left.
+	 */
+	val shownPose: Pose
+		get() =
+			if (posePinned) {
+				mutableModel.value.parameters.associate { parameter -> parameter.id to parameter.default }
+			} else {
+				mutablePose.value
+			}
+
+	/**
 	 * Commits a parameter scrub as one undo step: the live [pose] reached a new resting position (a slider
 	 * or 2D-pad gesture released, a value typed, a reset). Mid-gesture preview frames bypass this and reach
 	 * the renderer directly, so a whole drag is a single step. The model is unchanged, so this does not

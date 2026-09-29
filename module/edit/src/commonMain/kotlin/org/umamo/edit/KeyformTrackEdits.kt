@@ -187,7 +187,7 @@ fun EditorSession.insertTrackKeyAt(track: KeyformTrackRef, parameter: Parameter,
 	// insert would author a key outside the range that no scrub can ever reach.
 	val clamped = clampToParameterRange(position, parameter)
 	mutate(KeyformChange.InsertKey(channelOf(track))) { model ->
-		model.withTrackKeyInserted(track, parameter, clamped, pose.value)
+		model.withTrackKeyInserted(track, parameter, clamped, shownPose)
 	}
 }
 

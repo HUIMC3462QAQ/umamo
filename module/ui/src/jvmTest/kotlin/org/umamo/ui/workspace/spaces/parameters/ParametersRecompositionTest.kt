@@ -9,6 +9,8 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.DpSize
+import org.umamo.edit.Selection
+import org.umamo.edit.SelectionTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -158,8 +160,8 @@ class ParametersRecompositionTest {
 			assertTrue(named.getValue("ParameterSlider") <= moves.size, "the slider runs at most once per move, and ran ${named["ParameterSlider"]} times")
 			assertTrue(named.getValue("ParameterValueRow") <= moves.size, "and so does its value row, which ran ${named["ParameterValueRow"]} times")
 			assertTrue(
-				counter.lambdaRuns() <= VALUE_ROWS * moves.size,
-				"each row showing a value re-reads the pose once per move and no more; ${counter.lambdaRuns()} lambdas ran for ${moves.size} moves",
+				counter.lambdaRuns() <= moves.size,
+				"only the moved row re-reads its value, once per move; ${counter.lambdaRuns()} lambdas ran for ${moves.size} moves",
 			)
 			releasePress()
 		}
@@ -180,6 +182,10 @@ class ParametersRecompositionTest {
 			val named = counter.namedRuns()
 			assertEquals(setOf("ParameterPad2D", "ParameterValueRow"), named.keys, "a pad scrub must run the pad's controls and no other composable")
 			assertTrue(named.getValue("ParameterPad2D") <= PAD_WRITES_PER_MOVE * moves.size, "the pad ran ${named["ParameterPad2D"]} times for ${moves.size} moves")
+			assertTrue(
+				counter.lambdaRuns() <= PAD_LAMBDAS_PER_MOVE * moves.size,
+				"only the pad re-reads its values; ${counter.lambdaRuns()} lambdas ran for ${moves.size} moves",
+			)
 			releasePress()
 		}
 
@@ -195,7 +201,7 @@ class ParametersRecompositionTest {
 			waitForIdle()
 
 			assertEquals(mapOf("ParameterSlider" to 1, "ParameterValueRow" to 1), counter.namedRuns())
-			assertTrue(counter.lambdaRuns() <= VALUE_ROWS, "${counter.lambdaRuns()} lambdas ran for one write")
+			assertTrue(counter.lambdaRuns() <= 1, "only the moved row re-reads its value; ${counter.lambdaRuns()} lambdas ran for one write")
 		}
 
 	/** The release commits the pose, which the panel reads, so the panel runs; it must not run away. */
@@ -256,6 +262,33 @@ class ParametersRecompositionTest {
 			assertEquals(1, counter.runsOf("ParameterSlider"), "a row whose rename slot is rebuilt equal must skip its slider")
 			assertEquals(1, counter.runsOf("ParameterValueRow"))
 			assertEquals(0, counter.runsOf("ParameterPad2D"), "and its pad")
+			assertTrue(counter.runsOf("ParameterIsland") <= 1, "an island built again for the same parameter skips; ${counter.runsOf("ParameterIsland")} ran")
+			assertEquals(0, counter.runsOf("ParameterGripHandle"), "and so does a grip")
+		}
+
+	/**
+	 * A change the panel reads and no row depends on rebuilds the rows, each for the same parameters, and
+	 * runs none of their controls.  An object selection is one: the panel reads it for its filter, which is
+	 * off here.
+	 */
+	@Test
+	fun aChangeNoRowDependsOnRunsNoRowControl() =
+		counting { counter ->
+			val harness = ParametersPanelHarness()
+			mountParametersPanel(harness)
+			counter.reset()
+
+			runOnIdle {
+				val target = SelectionTarget.Drawable(PanelIds.drawable)
+				harness.session.setSelection(Selection(setOf(target), target))
+			}
+			waitForIdle()
+
+			assertTrue(counter.runsOf("ParametersSpace") >= 1, "the panel must really have recomposed")
+			assertEquals(0, counter.runsOf("ParameterGripHandle"))
+			assertEquals(0, counter.runsOf("ParameterIsland"))
+			assertEquals(0, counter.runsOf("ParameterSlider"))
+			assertEquals(0, counter.runsOf("ParameterPad2D"))
 		}
 
 	/** A row drag moves the drop line on every pointer move, which is the frame's business and no control's. */
@@ -284,10 +317,13 @@ class ParametersRecompositionTest {
 		/** The slider rows the fixture's list shows: Eye Open, Smile Shape, Smile, Body X, and Breath. */
 		const val SLIDER_ROWS = 5
 
-		/** The rows that show a value, which are the rows that read the pose: the sliders and the pad. */
-		const val VALUE_ROWS = 6
-
 		/** A pad move writes both its axes, each of which reaches the pad. */
 		const val PAD_WRITES_PER_MOVE = 2
+
+		/**
+		 * The lambdas a pad move runs: the island content that reads the pad's two values, and the pad's two
+		 * axis rows, which show them.  None belongs to another row.
+		 */
+		const val PAD_LAMBDAS_PER_MOVE = 3
 	}
 }

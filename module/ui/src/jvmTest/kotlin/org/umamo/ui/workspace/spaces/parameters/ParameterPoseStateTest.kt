@@ -80,7 +80,10 @@ class ParameterPoseStateTest {
 			assertEquals(2f, runOnIdle { seen.last().valueOf(parameterOf(harness, PanelIds.bodyX)) })
 		}
 
-	/** A mode change replaces the state with one that holds the new lock and shows the same values. */
+	/**
+	 * A mode change replaces the state with one that holds the new lock.  Locked, it shows the rest pose, as
+	 * the viewport does; the values it holds carry across, and show again once the lock is gone.
+	 */
 	@Test
 	fun aModeChangeReplacesTheWriterAndKeepsTheValues() =
 		runComposeUiTest {
@@ -96,13 +99,14 @@ class ParameterPoseStateTest {
 			val cursorLocked = harness.historyCursor
 			runOnIdle { seen.last().commitValue(PanelIds.bodyX, 7f) }
 			waitForIdle()
-			assertEquals(5f, runOnIdle { seen.last().valueOf(parameterOf(harness, PanelIds.bodyX)) }, "the value carried across, and the locked write left it")
+			assertEquals(0f, runOnIdle { seen.last().valueOf(parameterOf(harness, PanelIds.bodyX)) }, "a locked state shows the rest pose")
 			assertEquals(5f, harness.committed(PanelIds.bodyX))
 			assertEquals(cursorLocked, harness.historyCursor)
 
 			runOnIdle { harness.leaveEditMode() }
 			waitForIdle()
 			assertEquals(3, seen.size)
+			assertEquals(5f, runOnIdle { seen.last().valueOf(parameterOf(harness, PanelIds.bodyX)) }, "the value carried across, and the locked write left it")
 			runOnIdle { seen.last().commitValue(PanelIds.bodyX, 7f) }
 			waitForIdle()
 			assertEquals(7f, harness.committed(PanelIds.bodyX))

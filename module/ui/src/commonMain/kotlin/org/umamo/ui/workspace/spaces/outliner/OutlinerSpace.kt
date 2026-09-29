@@ -190,7 +190,7 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 			filterOutliner(tree, query, viewState.showParts, viewState.showDrawables, viewState.showDeformers)
 		}
 	// During an active search every branch opens so matches are not hidden behind the collapsed default.
-	val searching = query.isNotBlank()
+	val searching = viewState.searching
 	val trimmedQuery = query.trim()
 	val isOpen: (String) -> Boolean = { id -> searching || viewState.isOpen(id) }
 	// Memoise the visible rows on what actually changes them, so the width measurement below is stable
@@ -292,9 +292,7 @@ fun OutlinerSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 							ancestorOfSelection = row.node.id in ancestorParts,
 							matched = searching && row.node.label.contains(trimmedQuery, ignoreCase = true),
 							expanded = isOpen(row.node.id),
-							onToggle = {
-								expanded[row.node.id] = !viewState.isOpen(row.node.id)
-							},
+							onToggle = { viewState.toggleFold(row.node.id) },
 							onSelect = { toggle, extend ->
 								val target = row.node.target
 								val handle = selectionHandle

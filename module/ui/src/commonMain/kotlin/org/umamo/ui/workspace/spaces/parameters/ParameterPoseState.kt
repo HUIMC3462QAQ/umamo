@@ -3,7 +3,9 @@ package org.umamo.ui.workspace.spaces.parameters
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -24,22 +26,45 @@ import org.umamo.ui.model.LiveParamsHandle
  * Stable, so a row handed the same state skips.  The values are snapshot state read one key at a time,
  * which is what keeps a scrub to the rows whose value moved.
  *
- * @param SnapshotStateMap<ParameterId, Float> values The displayed values, one per parameter.
+ * @param SnapshotStateMap<ParameterId, Float> values The pose the panel holds, one value per parameter.
  * @param ParameterPoseWriter writer The lock-gated writes, which echo into [values].
+ * @param Boolean showsRest Whether every control shows its parameter's default: the pose is pinned, and
+ *   the editor shows the rig at rest.  [values] keeps the pinned pose, which shows again once unpinned.
  */
 @Stable
 internal class ParameterPoseState(
 	private val values: SnapshotStateMap<ParameterId, Float>,
 	private val writer: ParameterPoseWriter,
+	private val showsRest: Boolean,
 ) {
 	/**
 	 * The value a parameter's control shows.  A snapshot read, so it belongs in the scope that draws the
 	 * control and nowhere wider.
 	 *
 	 * @param Parameter parameter The parameter to read.
-	 * @return Float The displayed value, or the parameter's default when the panel holds none.
+	 * @return Float The value to show: the default while the rest pose is shown or when the panel holds
+	 *   none, else the value the panel holds.
 	 */
-	fun valueOf(parameter: Parameter): Float = values[parameter.id] ?: parameter.default
+	fun valueOf(parameter: Parameter): Float =
+		if (showsRest) {
+			parameter.default
+		} else {
+			values[parameter.id] ?: parameter.default
+		}
+
+	/**
+	 * The value a parameter's control shows, as state that changes only when this parameter's value does.
+	 *
+	 * The values are one snapshot map, and a read of it is invalidated by a write to any key: a control
+	 * reading [valueOf] directly would run again on every write to every parameter, which a scrub makes on
+	 * every pointer move.  Derived state reads the map on each write and passes on only a change of its own
+	 * value.  Read it in the scope that draws the control, as [valueOf].
+	 *
+	 * @param Parameter parameter The parameter to read.
+	 * @return State<Float> The value to show, as [valueOf] gives it.
+	 */
+	@Composable
+	fun rememberShownValue(parameter: Parameter): State<Float> = remember(this, parameter) { derivedStateOf { valueOf(parameter) } }
 
 	/**
 	 * Previews a value, recording no undo step.
@@ -147,20 +172,21 @@ internal fun rememberParameterPoseState(puppet: PuppetModel, liveParams: LivePar
 	}
 	val parametersLocked = rememberParametersLocked(session)
 	// A scrub still held when the lock engages has previewed a value nothing will commit: the writer it
-	// reaches from here on refuses the rest of the drag and its release.  Drop the preview, so a locked
-	// panel shows the committed pose and not a value the rig never took.  The renderer needs no such
-	// care, since Edit mode hands it a pose of its own.
+	// reaches from here on refuses the rest of the drag and its release.  Drop the preview, so the panel
+	// shows the committed pose once unlocked and not a value the rig never took.  The renderer needs no
+	// such care, since Edit mode hands it a pose of its own.
 	LaunchedEffect(parametersLocked, values) {
 		if (parametersLocked) {
 			followPose(values, pose)
 		}
 	}
-	// The values outlive the lock: a mode change builds a new writer around the same map, so what the
-	// sliders show carries across it.
+	// The values outlive the lock: a mode change builds a new writer around the same map, so the pose the
+	// panel holds carries across it.  Locked, the panel shows the rest pose, as the viewport does.
 	return remember(values, liveParams, parametersLocked) {
 		ParameterPoseState(
 			values,
 			ParameterPoseWriter(liveParams, parametersLocked) { id, newValue -> values[id] = newValue },
+			showsRest = parametersLocked,
 		)
 	}
 }
