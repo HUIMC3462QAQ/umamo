@@ -89,11 +89,21 @@ import org.umamo.ui.viewport.LiveParams
 import org.umamo.ui.viewport.LiveParamsAdapter
 import org.umamo.ui.viewport.initialLiveParams
 import org.umamo.ui.workspace.AreaScope
+import org.umamo.ui.workspace.HoveredSurface
+import org.umamo.ui.workspace.KeyableHover
+import org.umamo.ui.workspace.KeyformSheetViews
+import org.umamo.ui.workspace.LocalKeyableHover
+import org.umamo.ui.workspace.LocalKeyformSheetViews
 import org.umamo.ui.workspace.ShellOverlayState
+import org.umamo.ui.workspace.SpaceKind
 import org.umamo.ui.workspace.area.AreaDragController
 import org.umamo.ui.workspace.area.SplitterDragCancelController
+import org.umamo.ui.workspace.commands.CommandRouting
+import org.umamo.ui.workspace.commands.SessionAvailability
 import org.umamo.ui.workspace.commands.chromeCommands
+import org.umamo.ui.workspace.commands.keyformCommands
 import org.umamo.ui.workspace.commands.registerAll
+import org.umamo.ui.workspace.commands.selectCommands
 import org.umamo.ui.workspace.layout.WorkspaceLayoutController
 import org.umamo.ui.workspace.layout.defaultLayout
 import org.umamo.ui.workspace.rowdrag.LocalRowDragCancel
@@ -292,6 +302,12 @@ internal fun panelFixtureModel(runtimeTarget: RuntimeTarget = RuntimeTarget.NoTa
  * @property String rangeMaximum The range editor's maximum caption.
  * @property String more The overflow chip a narrow header collapses into.
  * @property String trackGeometry The keyform sheet's label for a geometry track.
+ * @property String keyformInsert The keyform sheet's Insert Key lane entry.
+ * @property String keyformDelete The keyform sheet's Delete Key lane entry.
+ * @property String selectDrawable The keyform sheet's label entry that selects a drawable.
+ * @property String selectPart The keyform sheet's label entry that selects a part.
+ * @property String sheetNoTracks The keyform sheet's notice for a parameter nothing is keyed on.
+ * @property String sheetAllFiltered The keyform sheet's notice for tracks the filters hide.
  */
 internal class PanelText(
 	val reset: String,
@@ -316,6 +332,12 @@ internal class PanelText(
 	val rangeMaximum: String,
 	val more: String,
 	val trackGeometry: String,
+	val keyformInsert: String,
+	val keyformDelete: String,
+	val selectDrawable: String,
+	val selectPart: String,
+	val sheetNoTracks: String,
+	val sheetAllFiltered: String,
 )
 
 /**
@@ -326,7 +348,9 @@ internal class PanelText(
  * @property Boolean showHeader Whether the panel's header strip is mounted above the body.
  * @property Boolean provideDocument Whether the composition gets an open document at all.
  * @property Boolean showKeyformSheet Whether a keyform sheet is mounted beside the panel, over the same
- *   session and the same pose hand-off.
+ *   session and the same pose hand-off.  The sheet gets what the shell gives it: the keyable hover, the
+ *   open-sheet registry, and the keyform and select commands, routed as though the pointer were over it.
+ * @property PuppetModel model The rig the session opens on.
  */
 internal class ParametersPanelHarness(
 	runtimeTarget: RuntimeTarget = RuntimeTarget.NoTarget,
@@ -335,8 +359,9 @@ internal class ParametersPanelHarness(
 	val showHeader: Boolean = false,
 	val provideDocument: Boolean = true,
 	val showKeyformSheet: Boolean = false,
+	val model: PuppetModel = panelFixtureModel(runtimeTarget),
 ) {
-	val session = EditorSession(panelFixtureModel(runtimeTarget), PANEL_FIXTURE_POSE)
+	val session = EditorSession(model, PANEL_FIXTURE_POSE)
 	val liveParams: LiveParams = initialLiveParams(session.model.value, PANEL_FIXTURE_POSE)
 	val liveParamsHandle = LiveParamsAdapter(liveParams, session)
 	val scope = AreaScope(PANEL_AREA_ID)
@@ -347,6 +372,11 @@ internal class ParametersPanelHarness(
 	val registry = CommandRegistry()
 	val keymap = Keymap(mapOf(parseKeyChord("primary+KeyS")!! to PANEL_SHORTCUT_COMMAND))
 	val rootFocus = FocusRequester()
+	val keyableHover = KeyableHover()
+	val keyformSheetViews = KeyformSheetViews()
+
+	/** The size the keyform sheet is laid out at, when one is mounted. */
+	var sheetSize by mutableStateOf(DpSize(PANEL_SHEET_WIDTH, PANEL_SHEET_HEIGHT))
 
 	/** Whether the root itself holds focus, so a focus left null can be told from one a field took. */
 	var rootFocused by mutableStateOf(false)
@@ -421,6 +451,15 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 			WorkspaceLayoutController(defaultLayout()) {},
 		) {} + listOf(Command(PANEL_SHORTCUT_COMMAND, title = null) { harness.shortcutRuns += 1 }),
 	)
+	if (harness.showKeyformSheet) {
+		// Routed as though the pointer were over the sheet, which is where a sheet command is aimed from.
+		val routing = CommandRouting { HoveredSurface(PANEL_SHEET_AREA_ID, SpaceKind.KeyformSheet) }
+		val availability = SessionAvailability(harness.session)
+		harness.registry.registerAll(
+			keyformCommands(harness.session, { harness.keyableHover.hovered }, routing, harness.keyformSheetViews, availability) +
+				selectCommands(harness.session, routing, harness.keyformSheetViews, availability),
+		)
+	}
 	setContent {
 		harness.text =
 			PanelText(
@@ -446,6 +485,12 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				rangeMaximum = stringResource(Res.string.parameter_range_max),
 				more = stringResource(Res.string.header_more),
 				trackGeometry = stringResource(Res.string.track_geometry),
+				keyformInsert = stringResource(Res.string.cmd_keyform_insert),
+				keyformDelete = stringResource(Res.string.cmd_keyform_delete),
+				selectDrawable = stringResource(Res.string.keyform_sheet_select_owner, stringResource(Res.string.owner_kind_drawable)),
+				selectPart = stringResource(Res.string.keyform_sheet_select_owner, stringResource(Res.string.owner_kind_part)),
+				sheetNoTracks = stringResource(Res.string.keyform_sheet_no_tracks),
+				sheetAllFiltered = stringResource(Res.string.keyform_sheet_all_filtered),
 			)
 		// Collected, not read once: an edit publishes a new model, and the panel has to be handed it.
 		val puppet by harness.session.model.collectAsState()
@@ -460,6 +505,8 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 				LocalPuppet provides (if (harness.provideDocument) puppet else null),
 				LocalLiveParams provides (if (harness.provideLiveParams) harness.liveParamsHandle else null),
 				LocalSelection provides rememberSessionEditorState(harness.session),
+				LocalKeyableHover provides (if (harness.showKeyformSheet) harness.keyableHover else null),
+				LocalKeyformSheetViews provides (if (harness.showKeyformSheet) harness.keyformSheetViews else null),
 			) {
 				// The viewport binding's pose mirror.  A commit records the live hand-off's map, so without
 				// this an undo would leave the hand-off on the undone pose and the next commit would restore it.
@@ -514,6 +561,7 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 										inlineEditController = harness.inlineEditController,
 										editorSession = session,
 										rowDragCancel = harness.rowDragCancel,
+										keyformSheets = harness.keyformSheetViews,
 										commandRegistry = harness.registry,
 										keymap = harness.keymap,
 									),
@@ -535,7 +583,7 @@ internal fun ComposeUiTest.mountParametersPanel(harness: ParametersPanelHarness)
 							Box(modifier = Modifier.testTag(PANEL_ELSEWHERE_TAG).size(PANEL_ELSEWHERE_SIZE))
 						}
 						if (harness.showKeyformSheet) {
-							Box(modifier = Modifier.size(PANEL_SHEET_WIDTH, PANEL_SHEET_HEIGHT).testTag(PANEL_SHEET_TAG)) {
+							Box(modifier = Modifier.size(harness.sheetSize).testTag(PANEL_SHEET_TAG)) {
 								KeyformSheetSpace(harness.sheetScope)
 							}
 						}

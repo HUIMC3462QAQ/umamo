@@ -22,9 +22,14 @@ import kotlin.test.assertTrue
  * The compiler emits the trace call after the skip check, so a composable that skipped is not counted:
  * the count is how many times the body really ran.  A lambda is traced under its enclosing function's
  * name followed by one "anonymous" marker per level, so the two are told apart by that marker.
+ *
+ * @property String packagePrefix The package whose composables are counted, with its trailing dot; the
+ *   panel's unless a case says otherwise.
  */
 @OptIn(InternalComposeTracingApi::class)
-internal class ComposableRunCounter : CompositionTracer {
+internal class ComposableRunCounter(
+	private val packagePrefix: String = PANEL_PACKAGE_PREFIX,
+) : CompositionTracer {
 	private val runsByName = HashMap<String, Int>()
 
 	/**
@@ -64,7 +69,7 @@ internal class ComposableRunCounter : CompositionTracer {
 	override fun isTraceInProgress(): Boolean = true
 
 	/**
-	 * Counts one body run, when the body belongs to the panel.
+	 * Counts one body run, when the body belongs to the counted package.
 	 *
 	 * @param Int key The composable's group key.
 	 * @param Int dirty1 The first changed-parameter mask.
@@ -74,10 +79,10 @@ internal class ComposableRunCounter : CompositionTracer {
 	override fun traceEventStart(key: Int, dirty1: Int, dirty2: Int, info: String) {
 		// The name only: the file and the line move with every edit, and the name is what is being pinned.
 		val qualifiedName = info.substringBefore(" (")
-		if (!qualifiedName.startsWith(PANEL_PACKAGE_PREFIX)) {
+		if (!qualifiedName.startsWith(packagePrefix)) {
 			return
 		}
-		val name = qualifiedName.removePrefix(PANEL_PACKAGE_PREFIX)
+		val name = qualifiedName.removePrefix(packagePrefix)
 		// The fixture mounts the panel from this same package; its own lambdas are not the panel's.
 		if (name.startsWith(FIXTURE_FUNCTION)) {
 			return
