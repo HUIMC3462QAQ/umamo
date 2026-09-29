@@ -31,7 +31,10 @@ import org.umamo.runtime.model.channelGridsOf
  * the user never pointed at.
  */
 sealed interface KeyformAim {
-	/** No place was named, so the edit acts at the current pose - a property row, or a bare keypress. */
+	/**
+	 * No place was named, so the edit acts at the pose the editor shows ([EditorSession.shownPose]) - a
+	 * property row, or a bare keypress.
+	 */
 	data object Pose : KeyformAim
 
 	/**
@@ -160,7 +163,7 @@ fun EditorSession.captureKeyOnTrack(
 	val keyPosition =
 		when (aim) {
 			is KeyformAim.Position -> aim.position
-			is KeyformAim.Pose -> pose.value[parameter.id] ?: parameter.default
+			is KeyformAim.Pose -> shownPose[parameter.id] ?: parameter.default
 		}
 	val inserted = insertedKeyRef(track, parameter, keyPosition, rowKey)
 	if (aim is KeyformAim.Position) {
@@ -172,7 +175,7 @@ fun EditorSession.captureKeyOnTrack(
 			val target = track.target
 			// Resolved before the wrap, because a channel with no value to capture must leave the selection
 			// alone rather than reconcile it around an edit that never happens.
-			val value = pendingChannelEdits.value[target] ?: model.value.channelValueAt(target, pose.value) ?: return
+			val value = pendingChannelEdits.value[target] ?: model.value.channelValueAt(target, shownPose) ?: return
 			insertingKey(inserted) {
 				// Retired BEFORE the capture records its step, exactly as the unkeyed branch of editKeyedChannel
 				// does below and for the same reason: a snapshot defaults every field to live state, so clearing
@@ -250,7 +253,7 @@ fun EditorSession.removeKeyOnTrack(
 	val keyIndex =
 		when (aim) {
 			is KeyformAim.Position -> aim.keyIndex ?: -1
-			is KeyformAim.Pose -> model.value.trackKeyIndexAtPose(track, parameter, pose.value)
+			is KeyformAim.Pose -> model.value.trackKeyIndexAtPose(track, parameter, shownPose)
 		}
 	if (keyIndex < 0) {
 		return

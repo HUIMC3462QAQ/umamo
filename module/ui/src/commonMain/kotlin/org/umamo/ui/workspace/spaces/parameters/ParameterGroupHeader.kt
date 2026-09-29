@@ -22,7 +22,7 @@ import org.umamo.ui.theme.LocalUmamoShapes
 import org.umamo.ui.theme.LocalUmamoTypography
 import org.umamo.ui.workspace.rowdrag.rowDropHighlight
 
-/** The shared height of a group header row (matches the kit SectionHeader it replaced). */
+/** The height of a group header row and of its rename field, the same as the kit's SectionHeader. */
 private val GROUP_HEADER_HEIGHT = 22.dp
 
 /**

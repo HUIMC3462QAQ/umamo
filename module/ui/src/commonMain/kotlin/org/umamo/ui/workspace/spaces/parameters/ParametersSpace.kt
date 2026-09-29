@@ -146,9 +146,9 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	// outliner / history spaces; the visibility guard keeps renaming an already-visible item from jumping.
 	// The row is AWAITED through snapshotFlow rather than looked up once: a created parameter reaches this
 	// composition through the model StateFlow's collector, which can land a recomposition after the
-	// renaming id was set - a one-shot look at the captured rows missed it and, with the effect's keys
-	// unchanged, never ran again.  The prepended row also sits above a scrolled-down viewport, where its
-	// lazy item cannot even open the rename field until this scroll composes it.
+	// renaming id was set - a one-shot look at the captured rows would find nothing and, with the effect's
+	// keys unchanged, would never look again.  The prepended row also sits above a scrolled-down viewport,
+	// where its lazy item cannot even open the rename field until this scroll composes it.
 	val currentRows = rememberUpdatedState(rows)
 	LaunchedEffect(viewState.renamingGroupId, viewState.renamingParameterId) {
 		val renamingGroupId = viewState.renamingGroupId
@@ -165,8 +165,8 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	}
 
 	// Transient drag-and-drop state, per panel instance. While a drag is in flight the panel parks its
-	// cancel on the shell's seam so Escape aborts the drag (the grip is pointerInput, never focusable,
-	// so it does not reintroduce the link-icon focus bug).
+	// cancel on the shell's seam so Escape aborts the drag (the grip is pointerInput and never focusable,
+	// so the shell root keeps the keyboard and its Escape reaches the seam).
 	val dragController = remember { RowDragController<ParameterMoveSubject>() }
 	dragController.parkCancelOnSeam()
 
@@ -175,8 +175,10 @@ fun ParametersSpace(scope: AreaScope, modifier: Modifier = Modifier) {
 	val createMenuItems =
 		createParameterMenuItems(labels, puppet.runtimeTarget, session, viewState) + newParameterGroupMenuItem(labels, session, viewState)
 	// One release handler for every row's grip: a drag reads the panel's drag state, not the row it began on.
+	// The rows are read through state at the release, so the handler stays one object while the panel
+	// builds new rows, and no grip runs again for it.
 	val onDrop = {
-		performParameterDrop(dragController, rows, puppet, session) { groupId ->
+		performParameterDrop(dragController, currentRows.value, puppet, session) { groupId ->
 			expandedGroups[groupId] = true
 		}
 	}

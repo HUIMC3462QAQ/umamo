@@ -39,8 +39,8 @@ import org.umamo.ui.workspace.rowdrag.RowDragController
 /**
  * The leading drag handle of a parameter row (a slider, a pad, or a group header). Dragging it reorders
  * the row or moves it into / out of a group. Uses raw pointerInput (immediate drag on a dedicated grip,
- * since the row body carries sliders and pads), which also never requests focus - so it does not
- * reintroduce the link-icon focus bug.
+ * since the row body carries sliders and pads), which also never requests focus: a focused node that
+ * leaves composition takes keyboard focus with it, and every shortcut then stays dead until the next click.
  *
  * @param String gripLabel The localized accessible label for the handle.
  * @param ParameterMoveSubject subject What a drag of this row relocates.

@@ -321,7 +321,8 @@ fun PuppetModel.isChannelKeyedOn(target: KeyableTarget, parameterId: ParameterId
 }
 
 /**
- * Captures [value] on [target] at the current pose, keyed on [parameter], as one undo step.
+ * Captures [value] on [target] at the pose the editor shows ([EditorSession.shownPose]), keyed on
+ * [parameter], as one undo step.
  *
  * @param KeyableTarget target The entity and channel to key.
  * @param Parameter parameter The parameter to key on.
@@ -329,19 +330,20 @@ fun PuppetModel.isChannelKeyedOn(target: KeyableTarget, parameterId: ParameterId
  */
 fun EditorSession.captureChannelKey(target: KeyableTarget, parameter: Parameter, value: ChannelValue) {
 	mutate(KeyformChange.InsertKey(target.channel)) { model ->
-		model.withChannelKeyCaptured(target, parameter, pose.value, value)
+		model.withChannelKeyCaptured(target, parameter, shownPose, value)
 	}
 }
 
 /**
- * Removes the key at the current pose from [target]'s channel on [parameter], as one undo step.
+ * Removes the key at the pose the editor shows ([EditorSession.shownPose]) from [target]'s channel on
+ * [parameter], as one undo step.
  *
  * @param KeyableTarget target The entity and channel.
  * @param Parameter parameter The parameter whose axis to remove from.
  */
 fun EditorSession.removeChannelKey(target: KeyableTarget, parameter: Parameter) {
 	mutate(KeyformChange.DeleteKey(target.channel)) { model ->
-		model.withChannelKeyRemoved(target, parameter, pose.value)
+		model.withChannelKeyRemoved(target, parameter, shownPose)
 	}
 }
 

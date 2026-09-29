@@ -8,7 +8,9 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -61,6 +63,13 @@ internal fun ParameterRowView(
 ) {
 	val colors = LocalUmamoColors.current
 	val key = rowKey(row)
+	// The panel builds its row objects again every time it recomposes, around the same parameters.  What
+	// the grip is handed is taken so that it stays the same object across that: the callback reads the
+	// row through state rather than holding it, and the subject is remembered on what it is made of - the
+	// key, and for a pad the vertical axis its key leaves out.  Either one new each time would run the
+	// grip again with nothing changed.
+	val currentRow by rememberUpdatedState(row)
+	val subject = remember(key, (row as? ParameterRow.Pair2D)?.vertical?.id) { parameterMoveSubjectOf(row) }
 	// Drop this row's window bounds when it scrolls off, so the drop hit-test never
 	// targets an invisible row.
 	DisposableEffect(key) {
@@ -113,7 +122,7 @@ internal fun ParameterRowView(
 	) {
 		ParameterGripHandle(
 			gripLabel = labels.reorderHandle,
-			subject = parameterMoveSubjectOf(row),
+			subject = subject,
 			rowKey = key,
 			dragController = dragController,
 			onDrop = onDrop,
@@ -123,7 +132,7 @@ internal fun ParameterRowView(
 			// and it already means "this row" for the drag.  A group header selects
 			// nothing: it owns no parameter to key on.
 			onSelect = {
-				parameterSelectionOf(row)?.let { selection ->
+				parameterSelectionOf(currentRow)?.let { selection ->
 					session?.setParameterSelection(selection)
 				}
 			},
@@ -271,6 +280,9 @@ private fun ParameterSliderRow(
 	modifier: Modifier = Modifier,
 ) {
 	val parameter = row.parameter
+	// Read through state, so the island's callback stays the same object while the panel builds new rows.
+	val currentRow by rememberUpdatedState(row)
+	val shownValue by pose.rememberShownValue(parameter)
 	val linkCandidateId = row.linkCandidateId
 	val rangeOpen = viewState.openRangeEditors[parameter.id] == true
 	val rename = parameterRenameSlot(parameter.id, rangeEditorId = parameter.id, viewState, session)
@@ -293,12 +305,12 @@ private fun ParameterSliderRow(
 			selected = selected,
 			// Through parameterSelectionOf, the ONE place the targeting policy lives -
 			// the grip handle uses the same function, so click and grab cannot drift.
-			onSelect = { parameterSelectionOf(row)?.let { target -> session?.setParameterSelection(target) } },
+			onSelect = { parameterSelectionOf(currentRow)?.let { target -> session?.setParameterSelection(target) } },
 		) {
 			ParameterSlider(
 				parameter = parameter,
 				keyMarks = keyMarks,
-				value = pose.valueOf(parameter),
+				value = shownValue,
 				labels = labels,
 				rangeOpen = rangeOpen,
 				onToggleRange = {
@@ -352,10 +364,14 @@ private fun ParameterPadRow(
 	createMenuItems: List<MenuItem>,
 	modifier: Modifier = Modifier,
 ) {
-	// The callbacks below capture the two parameters, never the row: the list builds its rows again
-	// whenever the panel recomposes, and a callback holding the row would be a new one each time.
+	// The callbacks below hold the two parameters, or the row through state, never the row itself: the
+	// list builds its rows again whenever the panel recomposes, and a callback holding the row would be a
+	// new one each time.
 	val horizontal = row.horizontal
 	val vertical = row.vertical
+	val currentRow by rememberUpdatedState(row)
+	val shownX by pose.rememberShownValue(horizontal)
+	val shownY by pose.rememberShownValue(vertical)
 	val rangeOpen = viewState.openRangeEditors[horizontal.id] == true
 	// Double-clicking an axis name renames it, as the menu's per-axis entry does.  Either name toggles
 	// the one range editor the pad keys on its upper axis, so that is the one a double click gives back.
@@ -380,13 +396,13 @@ private fun ParameterPadRow(
 			selected = selected,
 			// A pad targets BOTH its axes - through parameterSelectionOf, the ONE place
 			// the policy lives, shared with the grip handle and the single island.
-			onSelect = { parameterSelectionOf(row)?.let { target -> session?.setParameterSelection(target) } },
+			onSelect = { parameterSelectionOf(currentRow)?.let { target -> session?.setParameterSelection(target) } },
 		) {
 			ParameterPad2D(
 				horizontal = horizontal,
 				vertical = vertical,
-				xValue = pose.valueOf(horizontal),
-				yValue = pose.valueOf(vertical),
+				xValue = shownX,
+				yValue = shownY,
 				labels = labels,
 				rangeOpen = rangeOpen,
 				onToggleRange = {
