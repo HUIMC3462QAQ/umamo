@@ -215,6 +215,32 @@ class EditModalTransformTest {
 		assertTrue(rig.pushed.isEmpty())
 	}
 
+	/** Abandoning a live gesture clears this area's latch and asks for the resync. */
+	@Test
+	fun abandoningALiveGestureClearsItsLatch() {
+		val rig = rigOver(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+		rig.latch(MeshOperatorKind.Grab)
+		rig.driveTo(Offset(240f, 150f))
+
+		assertTrue(rig.transform.abandon(), "a gesture was in flight")
+
+		assertNull(rig.session.activeMeshOperator.value)
+		assertNull(rig.transform.gesture.capture)
+		assertEquals(0f, rigPositionsOf(rig.session, RIG_QUAD)[0], "nothing committed")
+		assertFalse(rig.transform.abandon(), "and only once")
+	}
+
+	/** Abandoning never clears a latch another area holds. */
+	@Test
+	fun abandoningLeavesAnotherAreasLatch() {
+		val rig = rigOver(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+		rig.session.beginMeshOperator(MeshOperatorKind.Grab, "right")
+
+		assertFalse(rig.transform.abandon())
+
+		assertEquals("right", rig.session.activeMeshOperator.value?.areaId)
+	}
+
 	private companion object {
 		const val LEFT_AREA_ID = "left"
 	}

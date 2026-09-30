@@ -172,6 +172,24 @@ internal class EditModalTransform(
 	fun end(): Boolean = gesture.end()
 
 	/**
+	 * Ends the gesture because the overlay is leaving composition mid-gesture: the mode changed, the area
+	 * closed, or every mesh in the edit stopped projecting (the overlay returns before it reaches this transform).  The latch effect is cancelled with the overlay and never runs its teardown,
+	 * so this does it instead.  The latch is cleared while it is still this area's - a mode switch has
+	 * cleared it already, and a latch another area holds is not this one's to clear - so no gesture is
+	 * left latched to an overlay that cannot drive it, and none restarts from a fresh gesture state when
+	 * the overlay comes back.
+	 *
+	 * @return Boolean True when a gesture was in flight, so the caller resyncs the renderer to the
+	 *   committed model rather than leave it on the uncommitted preview.
+	 */
+	fun abandon(): Boolean {
+		if (session.activeMeshOperator.value?.areaId == areaId) {
+			session.clearMeshOperator()
+		}
+		return gesture.end()
+	}
+
+	/**
 	 * Re-derives the capture's weights after a proportional toggle or falloff change MID-GESTURE (O falls
 	 * through the shell ladder to the keymap while an operator runs - Blender allows the same); the next
 	 * pointer move applies them.  The scroll path recomputes inline, since it must re-drive the preview

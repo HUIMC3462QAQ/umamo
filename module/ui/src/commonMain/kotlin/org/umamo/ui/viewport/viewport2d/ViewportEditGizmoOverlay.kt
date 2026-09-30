@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -182,6 +183,17 @@ fun ViewportEditGizmoOverlay(
 	// loop, and the chrome read.
 	val modalTransform = remember(areaId) { EditModalTransform(areaId, session, service::setModel) }
 	val gesture = modalTransform.gesture
+
+	// The unmount-mid-gesture guard: leaving Edit mode, closing the area, or every mesh in the edit ceasing to project disposes this part of the overlay mid-gesture, which cancels
+	// the latch effect below WITHOUT running its teardown - the renderer would be left on the uncommitted
+	// preview, and the latch on an overlay that no longer exists.
+	DisposableEffect(modalTransform) {
+		onDispose {
+			if (modalTransform.abandon()) {
+				service.setModel(session.model.value)
+			}
+		}
+	}
 
 	// A tool change - armed, cleared by Escape / right-click, or switched between box and circle - resolves any
 	// in-flight gesture (see MarqueeSelectController.cancel: the stroke commits, the box abandons). This clears

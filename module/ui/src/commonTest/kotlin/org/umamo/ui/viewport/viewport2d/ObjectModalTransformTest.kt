@@ -100,6 +100,21 @@ class ObjectModalTransformTest {
 		assertTrue(pushed.isEmpty())
 	}
 
+	/** Abandoning a live gesture clears this area's latch and asks for the resync; another area's latch stays. */
+	@Test
+	fun abandoningClearsOnlyThisAreasLatch() {
+		val rig = latched(gizmoObjectSession())
+		rig.transform.drivePreview(Offset(240f, 150f), RIG_CAMERA, RIG_AREA_SIZE)
+
+		assertTrue(rig.transform.abandon())
+		assertNull(rig.session.activeObjectOperator.value)
+		assertEquals(0f, rigPositionsOf(rig.session, RIG_QUAD)[0])
+
+		rig.session.beginObjectOperator(MeshOperatorKind.Grab, "right")
+		assertFalse(rig.transform.abandon())
+		assertEquals("right", rig.session.activeObjectOperator.value?.areaId)
+	}
+
 	private companion object {
 		const val LEFT_AREA_ID = "left"
 	}

@@ -4,12 +4,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.v2.runComposeUiTest
+import org.umamo.edit.EditorMode
 import org.umamo.edit.MeshOperatorKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * Pins the Object-mode gizmo overlay's modal transform through the overlay itself: a Grab previews into
@@ -80,5 +82,26 @@ class ObjectGizmoOverlayGestureTest {
 
 			assertNull(session.activeObjectOperator.value)
 			assertEquals(10f, rigPositionsOf(session, RIG_QUAD)[0])
+		}
+
+	/** Leaving Object mode mid-gesture puts the renderer back on the committed model. */
+	@Test
+	fun leavingObjectModeMidGestureRestoresTheRenderer() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoObjectSession())
+			val session = fixture.session
+			moveIn(LEFT_AREA, listOf(gestureStart))
+			session.beginObjectOperator(MeshOperatorKind.Grab, LEFT_AREA)
+			waitForIdle()
+			moveIn(LEFT_AREA, listOf(tenUnitsRight))
+			assertTrue(fixture.service.pushedModels.isNotEmpty(), "the move previewed")
+
+			session.setMode(EditorMode.Edit)
+			waitForIdle()
+
+			assertEquals(EditorMode.Edit, session.mode.value)
+			assertNull(session.activeObjectOperator.value)
+			assertEquals(0f, rigPositionsOf(session, RIG_QUAD)[0], "nothing committed")
+			assertSame(session.model.value, fixture.service.pushedModels.last(), "the renderer is back on the committed model")
 		}
 }

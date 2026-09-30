@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.v2.runComposeUiTest
+import org.umamo.edit.EditorMode
 import org.umamo.edit.MeshElement
 import org.umamo.edit.MeshOperatorKind
 import org.umamo.edit.MeshSelectMode
@@ -12,7 +13,9 @@ import org.umamo.edit.ProportionalEditState
 import org.umamo.edit.ProportionalFalloff
 import org.umamo.edit.TransformParameterKeys
 import org.umamo.edit.floatValue
+import org.umamo.edit.setDrawableParentDeformer
 import org.umamo.render.pick.PickCandidate
+import org.umamo.runtime.model.DeformerId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -263,5 +266,85 @@ class EditGizmoOverlayGestureTest {
 			val notice = assertNotNull(session.notice.value)
 			assertEquals("notice.edit.noEditableGeometry", notice.messageKey)
 			assertEquals(serialBefore + 1, notice.serial, "one notice, not one per area")
+		}
+
+	/**
+	 * Leaving Edit mode mid-gesture ends the gesture with the overlay gone, so nothing is left to tear it
+	 * down but the overlay's own disposal: the renderer goes back to the committed model, which the
+	 * uncommitted preview never reached.
+	 */
+	@Test
+	fun leavingEditModeMidGestureRestoresTheRenderer() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			val session = fixture.session
+			moveIn(LEFT_AREA, listOf(gestureStart))
+			session.beginMeshOperator(MeshOperatorKind.Grab, LEFT_AREA)
+			waitForIdle()
+			moveIn(LEFT_AREA, listOf(tenUnitsRight))
+			assertTrue(fixture.service.pushedModels.isNotEmpty(), "the move previewed")
+
+			session.setMode(EditorMode.Object)
+			waitForIdle()
+
+			assertNull(session.activeMeshOperator.value)
+			assertEquals(0f, rigPositionsOf(session, RIG_QUAD)[0], "nothing committed")
+			assertSame(session.model.value, fixture.service.pushedModels.last(), "the renderer is back on the committed model")
+		}
+
+	/**
+	 * When every mesh in the edit stops projecting mid-gesture (its deformer went missing), the gesture
+	 * cannot go on: it is cancelled and the renderer resynced, so when the mesh projects again nothing
+	 * restarts under the pointer.
+	 */
+	@Test
+	fun losingEveryProjectableMeshMidGestureCancelsIt() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			val session = fixture.session
+			moveIn(LEFT_AREA, listOf(gestureStart))
+			session.beginMeshOperator(MeshOperatorKind.Grab, LEFT_AREA)
+			waitForIdle()
+			moveIn(LEFT_AREA, listOf(tenUnitsRight))
+
+			session.setDrawableParentDeformer(RIG_QUAD, DeformerId("missing"))
+			waitForIdle()
+
+			assertNull(session.activeMeshOperator.value, "the gesture was cancelled")
+			assertSame(session.model.value, fixture.service.pushedModels.last(), "the renderer is back on the committed model")
+
+			session.setDrawableParentDeformer(RIG_QUAD, null)
+			waitForIdle()
+			val pushesBefore = fixture.service.pushedModels.size
+			moveIn(LEFT_AREA, listOf(tenUnitsRight, Offset(250f, 150f)))
+
+			assertNull(session.activeMeshOperator.value, "no gesture restarted")
+			assertEquals(pushesBefore, fixture.service.pushedModels.size, "and nothing drove")
+			assertEquals(0f, rigPositionsOf(session, RIG_QUAD)[0])
+		}
+
+	/**
+	 * Pins the restart the cancel prevents: a gesture that lived through a stretch with nothing to project
+	 * would be captured again from a fresh gesture state whose pointer is (0, 0), so its next move would
+	 * land dozens of units away.  Confirming right after the mesh projects again must not move it.
+	 */
+	@Test
+	fun aGestureDoesNotRestartFromTheOrigin() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			val session = fixture.session
+			moveIn(LEFT_AREA, listOf(gestureStart))
+			session.beginMeshOperator(MeshOperatorKind.Grab, LEFT_AREA)
+			waitForIdle()
+			session.setDrawableParentDeformer(RIG_QUAD, DeformerId("missing"))
+			waitForIdle()
+			session.setDrawableParentDeformer(RIG_QUAD, null)
+			waitForIdle()
+
+			moveIn(LEFT_AREA, listOf(tenUnitsRight))
+			session.requestMeshConfirm()
+			waitForIdle()
+
+			assertEquals(0f, rigPositionsOf(session, RIG_QUAD)[0], "vertex 0 did not jump")
 		}
 }

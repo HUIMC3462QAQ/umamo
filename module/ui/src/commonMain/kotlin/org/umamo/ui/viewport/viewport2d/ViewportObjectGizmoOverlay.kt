@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -134,6 +135,17 @@ fun ViewportObjectGizmoOverlay(
 	// loop, and the HUD read.
 	val modalTransform = remember(areaId) { ObjectModalTransform(areaId, session, service::setModel) }
 	val gesture = modalTransform.gesture
+
+	// The unmount-mid-gesture guard: leaving Object mode or closing the area disposes this part of the overlay mid-gesture, which cancels
+	// the latch effect below WITHOUT running its teardown - the renderer would be left on the uncommitted
+	// preview, and the latch on an overlay that no longer exists.
+	DisposableEffect(modalTransform) {
+		onDispose {
+			if (modalTransform.abandon()) {
+				service.setModel(session.model.value)
+			}
+		}
+	}
 
 	// The drawable ids a working selection currently paints, for the live GPU tint preview.
 	fun Selection.drawableIds(): Set<DrawableId> =
