@@ -7,10 +7,21 @@ Umamo is early alpha.
 (Unreleased changes)
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## 0.4.0 - 2026-10-02
+
+NOTE: Going forward the `-dev` suffix will be dropped for production releases due to a build script change.
+
+### Added
 * Format: New native UMA file format!
 * Format: A UMA document remembers each panel's open branches, filters, tab, and the UV Editor's texture choice, per area.
 * Format: A UMA document reopens to the pose, selection, mode, cursors, pivot and proportional editing settings, and each viewport's pan and zoom it was saved with.
 * Format: The `.uma` file type is now declared for desktop packages and Android along with freedesktop files in the Linux build to register it per user.
+* UI: Quick Setup splash screen: A new modal will open on first launch to quickly select basic settings.  Please enjoy my lovely artwork with care.
 * UI: The unsaved-changes prompts when replacing a document or quitting now offer Save, Don’t Save, and Cancel.
 * UI: Added save confirmation for dirty files when closing the application.
 * UI: Opens to a new document by default with New and Open file menu operations available.
@@ -29,7 +40,7 @@ Umamo is early alpha.
 * Diagnostics: Desktop sessions now write out the log into the `umamo/logs` directory.
 * Diagnostics: Help -> Open Log Folder opens the folder holding the session logs.
 * Diagnostics: Starting the desktop app with `--self-check` runs a headless check of its Java runtime, native libraries, and file formats then prints the results, and exits.
-* Packaging: Apple silicon Macs get a `Umamo.app` download, bundling Java 27.  Intel Macs keep using the jar.
+* Packaging: Apple silicon Macs now have a `.dmg` and `.app` download, bundling Java 27.  Intel Macs will keep using the `.jar` for now.
 * Packaging: A JAR started without a memory option restarts itself with room for up to half of the system RAM when Java's default would give Umamo less than 3 GB.
 * Packaging: Installers are now built: MSI for Windows, DEB and an RPM for Linux, and DMG for MacOS ARM64.
 * Packaging: MacOS ARM64 DMG/APP are now signed and notarized.
