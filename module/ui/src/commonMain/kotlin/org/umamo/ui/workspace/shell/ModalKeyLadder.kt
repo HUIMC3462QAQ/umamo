@@ -242,9 +242,9 @@ internal fun handleModalKeyLadder(stroke: ShellKeyStroke, state: ShellModalState
 				commandRegistry.invoke("area.dragCancel")
 				true
 			}
-			// An in-flight non-armed viewport box drag owns Escape in any mode (the Object overlay
-			// publishes the flag): abandon the rubber-band WITHOUT falling through to the Object-mode
-			// clear-selection branch below, so cancelling a drag never also wipes the selection.
+			// An in-flight select drag owns Escape in any mode (every box and circle stroke publishes the
+			// flag): abandon the rubber-band WITHOUT falling through to the Object-mode clear-selection
+			// branch below, so cancelling a drag never also wipes the selection.
 			isEscapeDown && editorSession?.viewportGestureActive?.value == true && !dragController.isDragging -> {
 				editorSession.requestMeshGestureCancel()
 				true

@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -20,6 +21,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.ScrollWheel
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -29,14 +31,15 @@ import org.umamo.settings.Settings
 import org.umamo.ui.LocalSettings
 import org.umamo.ui.theme.UmamoTheme
 import org.umamo.ui.viewport.StubPuppetViewportService
+import org.umamo.ui.viewport.ViewportRegionOverlay
 import org.umamo.ui.workspace.commands.inMemorySettings
 import org.umamo.ui.workspace.spaces.parameters.GESTURE_GAP_MILLIS
 import org.umamo.ui.workspace.spaces.parameters.GESTURE_STEP_MILLIS
 
 /*
- * The viewport gizmo overlays mounted the way PuppetViewportBinding mounts them, twice: two areas side by
- * side over ONE session and ONE render service, so a case can check that a gesture belongs to the area
- * it started in.  The render service is the stub, which records what the overlays push; the frame each
+ * The viewport gizmo overlays, with the Zoom Region overlay above them, mounted the way
+ * PuppetViewportBinding mounts them, twice: two areas side by side over ONE session and ONE render
+ * service, so a case can check that a gesture belongs to the area it started in.  The render service is the stub, which records what the overlays push; the frame each
  * overlay draws against is the session's committed model (the stub never renders, so a landed frame is
  * always the committed one), and the camera is the rig's.  Density is one, so a dp is a pixel and the
  * rig's screen coordinates are the pointer coordinates the helpers below take.
@@ -64,6 +67,13 @@ internal class GizmoOverlayFixture(
 
 	/** Every overlap picker an overlay asked for, as the area, the anchor, and the candidates. */
 	val overlapRequests = ArrayList<Triple<String, Offset, List<PickCandidate>>>()
+
+	/**
+	 * The areas whose overlays are mounted.  Taking an area out unmounts its overlays mid-gesture the way
+	 * a mode switch or a closing area does, while the area's box, its tag, and the host's pointer record
+	 * stay, so input can go on after it.
+	 */
+	val mountedAreas = mutableStateOf(setOf(LEFT_AREA, RIGHT_AREA))
 }
 
 /**
@@ -108,26 +118,37 @@ internal fun ComposeUiTest.mountGizmoOverlays(session: EditorSession): GizmoOver
 												}
 											},
 								) {
-									ViewportEditGizmoOverlay(
-										areaId = areaId,
-										service = fixture.service,
-										session = session,
-										camera = RIG_CAMERA,
-										frameModel = frameModel,
-										widthPx = RIG_AREA_WIDTH,
-										heightPx = RIG_AREA_HEIGHT,
-										areaPointer = areaPointer,
-										onOverlapRequest = { anchor, candidates -> fixture.overlapRequests.add(Triple(areaId, anchor, candidates)) },
-									)
-									ViewportObjectGizmoOverlay(
-										areaId = areaId,
-										service = fixture.service,
-										session = session,
-										camera = RIG_CAMERA,
-										widthPx = RIG_AREA_WIDTH,
-										heightPx = RIG_AREA_HEIGHT,
-										onOverlapRequest = { anchor, candidates -> fixture.overlapRequests.add(Triple(areaId, anchor, candidates)) },
-									)
+									if (areaId in fixture.mountedAreas.value) {
+										ViewportEditGizmoOverlay(
+											areaId = areaId,
+											service = fixture.service,
+											session = session,
+											camera = RIG_CAMERA,
+											frameModel = frameModel,
+											widthPx = RIG_AREA_WIDTH,
+											heightPx = RIG_AREA_HEIGHT,
+											areaPointer = areaPointer,
+											onOverlapRequest = { anchor, candidates -> fixture.overlapRequests.add(Triple(areaId, anchor, candidates)) },
+										)
+										ViewportObjectGizmoOverlay(
+											areaId = areaId,
+											service = fixture.service,
+											session = session,
+											camera = RIG_CAMERA,
+											widthPx = RIG_AREA_WIDTH,
+											heightPx = RIG_AREA_HEIGHT,
+											onOverlapRequest = { anchor, candidates -> fixture.overlapRequests.add(Triple(areaId, anchor, candidates)) },
+										)
+										// Above the gizmos, as the binding mounts it; inert unless Zoom Region is armed here.
+										ViewportRegionOverlay(
+											areaId = areaId,
+											service = fixture.service,
+											session = session,
+											camera = RIG_CAMERA,
+											widthPx = RIG_AREA_WIDTH,
+											heightPx = RIG_AREA_HEIGHT,
+										)
+									}
 								}
 							}
 						}
@@ -141,7 +162,7 @@ internal fun ComposeUiTest.mountGizmoOverlays(session: EditorSession): GizmoOver
 }
 
 /**
- * Moves the pointer through [points] in one area, no button held.
+ * Moves the pointer through [points] in one area, with whatever buttons a [pressIn] holds.
  *
  * @param String areaId The area.
  * @param List<Offset> points The area-local points, in order.
@@ -212,5 +233,52 @@ internal fun ComposeUiTest.scrollIn(areaId: String, steps: Float) {
 		advanceEventTime(GESTURE_STEP_MILLIS)
 		scroll(steps, ScrollWheel.Vertical)
 	}
+	waitForIdle()
+}
+
+/**
+ * Presses a button at a point in an area and holds it.
+ *
+ * @param String areaId The area.
+ * @param Offset point The area-local point.
+ * @param MouseButton button The button.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.pressIn(areaId: String, point: Offset, button: MouseButton = MouseButton.Primary) {
+	onNodeWithTag(areaTag(areaId)).performMouseInput {
+		advanceEventTime(GESTURE_GAP_MILLIS)
+		moveTo(point)
+		press(button)
+	}
+	waitForIdle()
+}
+
+/**
+ * Releases a button a [pressIn] held, where the pointer is.
+ *
+ * @param String areaId The area the pointer is in.
+ * @param MouseButton button The button.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.releaseIn(areaId: String, button: MouseButton = MouseButton.Primary) {
+	onNodeWithTag(areaTag(areaId)).performMouseInput {
+		advanceEventTime(GESTURE_STEP_MILLIS)
+		release(button)
+	}
+	waitForIdle()
+}
+
+/**
+ * Runs [action] with a key held, so the pointer events it sends carry that modifier.
+ *
+ * @param String areaId The area the key goes to.
+ * @param Key key The key to hold (for example Key.ShiftLeft).
+ * @param Function action The input sent while the key is down.
+ */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.withKeyHeld(areaId: String, key: Key, action: () -> Unit) {
+	onNodeWithTag(areaTag(areaId)).performKeyInput { keyDown(key) }
+	action()
+	onNodeWithTag(areaTag(areaId)).performKeyInput { keyUp(key) }
 	waitForIdle()
 }

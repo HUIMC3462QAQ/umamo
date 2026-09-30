@@ -3,7 +3,11 @@ package org.umamo.ui.viewport.gizmo
 import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
 import org.umamo.render.pick.PickCandidate
+import org.umamo.runtime.model.BlendMode
+import org.umamo.runtime.model.Drawable
 import org.umamo.runtime.model.DrawableId
+import org.umamo.runtime.model.OrgChild
+import org.umamo.runtime.model.PuppetModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -86,4 +90,72 @@ class ObjectPickControllerTest {
 		val overlap = assertIs<AltPickResolution.ShowOverlap>(resolution, "two candidates need the picker")
 		assertEquals(candidates, overlap.candidates, "the front-to-back order is preserved")
 	}
+
+	/** Plain box replaces; additive extends with the last enclosed drawable active. */
+	@Test
+	fun boxSelectionReplacesOrExtends() {
+		val drawableA = SelectionTarget.Drawable(DrawableId("a"))
+		val drawableB = SelectionTarget.Drawable(DrawableId("b"))
+		val replaced = resolveObjectBoxSelection(Selection(setOf(drawableA), drawableA), listOf(drawableB), additive = false)
+		assertEquals(setOf<SelectionTarget>(drawableB), replaced.targets, "a plain box replaces the selection")
+		assertEquals(drawableB, replaced.active, "the last enclosed drawable becomes active")
+		val extended = resolveObjectBoxSelection(Selection(setOf(drawableA), drawableA), listOf(drawableB), additive = true)
+		assertEquals(setOf<SelectionTarget>(drawableA, drawableB), extended.targets, "an additive box keeps the current targets")
+		assertEquals(drawableB, extended.active, "the last enclosed drawable becomes active")
+	}
+
+	/** An additive box that enclosed nothing keeps the selection AND its active target. */
+	@Test
+	fun emptyAdditiveBoxKeepsTheSelection() {
+		val drawableA = SelectionTarget.Drawable(DrawableId("a"))
+		val current = Selection(setOf(drawableA), drawableA)
+		val result = resolveObjectBoxSelection(current, emptyList(), additive = true)
+		assertEquals(current, result, "nothing enclosed changes nothing")
+	}
+
+	/** A plain box that enclosed nothing clears (the viewport's box rule). */
+	@Test
+	fun emptyPlainBoxClears() {
+		val drawableA = SelectionTarget.Drawable(DrawableId("a"))
+		val result = resolveObjectBoxSelection(Selection(setOf(drawableA), drawableA), emptyList(), additive = false)
+		assertTrue(result.isEmpty, "an empty plain box clears the selection")
+		assertNull(result.active, "no active target survives")
+	}
+
+	/** A region passes over what cannot be selected and keeps the order it enclosed the rest in. */
+	@Test
+	fun selectableTargetsSkipTheUnselectableInOrder() {
+		val model =
+			PuppetModel(
+				parameters = emptyList(),
+				parts = emptyList(),
+				deformers = emptyList(),
+				drawables = listOf(drawableNamed("a"), drawableNamed("b", selectable = false), drawableNamed("c")),
+				rootChildren = listOf("a", "b", "c").map { raw -> OrgChild.Drawable(DrawableId(raw)) },
+				rootPartId = null,
+			)
+
+		val targets = selectableDrawableTargets(listOf(DrawableId("c"), DrawableId("b"), DrawableId("a")), model)
+
+		assertEquals(listOf(DrawableId("c"), DrawableId("a")), targets.map { target -> target.id })
+	}
+
+	/**
+	 * A mesh-less drawable for the selectable filter.
+	 *
+	 * @param String raw The drawable id.
+	 * @param Boolean selectable Whether it can be selected.
+	 * @return Drawable The drawable.
+	 */
+	private fun drawableNamed(raw: String, selectable: Boolean = true): Drawable =
+		Drawable(
+			id = DrawableId(raw),
+			name = raw,
+			parentDeformerId = null,
+			blendMode = BlendMode.Normal,
+			maskedBy = emptyList(),
+			mesh = null,
+			geometryGrid = null,
+			isSelectable = selectable,
+		)
 }

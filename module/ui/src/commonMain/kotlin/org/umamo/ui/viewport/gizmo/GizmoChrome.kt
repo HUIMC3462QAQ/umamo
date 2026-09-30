@@ -1,5 +1,6 @@
 package org.umamo.ui.viewport.gizmo
 
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -8,10 +9,13 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import org.umamo.edit.ActiveSelectTool
 import org.umamo.edit.TransformAxisConstraint
+import org.umamo.render.ViewportCamera
 import org.umamo.render.WorldAxisColors
+import org.umamo.ui.theme.LocalUmamoCursors
 import org.umamo.ui.theme.LocalUmamoIcons
 import org.umamo.ui.theme.SelectionOverlayStyle
 import org.umamo.ui.theme.UmamoCursor
@@ -20,9 +24,11 @@ import org.umamo.ui.theme.drawCursor
 import org.umamo.ui.theme.drawIcon
 import org.umamo.ui.theme.drawSelectionCircle
 
-// The shared gizmo chrome: the draw helpers and constants all three gizmo overlays (Edit, Object, and
-// UV) render identically.  Everything here is geometry-source agnostic: it takes screen-space points
-// and the shared affordance style, never a session or a mesh.
+// The shared gizmo chrome: the draw helpers and constants the gizmo overlays (the viewport's Edit and
+// Object, the UV editor's Edit and Object) render identically.  Everything here is geometry-source
+// agnostic: it takes screen-space points and the shared affordance style, never a session or a mesh.
+// drawOwnedModalTransformHud alone reads a gesture's pointer state and projects its pivot through the
+// area camera, so the four overlays' HUDs cannot drift apart.
 
 /** A primary drag shorter than this (px) is treated as a click, not a box select. */
 internal const val SELECT_DRAG_THRESHOLD_PX = 3f
@@ -57,6 +63,48 @@ internal fun DrawScope.drawAxisConstraintLine(constraint: TransformAxisConstrain
 
 		null -> {}
 	}
+}
+
+/**
+ * Draws the modal transform HUD for the gesture this area owns: the pivot projects through the area
+ * camera, and the pointers come from the gesture state (the virtual one past a cursor wrap).  The caller
+ * evaluates [owned] and [pivotWorld] inside its Canvas draw lambda, where it always has; nothing else is
+ * read unless both hold, so the axis constraint and the ring radius stay reads of an owned gesture only
+ * and a change to either while no gesture runs redraws nothing.
+ *
+ * @param Boolean owned Whether the caller's gate says this area draws the HUD.
+ * @param Pair<Float, Float>? pivotWorld The capture's pivot, or null when no capture has landed.
+ * @param ModalGestureState<*> gesture The area's modal gesture state.
+ * @param State axisConstraint The session's axis constraint.
+ * @param ViewportCamera camera The camera the pivot projects through.
+ * @param IntSize size The area size in pixels.
+ * @param Color lineColor The HUD's line color.
+ * @param Function proportionalRadiusPx The proportional ring's radius in pixels, or null for none; read
+ *   only when the HUD draws.
+ */
+internal fun DrawScope.drawOwnedModalTransformHud(
+	owned: Boolean,
+	pivotWorld: Pair<Float, Float>?,
+	gesture: ModalGestureState<*>,
+	axisConstraint: State<TransformAxisConstraint?>,
+	camera: ViewportCamera,
+	size: IntSize,
+	lineColor: Color,
+	proportionalRadiusPx: () -> Float? = { null },
+) {
+	if (!owned || pivotWorld == null) {
+		return
+	}
+	drawModalTransformHud(
+		axisConstraint = axisConstraint.value,
+		pivotScreen = worldToScreen(pivotWorld.first, pivotWorld.second, camera, size),
+		virtualPointer = gesture.cursorWrap.virtualPointer(gesture.lastPointer),
+		realPointer = gesture.lastPointer,
+		viewport = Size(size.width.toFloat(), size.height.toFloat()),
+		lineColor = lineColor,
+		pointerCursor = LocalUmamoCursors.nsewScroll,
+		proportionalRadiusPx = proportionalRadiusPx(),
+	)
 }
 
 /**

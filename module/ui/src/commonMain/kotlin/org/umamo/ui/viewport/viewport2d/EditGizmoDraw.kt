@@ -22,9 +22,8 @@ import org.umamo.ui.viewport.gizmo.MarqueeSelectController
 import org.umamo.ui.viewport.gizmo.MeshHighlightSets
 import org.umamo.ui.viewport.gizmo.ModalGestureState
 import org.umamo.ui.viewport.gizmo.drawMeshWireframe
-import org.umamo.ui.viewport.gizmo.drawModalTransformHud
+import org.umamo.ui.viewport.gizmo.drawOwnedModalTransformHud
 import org.umamo.ui.viewport.gizmo.drawSelectToolAffordances
-import org.umamo.ui.viewport.gizmo.worldToScreen
 
 /**
  * Draws every session mesh from the DISPLAYED frame's geometry, so the wireframes lag together with the
@@ -115,26 +114,23 @@ internal fun DrawScope.drawEditGizmoChrome(
 	// Modal transform HUD, shared chrome with the Object gizmo (see drawModalTransformHud).  Only the
 	// initiating area draws the modal chrome: the capture exists solely in the overlay whose area the
 	// operator latch names, so its presence IS the ownership gate.
-	val hudPivot = gesture.capture?.transform?.anchor
-	if (hudOperator != null && hudPivot != null) {
-		// The proportional influence ring hugs the world-unit radius the weights use (scaled by the frame
-		// camera).  Vertex Slide and a suppressed latch never take weights, so they show no ring.
-		val proportionalState = proportionalEdit.value
-		val ringRadiusPx =
-			if (proportionalState != null && session.meshOperatorTakesProportional(hudOperator.kind)) {
+	drawOwnedModalTransformHud(
+		owned = hudOperator != null,
+		pivotWorld = gesture.capture?.transform?.anchor,
+		gesture = gesture,
+		axisConstraint = axisConstraint,
+		camera = camera,
+		size = size,
+		lineColor = lineColor,
+		proportionalRadiusPx = {
+			// The proportional influence ring hugs the world-unit radius the weights use (scaled by the frame
+			// camera).  Vertex Slide and a suppressed latch never take weights, so they show no ring.
+			val proportionalState = proportionalEdit.value
+			if (hudOperator != null && proportionalState != null && session.meshOperatorTakesProportional(hudOperator.kind)) {
 				proportionalState.radiusWorld * camera.zoom
 			} else {
 				null
 			}
-		drawModalTransformHud(
-			axisConstraint = axisConstraint.value,
-			pivotScreen = worldToScreen(hudPivot.first, hudPivot.second, camera, size),
-			virtualPointer = gesture.cursorWrap.virtualPointer(gesture.lastPointer),
-			realPointer = gesture.lastPointer,
-			viewport = viewport,
-			lineColor = lineColor,
-			pointerCursor = LocalUmamoCursors.nsewScroll,
-			proportionalRadiusPx = ringRadiusPx,
-		)
-	}
+		},
+	)
 }

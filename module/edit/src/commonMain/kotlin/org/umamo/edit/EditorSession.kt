@@ -261,17 +261,18 @@ class EditorSession(
 	}
 
 	/**
-	 * True while a viewport overlay is driving a non-armed pointer gesture (today: the Object-mode
-	 * un-armed box drag), so the shell can route Escape to a gesture cancel instead of its next Escape
-	 * behavior (clearing the object selection). Transient UI coordination like [previewSelection] - not
-	 * snapshotted, not on the bus; the overlay sets it at press and clears it on release or cancel.
+	 * True while a select drag is held in a viewport or UV area - a box (armed or not) or a circle stroke,
+	 * in either mode - so navigation does not also pan, the shell routes Escape to a gesture cancel instead
+	 * of its next Escape behavior (clearing the object selection), and undo / redo wait for the release.
+	 * Transient UI coordination like [previewSelection] - not snapshotted, not on the bus; the overlay sets
+	 * it at press and clears it on release, cancel, or when it leaves composition.
 	 */
 	val viewportGestureActive: StateFlow<Boolean> = latches.viewportGestureActive
 
 	/**
-	 * Publishes whether a non-armed viewport gesture is in flight (see [viewportGestureActive]).
+	 * Publishes whether a select drag is held (see [viewportGestureActive]).
 	 *
-	 * @param Boolean active True while the overlay's gesture owns the pointer.
+	 * @param Boolean active True while the overlay's select drag owns the pointer.
 	 */
 	fun setViewportGestureActive(active: Boolean) {
 		latches.setViewportGestureActive(active)
@@ -2112,24 +2113,40 @@ class EditorSession(
 		requestBus.requestMeshGestureCancel()
 	}
 
-	/** Steps back one undo level, republishing the model and selection. No-op when nothing to undo. */
+	/**
+	 * Steps back one undo level, republishing the model and selection. No-op when nothing to undo, and while
+	 * a select drag is held ([viewportGestureActive]): the drag lands or is abandoned first (Blender parity),
+	 * rather than landing on top of the restored state and wiping redo.
+	 */
 	fun undo() {
+		if (latches.viewportGestureActive.value) {
+			return
+		}
 		restore(history.undo() ?: return)
 	}
 
-	/** Steps forward one redo level, republishing the model and selection. No-op when nothing to redo. */
+	/**
+	 * Steps forward one redo level, republishing the model and selection. No-op when nothing to redo, and
+	 * while a select drag is held (see [undo]).
+	 */
 	fun redo() {
+		if (latches.viewportGestureActive.value) {
+			return
+		}
 		restore(history.redo() ?: return)
 	}
 
 	/**
 	 * Jumps the history cursor directly to [index], republishing the model and selection at that step. The
 	 * history panel calls this when a row is clicked, so the user can leap across several undo levels at
-	 * once. No-op when [index] is already the live step.
+	 * once. No-op when [index] is already the live step, and while a select drag is held (see [undo]).
 	 *
 	 * @param Int index The target step index within [historyView].
 	 */
 	fun jumpTo(index: Int) {
+		if (latches.viewportGestureActive.value) {
+			return
+		}
 		restore(history.jumpTo(index) ?: return)
 	}
 

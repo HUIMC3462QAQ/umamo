@@ -228,6 +228,31 @@ class TransformStateTest {
 		assertTrue(!session.meshOperatorTakesProportional(MeshOperatorKind.Grab), "a suppressed latch takes none")
 	}
 
+	/** Undo, redo, and a history jump wait while a viewport select drag is held (Blender parity). */
+	@Test
+	fun historyWaitsForASelectDrag() {
+		val session = meshedSession()
+		val target = SelectionTarget.Drawable(DrawableId("d"))
+		session.setSelection(Selection(setOf(target), target))
+		val selected = session.historyView.value
+
+		session.setViewportGestureActive(true)
+		session.undo()
+		assertEquals(selected, session.historyView.value, "undo waits")
+		session.setViewportGestureActive(false)
+		session.undo()
+		val undone = session.historyView.value
+		assertTrue(undone.cursor < selected.cursor, "and runs once the drag is released")
+
+		session.setViewportGestureActive(true)
+		session.redo()
+		session.jumpTo(selected.cursor)
+		assertEquals(undone, session.historyView.value, "redo and a jump wait too")
+		session.setViewportGestureActive(false)
+		session.redo()
+		assertEquals(selected.cursor, session.historyView.value.cursor)
+	}
+
 	/** Operator latches record the initiating area; re-latching moves ownership atomically. */
 	@Test
 	fun operatorLatchesCarryTheInitiatingArea() {
