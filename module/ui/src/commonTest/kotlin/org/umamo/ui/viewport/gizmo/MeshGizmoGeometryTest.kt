@@ -2,6 +2,7 @@ package org.umamo.ui.viewport.gizmo
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
+import org.umamo.edit.ActiveMeshElement
 import org.umamo.edit.MeshElement
 import org.umamo.edit.MeshSelectMode
 import org.umamo.edit.MeshSelection
@@ -102,5 +103,24 @@ class MeshGizmoGeometryTest {
 		assertEquals(2, highlight.activeVertexIndex)
 		assertTrue(MeshElement.Edge(0, 1) in highlight.selectedEdges)
 		assertEquals(setOf(0), highlight.selectedFaceIndices)
+	}
+
+	/** The active vertex's median is the vertex; an active edge's is its midpoint. */
+	@Test
+	fun theActiveElementMedianIsWhatTheElementCovers() {
+		val geometries = listOf(quad("a"))
+		val vertexActive = MeshSelection(listOf(DrawableId("a")), DrawableId("a"), activeElement = ActiveMeshElement(DrawableId("a"), MeshElement.Vertex(3)))
+		assertEquals(20f to 20f, activeElementMedian(vertexActive, geometries))
+		val edgeActive = vertexActive.copy(selectMode = MeshSelectMode.Edge, activeElement = ActiveMeshElement(DrawableId("a"), MeshElement.Edge(0, 1)))
+		assertEquals(10f to 0f, activeElementMedian(edgeActive, geometries))
+	}
+
+	/** Nothing active, or an active element on a mesh that is not shown, has no median. */
+	@Test
+	fun noShownActiveElementHasNoMedian() {
+		val geometries = listOf(quad("a"))
+		assertNull(activeElementMedian(MeshSelection(listOf(DrawableId("a")), DrawableId("a")), geometries))
+		val elsewhere = MeshSelection(listOf(DrawableId("b")), DrawableId("b"), activeElement = ActiveMeshElement(DrawableId("b"), MeshElement.Vertex(0)))
+		assertNull(activeElementMedian(elsewhere, geometries))
 	}
 }

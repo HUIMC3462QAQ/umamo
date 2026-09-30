@@ -5,7 +5,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import org.umamo.edit.EditorSession
-import org.umamo.edit.MeshOperatorKind
 import org.umamo.render.ViewportCamera
 import org.umamo.ui.resources.*
 import org.umamo.ui.viewport.ActiveMeshInfoLabel
@@ -54,8 +53,7 @@ fun ViewportHudOverlay(
 		val showProportional =
 			proportionalState != null &&
 				liveMeshOperator != null &&
-				liveMeshOperator.kind != MeshOperatorKind.VertexSlide &&
-				!session.activeMeshOperatorSuppressesProportional
+				session.meshOperatorTakesProportional(liveMeshOperator.kind)
 		ModalOperatorBadge(
 			operatorKind = liveOperator.kind,
 			axisConstraint = axisConstraint,

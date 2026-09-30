@@ -33,7 +33,6 @@ import org.umamo.edit.MeshOperatorKind
 import org.umamo.edit.MeshSelection
 import org.umamo.edit.MeshSelectionOps
 import org.umamo.edit.MeshTopology
-import org.umamo.edit.MeshTransforms
 import org.umamo.edit.ModalCaptureSource
 import org.umamo.edit.ModalTransformCapture
 import org.umamo.edit.PROPORTIONAL_RADIUS_STEP_FACTOR
@@ -53,6 +52,7 @@ import org.umamo.ui.viewport.gizmo.MarqueeSelectController
 import org.umamo.ui.viewport.gizmo.ModalGestureState
 import org.umamo.ui.viewport.gizmo.ModalTransformTarget
 import org.umamo.ui.viewport.gizmo.TransformGestureFrame
+import org.umamo.ui.viewport.gizmo.activeElementMedian
 import org.umamo.ui.viewport.gizmo.applyOperator
 import org.umamo.ui.viewport.gizmo.buildHighlightSets
 import org.umamo.ui.viewport.gizmo.circleSelection
@@ -419,17 +419,7 @@ internal fun UvEditGizmoOverlay(
 			}
 			// The two per-area anchors the shared builder cannot resolve itself, in display space: the
 			// active element's own covered median and the UV cursor.  Null falls back to the shared median.
-			val activeAnchor =
-				run {
-					val active = selection.activeElement ?: return@run null
-					val activeGeometry = liveGeometries.value.firstOrNull { it.drawableId == active.drawableId } ?: return@run null
-					val activeCovered = MeshTopology.coveredVertexIndices(setOf(active.element), activeGeometry.indices)
-					if (activeCovered.isEmpty()) {
-						null
-					} else {
-						MeshTransforms.medianPivot(activeGeometry.positions, activeCovered)
-					}
-				}
+			val activeAnchor = activeElementMedian(selection, liveGeometries.value)
 			val cursorAnchor =
 				session.uvCursor.value?.let { cursor ->
 					liveFrame.value.displayAt(cursor.u, cursor.v)

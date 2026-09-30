@@ -3,10 +3,13 @@ package org.umamo.ui.viewport.viewport2d
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import org.umamo.edit.MeshElement
+import org.umamo.edit.MeshTopology
 import org.umamo.render.eval.DrawableSpaceMapping
 import org.umamo.runtime.model.DrawableId
 import org.umamo.runtime.model.DrawableMesh
+import org.umamo.runtime.model.PuppetModel
 import org.umamo.ui.transform.DrawableWorldGeometry
+import org.umamo.ui.transform.captureDrawableWorld
 import org.umamo.ui.viewport.gizmo.GizmoMeshGeometry
 
 /**
@@ -52,3 +55,28 @@ internal class EditMeshGeometry(
 	 */
 	fun worldToBase(transformedWorld: FloatArray, indices: Set<Int>): FloatArray = worldGeometry.worldToBase(transformedWorld, indices)
 }
+
+/**
+ * Each session mesh's geometry at the constant neutral pose Edit mode is pinned to: its rest shape
+ * (displayed = base + the neutral keyform blend), its deformer-chain mapping, and its world projection.
+ *
+ * A drawable whose mapping cannot be built (a hidden ancestor) is skipped: it cannot be drawn, so it
+ * cannot be edited - the same three-space primitive the object gizmo and Properties use.  An empty
+ * result is therefore a real state, not a failure, and it is exactly the state the pointer-addressed
+ * commands have to keep working in.
+ *
+ * @param PuppetModel model The model to project.
+ * @param List<DrawableId> drawableIds The session's mesh selection.
+ * @return List The per-mesh geometry, skipping what cannot be projected.
+ */
+internal fun editMeshGeometries(model: PuppetModel, drawableIds: List<DrawableId>): List<EditMeshGeometry> =
+	drawableIds.mapNotNull { drawableId ->
+		val mesh = model.drawables.firstOrNull { it.id == drawableId }?.mesh ?: return@mapNotNull null
+		// Edit mode is pinned to the neutral pose, so the three-space geometry is captured at emptyMap().
+		val worldGeometry = captureDrawableWorld(model, emptyMap(), drawableId) ?: return@mapNotNull null
+		EditMeshGeometry(
+			worldGeometry = worldGeometry,
+			mesh = mesh,
+			edges = MeshTopology.uniqueEdges(mesh.indices),
+		)
+	}

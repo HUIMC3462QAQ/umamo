@@ -212,6 +212,22 @@ class TransformStateTest {
 		assertTrue(!session.activeMeshOperatorSuppressesProportional, "a plain latch is never suppressed")
 	}
 
+	/** Every mesh operator takes proportional weights but Vertex Slide and a suppressed latch. */
+	@Test
+	fun meshOperatorsTakeProportionalWeightsButASlideOrASuppressedLatch() {
+		val session = meshedSession()
+		session.setMode(EditorMode.Edit)
+		session.setMeshSelection(MeshSelectionOps.add(session.meshSelection.value, DrawableId("d"), MeshElement.Vertex(0)))
+
+		session.beginMeshOperator(MeshOperatorKind.Grab, "area-test")
+		assertTrue(session.meshOperatorTakesProportional(MeshOperatorKind.Grab), "a plain Grab takes weights")
+		assertTrue(session.meshOperatorTakesProportional(MeshOperatorKind.Rotate), "and so does every other transform")
+		assertTrue(!session.meshOperatorTakesProportional(MeshOperatorKind.VertexSlide), "a slide never does")
+
+		session.beginMeshOperator(MeshOperatorKind.Grab, "area-test", suppressProportional = true)
+		assertTrue(!session.meshOperatorTakesProportional(MeshOperatorKind.Grab), "a suppressed latch takes none")
+	}
+
 	/** Operator latches record the initiating area; re-latching moves ownership atomically. */
 	@Test
 	fun operatorLatchesCarryTheInitiatingArea() {

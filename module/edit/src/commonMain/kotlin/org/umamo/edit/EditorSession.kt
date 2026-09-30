@@ -1264,6 +1264,20 @@ class EditorSession(
 		get() = latches.activeMeshOperatorSuppressesProportional
 
 	/**
+	 * Whether a mesh operator of [kind], latched as the active one, weights the unselected vertices near
+	 * the selection by proportional editing: every operator but Vertex Slide (positions-only, one vertex
+	 * along one edge), unless its latch suppressed proportional editing (the duplicate / rip auto-grab).
+	 * The one rule every proportional gate asks - the capture, the wheel, a mid-gesture change, the strip's
+	 * rows, the ring, and the status badge.  It takes the kind rather than reading the latch because each
+	 * gate already holds the kind it is deciding for.
+	 *
+	 * @param MeshOperatorKind kind The latched operator's kind.
+	 * @return Boolean True when the gesture takes proportional weights.
+	 */
+	fun meshOperatorTakesProportional(kind: MeshOperatorKind): Boolean =
+		kind != MeshOperatorKind.VertexSlide && !latches.activeMeshOperatorSuppressesProportional
+
+	/**
 	 * Latches a modal mesh operator so the gizmo overlay begins the gesture. A no-op unless Edit mode is
 	 * active with a drawable and a non-empty selection — so the bound G / S / R commands need no context
 	 * guard of their own and the keymap stays mode-agnostic. For an edge or face selection the gesture

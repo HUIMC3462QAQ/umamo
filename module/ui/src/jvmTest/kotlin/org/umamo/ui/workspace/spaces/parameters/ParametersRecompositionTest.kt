@@ -27,10 +27,13 @@ import kotlin.test.assertTrue
  *
  * @property String packagePrefix The package whose composables are counted, with its trailing dot; the
  *   panel's unless a case says otherwise.
+ * @property String fixtureFunction The function that mounts the rig from that package, whose own body and
+ *   lambdas are not counted; the panel harness's unless a case says otherwise.
  */
 @OptIn(InternalComposeTracingApi::class)
 internal class ComposableRunCounter(
 	private val packagePrefix: String = PANEL_PACKAGE_PREFIX,
+	private val fixtureFunction: String = FIXTURE_FUNCTION,
 ) : CompositionTracer {
 	private val runsByName = HashMap<String, Int>()
 
@@ -86,7 +89,7 @@ internal class ComposableRunCounter(
 		}
 		val name = qualifiedName.removePrefix(packagePrefix)
 		// The fixture mounts the panel from this same package; its own lambdas are not the panel's.
-		if (name.startsWith(FIXTURE_FUNCTION)) {
+		if (name.startsWith(fixtureFunction)) {
 			return
 		}
 		runsByName[name] = (runsByName[name] ?: 0) + 1
