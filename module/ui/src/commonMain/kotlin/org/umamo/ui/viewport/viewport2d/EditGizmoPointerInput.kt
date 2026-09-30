@@ -8,13 +8,15 @@ import org.umamo.edit.EditorSession
 import org.umamo.edit.MeshSelection
 import org.umamo.render.ViewportCamera
 import org.umamo.ui.viewport.gizmo.MarqueeSelectController
-import org.umamo.ui.viewport.gizmo.handleIdleMeshSelectionEvent
+import org.umamo.ui.viewport.gizmo.MeshPickController
 
 /**
  * The Edit overlay's pointer loop.  Every event records the pointer, then goes to exactly one of three
  * branches: the modal transform while an operator is latched here, the circle brush while it is armed
- * here, and otherwise the idle element selection.  While another area owns a gesture (or a UV operator
- * runs, which never belongs to a viewport), or Zoom Region is armed here, the loop takes nothing.
+ * here, and otherwise the element pick and the box select, armed or not.  While another area owns a
+ * gesture (or a UV operator runs, which never belongs to a viewport), or Zoom Region is armed here, the
+ * loop takes nothing.  Whatever takes the area over mid-drag - another area, a transform, the circle
+ * tool, Zoom Region - abandons an in-flight box first.
  *
  * It runs for the life of its pointerInput, keyed on the area, and keeps the arguments it started with:
  * each is fixed for the area's life or a State holder read per event.
@@ -23,7 +25,7 @@ import org.umamo.ui.viewport.gizmo.handleIdleMeshSelectionEvent
  * @param EditorSession session The session owning the latches and the selection.
  * @param EditModalTransform modalTransform The area's modal transform (its gesture state and commit side).
  * @param MarqueeSelectController<MeshSelection> marquee The area's box / circle machinery.
- * @param State<List<EditMeshGeometry>> liveGeometryState The session meshes' live geometry.
+ * @param MeshPickController meshPick The area's element pick and box select.
  * @param State<ViewportCamera> liveCamera The area camera.
  * @param State<IntSize> liveSize The area size in pixels.
  */
@@ -32,7 +34,7 @@ internal suspend fun PointerInputScope.editGizmoPointerLoop(
 	session: EditorSession,
 	modalTransform: EditModalTransform,
 	marquee: MarqueeSelectController<MeshSelection>,
-	liveGeometryState: State<List<EditMeshGeometry>>,
+	meshPick: MeshPickController,
 	liveCamera: State<ViewportCamera>,
 	liveSize: State<IntSize>,
 ) {
@@ -52,16 +54,23 @@ internal suspend fun PointerInputScope.editGizmoPointerLoop(
 				(latchedTool != null && latchedTool.areaId != areaId) ||
 				session.activeUvOperator.value != null
 			) {
+				meshPick.cancel()
 				continue
 			}
 			val operator = latchedOperator
 			val selectTool = latchedTool
 			val activeCamera = liveCamera.value
 			val size = liveSize.value
-			// Zoom Region armed for this area: the top-level region overlay owns the drag. This gizmo's
-			// idle branch would otherwise also start a box (it does not check isConsumed), so yield.
+			// Zoom Region armed for this area: the region overlay above owns the next drag.  One armed
+			// mid-drag leaves this drag's events here (the hit path is fixed at the press), so the box
+			// in flight is abandoned rather than left to follow the pointer after Zoom Region disarms.
 			if (session.zoomRegionArmedArea.value == areaId) {
+				meshPick.cancel()
 				continue
+			}
+			// A transform or the circle tool armed mid-drag supersedes the box.
+			if (operator != null || selectTool is ActiveSelectTool.Circle) {
+				meshPick.cancel()
 			}
 			if (operator != null) {
 				// MODAL: the shared controller drives the transform over the captured shape and
@@ -74,20 +83,11 @@ internal suspend fun PointerInputScope.editGizmoPointerLoop(
 				// also pan / zoom); see MarqueeSelectController.handleCircleEvent.
 				marquee.handleCircleEvent(event, change, selectTool.radiusPx, activeCamera, size)
 			} else {
-				// IDLE: element selection, shared with the UV editor (Shift+RightClick places the
-				// viewport's 2D cursor here).  Only primary-driven events are consumed, so middle-drag
-				// pan and wheel zoom fall through; armed Box-select boxes on any press and disarms.
-				handleIdleMeshSelectionEvent(
-					event = event,
-					change = change,
-					session = session,
-					geometries = liveGeometryState.value.map { it.gizmo },
-					marquee = marquee,
-					boxArmed = selectTool is ActiveSelectTool.BoxArmed,
-					camera = activeCamera,
-					size = size,
-					placeCursor = session::setCursor2d,
-				)
+				// ELEMENT PICK AND BOX SELECT, armed or not: the flow shared with the UV editor and
+				// Object mode (Shift+RightClick places the viewport's 2D cursor here).  Only
+				// primary-driven events and right-clicks are consumed, so middle-drag pan and wheel
+				// zoom fall through.
+				meshPick.handleEvent(event, change, selectTool is ActiveSelectTool.BoxArmed, activeCamera, size)
 			}
 		}
 	}

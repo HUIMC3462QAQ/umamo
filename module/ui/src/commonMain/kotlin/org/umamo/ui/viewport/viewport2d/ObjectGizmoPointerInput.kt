@@ -1,7 +1,6 @@
 package org.umamo.ui.viewport.viewport2d
 
 import androidx.compose.runtime.State
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.unit.IntSize
 import org.umamo.edit.ActiveSelectTool
@@ -13,13 +12,11 @@ import org.umamo.ui.viewport.gizmo.ObjectPickController
 
 /**
  * The Object overlay's pointer loop.  Every event records the pointer, then goes to exactly one branch: the
- * modal transform while an operator is latched here, the circle brush or the armed box while that tool is
- * armed here, and otherwise the idle click pick and box.  While another area owns a gesture (or a UV
- * operator runs, which never belongs to a viewport) the loop takes nothing and drops its own idle box.
- *
- * There is no Zoom Region yield (the Edit loop has one): an armed Zoom Region overlay sits above this one,
- * and Compose delivers a press to the top-most sibling that is hit, so a drag started while it is armed
- * never reaches this loop.
+ * modal transform while an operator is latched here, the circle brush while it is armed here, and
+ * otherwise the click pick and the box select, armed or not.  While another area owns a gesture (or a UV
+ * operator runs, which never belongs to a viewport), or Zoom Region is armed here, the loop takes nothing.
+ * Whatever takes the area over mid-drag - another area, a transform, the circle tool, Zoom Region -
+ * abandons an in-flight box first.
  *
  * It runs for the life of its pointerInput, keyed on the area, and keeps the arguments it started with:
  * each is fixed for the area's life or a State holder read per event.
@@ -64,21 +61,17 @@ internal suspend fun PointerInputScope.objectGizmoPointerLoop(
 			val tool = latchedTool
 			val activeCamera = liveCamera.value
 			val size = liveSize.value
-			// A tool or operator armed mid-drag (via its keymap command) supersedes the un-armed box:
-			// drop the rubber-band so its release handler cannot fire into the armed gesture's state
-			// (the controller's cancel no-ops when no box is in flight).
-			if (operator != null || tool != null) {
-				objectPick.cancel()
-			}
-			// Compose ends a gesture whose pointer input is cancelled - this overlay leaving composition,
-			// the pointer taken away - with a synthetic release that arrives already consumed (a real
-			// release reaching this loop never is: nothing beneath the overlay takes the pointer first).
-			// A cancelled select gesture is abandoned, never landed: the box applies nothing and the
-			// stroke goes uncommitted.  A modal transform has its own teardown, so it is left to that.
-			if (operator == null && event.type == PointerEventType.Release && change.isConsumed) {
-				marquee.discard()
+			// Zoom Region armed for this area: the region overlay above owns the next drag.  One armed
+			// mid-drag leaves this drag's events here (the hit path is fixed at the press), so the box
+			// in flight is abandoned rather than landed.
+			if (session.zoomRegionArmedArea.value == areaId) {
 				objectPick.cancel()
 				continue
+			}
+			// A transform or the circle tool armed mid-drag supersedes the box (an armed box that changes
+			// state under the drag is handled by the box flow itself).
+			if (operator != null || tool is ActiveSelectTool.Circle) {
+				objectPick.cancel()
 			}
 			if (operator != null) {
 				// MODAL transform: the shared controller drives every captured drawable over the
@@ -90,18 +83,13 @@ internal suspend fun PointerInputScope.objectGizmoPointerLoop(
 				// stroke through the GPU tint, and consumes every event; see
 				// MarqueeSelectController.handleCircleEvent.
 				marquee.handleCircleEvent(event, change, tool.radiusPx, activeCamera, size)
-			} else if (tool is ActiveSelectTool.BoxArmed) {
-				// BOX SELECT (armed): a drag rubber-bands; on release every drawable whose centroid is enclosed is
-				// selected (Shift adds).  A right-click or a sub-threshold click just disarms.  One-shot.
-				objectPick.handleArmedBoxEvent(event, change, activeCamera, size)
 			} else {
-				// IDLE (nothing armed): the primary button owns picking here, through the shared
-				// controller - a press starts a provisional rubber-band, a drag past the threshold
-				// box-selects on release (Shift adds), a sub-threshold release is the click pick
-				// (replace / toggle / Alt overlap), Shift+RightClick places the 2D cursor, and a
-				// right-click or Escape abandons the drag.  Only primary-driven events are
+				// CLICK PICK AND BOX SELECT, armed (Blender's B) or not: the flow shared with the Edit
+				// overlay and the UV editor - a drag boxes (Shift adds), a sub-threshold release is the
+				// click pick (replace / toggle / Alt overlap) or, armed, just disarms, and
+				// Shift+RightClick places the 2D cursor.  Only primary-driven events and right-clicks are
 				// consumed, so middle-drag pan and wheel zoom fall through to the navigation layer.
-				objectPick.handleIdleEvent(event, change, activeCamera, size)
+				objectPick.handleEvent(event, change, tool is ActiveSelectTool.BoxArmed, activeCamera, size)
 			}
 		}
 	}

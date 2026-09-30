@@ -49,6 +49,8 @@ internal enum class BoxRelease {
  *   refreshes its selection anchors here); defaults to nothing.
  * @param Function previewStroke Publishes the live stroke after every stamp and null when the stroke
  *   ends (the Object overlay's GPU tint); defaults to nothing.
+ * @param Function setGestureActive Raises the session's select-drag flag as a stroke begins and lowers it
+ *   as the stroke ends (see BoxSelectFlow for what the flag gates); defaults to nothing.
  */
 internal class MarqueeSelectController<StrokeSelection>(
 	private val seedStroke: () -> StrokeSelection,
@@ -59,6 +61,7 @@ internal class MarqueeSelectController<StrokeSelection>(
 	private val clearTool: () -> Unit,
 	private val onStrokeBegin: () -> Unit = {},
 	private val previewStroke: (StrokeSelection?) -> Unit = {},
+	private val setGestureActive: (Boolean) -> Unit = {},
 ) {
 	/**
 	 * The live Circle-select stroke: a working selection seeded at press, painted on move, committed
@@ -82,7 +85,9 @@ internal class MarqueeSelectController<StrokeSelection>(
 	 * Handles one pointer event of the live Circle-select tool: a primary drag paints (adds), a middle
 	 * or Shift+primary drag erases, the stroke accumulates into the working selection committed once on
 	 * release, the wheel resizes the brush, and a right-click leaves the tool keeping what was painted
-	 * (Blender parity).  Every event is consumed so the tool owns the pointer.
+	 * (Blender parity).  A cancelled release - Compose's synthetic, already-consumed release when the
+	 * pointer input is torn down - drops the stroke uncommitted.  Every event is consumed so the tool owns
+	 * the pointer.
 	 *
 	 * @param PointerEvent event The full pointer event (buttons and modifiers).
 	 * @param PointerInputChange change The event's first change (position and consumption).
@@ -113,7 +118,12 @@ internal class MarqueeSelectController<StrokeSelection>(
 				}
 			}
 
-			PointerEventType.Release -> endStroke()
+			PointerEventType.Release ->
+				if (change.isConsumed) {
+					discard()
+				} else {
+					endStroke()
+				}
 
 			PointerEventType.Scroll -> {
 				val steps = change.scrollDelta.y
@@ -201,9 +211,13 @@ internal class MarqueeSelectController<StrokeSelection>(
 	private fun beginStamp(erasing: Boolean, center: Offset, radiusPx: Float, camera: ViewportCamera, size: IntSize) {
 		onStrokeBegin()
 		circleErasing = erasing
-		val painted = stampStroke(circleStroke ?: seedStroke(), erasing, center, radiusPx, camera, size)
+		val live = circleStroke
+		val painted = stampStroke(live ?: seedStroke(), erasing, center, radiusPx, camera, size)
 		circleStroke = painted
 		previewStroke(painted)
+		if (live == null) {
+			setGestureActive(true)
+		}
 	}
 
 	/**
@@ -219,20 +233,24 @@ internal class MarqueeSelectController<StrokeSelection>(
 		boxCurrent = null
 		if (hadStroke) {
 			previewStroke(null)
+			setGestureActive(false)
 		}
 	}
 
 	/**
-	 * Ends the in-flight stroke, committing its paint (one undo step) and clearing the preview; a
-	 * no-op with no stroke live beyond resetting the erase flag and preview.
+	 * Ends the in-flight stroke, committing its paint (one undo step), clearing its preview, and lowering
+	 * the gesture flag.  With no stroke live it only resets the erase flag: the preview and the flag may
+	 * belong to another area's stroke, so they are left alone.
 	 */
 	private fun endStroke() {
 		val stroke = circleStroke
-		if (stroke != null) {
-			commitStroke(stroke)
-			circleStroke = null
-		}
 		circleErasing = false
+		if (stroke == null) {
+			return
+		}
+		commitStroke(stroke)
+		circleStroke = null
 		previewStroke(null)
+		setGestureActive(false)
 	}
 }

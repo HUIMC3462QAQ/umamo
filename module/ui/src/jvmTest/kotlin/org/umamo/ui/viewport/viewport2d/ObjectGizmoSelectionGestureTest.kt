@@ -182,7 +182,7 @@ class ObjectGizmoSelectionGestureTest {
 			assertEquals(emptySet(), selectedIn(fixture.session))
 		}
 
-	/** The armed Box tool (B) boxes and then disarms, taking one snapshot and never raising the gesture flag. */
+	/** The armed Box tool (B) boxes and then disarms, taking one snapshot. */
 	@Test
 	fun theArmedBoxSelectsThenDisarms() =
 		runComposeUiTest {
@@ -193,11 +193,12 @@ class ObjectGizmoSelectionGestureTest {
 
 			pressIn(LEFT_AREA, aroundQuad.first)
 			moveIn(LEFT_AREA, listOf(aroundQuad.second))
-			assertFalse(fixture.session.viewportGestureActive.value, "an armed box does not raise the flag")
+			assertTrue(fixture.session.viewportGestureActive.value, "an armed box raises the flag like any select drag")
 			releaseIn(LEFT_AREA)
 
 			assertEquals(setOf(RIG_QUAD), selectedIn(fixture.session))
 			assertNull(fixture.session.activeSelectTool.value, "one-shot")
+			assertFalse(fixture.session.viewportGestureActive.value)
 			assertEquals(1, fixture.service.centroidSnapshots)
 		}
 
@@ -484,5 +485,64 @@ class ObjectGizmoSelectionGestureTest {
 			assertEquals(setOf(RIG_QUAD), selectedIn(session), "the box around the other drawable did not land")
 			assertFalse(session.viewportGestureActive.value)
 			releaseIn(LEFT_AREA)
+		}
+
+	/** Arming Zoom Region mid-box abandons the box: nothing lands. */
+	@Test
+	fun armingZoomRegionMidBoxAbandonsIt() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoObjectSession(emptyList()))
+			placeCentroids(fixture)
+			pressIn(LEFT_AREA, aroundQuad.first)
+			moveIn(LEFT_AREA, listOf(aroundQuad.second))
+
+			fixture.session.armZoomRegion(LEFT_AREA)
+			waitForIdle()
+			moveIn(LEFT_AREA, listOf(Offset(221f, 171f)))
+			releaseIn(LEFT_AREA)
+
+			assertEquals(emptySet(), selectedIn(fixture.session))
+			assertFalse(fixture.session.viewportGestureActive.value)
+		}
+
+	/** A second area opening mid-stroke leaves the stroking area's tint up. */
+	@Test
+	fun aSplitOpeningMidStrokeKeepsTheTint() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoObjectSession(emptyList()))
+			val session = fixture.session
+			placeCentroids(fixture)
+			fixture.mountedAreas.value = setOf(LEFT_AREA)
+			waitForIdle()
+			session.beginCircleSelect(LEFT_AREA)
+			waitForIdle()
+			pressIn(LEFT_AREA, quadCentroid)
+
+			fixture.mountedAreas.value = setOf(LEFT_AREA, RIGHT_AREA)
+			waitForIdle()
+
+			assertEquals(setOf(RIG_QUAD), session.previewSelection.value)
+			releaseIn(LEFT_AREA)
+			assertEquals(setOf(RIG_QUAD), selectedIn(session))
+		}
+
+	/** Undo mid-box is ignored until release; the box then lands as its own step. */
+	@Test
+	fun undoMidBoxWaitsForTheRelease() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoObjectSession())
+			val session = fixture.session
+			placeCentroids(fixture)
+			val historyBefore = session.historyView.value
+
+			pressIn(LEFT_AREA, aroundOther.first)
+			moveIn(LEFT_AREA, listOf(aroundOther.second))
+			session.undo()
+			waitForIdle()
+			assertEquals(historyBefore, session.historyView.value, "the undo was ignored")
+			releaseIn(LEFT_AREA)
+
+			assertEquals(setOf(RIG_OTHER), selectedIn(session))
+			assertEquals(historyBefore.steps.size + 1, session.historyView.value.steps.size)
 		}
 }

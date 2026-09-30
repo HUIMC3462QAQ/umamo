@@ -167,6 +167,9 @@ fun ViewportEditGizmoOverlay(
 	// The marquee (box + circle) machinery over mesh elements, one per area (see editMarquee).
 	val marquee = remember(areaId) { editMarquee(session, liveGeometryState) }
 
+	// The element pick and box select, armed or not, one per area (see MeshPickController).
+	val meshPick = remember(areaId) { editMeshPick(session, marquee, liveGeometryState) }
+
 	// What the draw pass reflects: the live stroke while one is in flight, else the committed selection - so
 	// painted elements light up immediately during a Circle stroke.
 	val effectiveSelection = marquee.circleStroke ?: meshSelection
@@ -184,14 +187,18 @@ fun ViewportEditGizmoOverlay(
 	val modalTransform = remember(areaId) { EditModalTransform(areaId, session, service::setModel) }
 	val gesture = modalTransform.gesture
 
-	// The unmount-mid-gesture guard: leaving Edit mode, closing the area, or every mesh in the edit ceasing to project disposes this part of the overlay mid-gesture, which cancels
-	// the latch effect below WITHOUT running its teardown - the renderer would be left on the uncommitted
-	// preview, and the latch on an overlay that no longer exists.
+	// The unmount-mid-gesture guard: leaving Edit mode, closing the area, or every mesh in the edit ceasing
+	// to project disposes this part of the overlay mid-gesture, which cancels the latch effect below WITHOUT
+	// running its teardown - the renderer would be left on the uncommitted preview, and the latch on an
+	// overlay that no longer exists.  A select gesture in flight is dropped the same way, nothing of it
+	// landing, and the gesture flag it raised comes down.
 	DisposableEffect(modalTransform) {
 		onDispose {
 			if (modalTransform.abandon()) {
 				service.setModel(session.model.value)
 			}
+			marquee.discard()
+			meshPick.cancel()
 		}
 	}
 
@@ -213,6 +220,7 @@ fun ViewportEditGizmoOverlay(
 	val ownedSelectTool = activeSelectTool?.takeIf { it.areaId == areaId }
 	LaunchedEffect(selectToolKind(ownedSelectTool)) {
 		marquee.cancel()
+		meshPick.cancel()
 	}
 
 	// The race-free cancel path: an already-suspended collector that resumes before the mouse release, so the
@@ -222,6 +230,7 @@ fun ViewportEditGizmoOverlay(
 	LaunchedEffect(session) {
 		session.meshGestureCancelRequests.collect {
 			marquee.cancel()
+			meshPick.cancel()
 		}
 	}
 
@@ -292,7 +301,7 @@ fun ViewportEditGizmoOverlay(
 					.fillMaxSize()
 					.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
 					.pointerInput(areaId) {
-						editGizmoPointerLoop(areaId, session, modalTransform, marquee, liveGeometryState, liveCamera, liveSize)
+						editGizmoPointerLoop(areaId, session, modalTransform, marquee, meshPick, liveCamera, liveSize)
 					},
 		) {
 			// The live Circle stroke drives the highlighted domain so painted elements light up mid-stroke.

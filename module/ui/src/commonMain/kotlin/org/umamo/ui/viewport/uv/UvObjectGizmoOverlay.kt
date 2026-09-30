@@ -406,6 +406,7 @@ internal fun UvObjectGizmoOverlay(
 	// The controller's boxing latch and the gesture's end() make both no-ops otherwise.
 	DisposableEffect(areaId) {
 		onDispose {
+			marquee.discard()
 			objectPick.cancel()
 			if (gesture.end()) {
 				placementDragStatusState.value = null
@@ -456,7 +457,8 @@ internal fun UvObjectGizmoOverlay(
 								objectPick.cancel()
 								gesture.lastPointer = gesture.modalController.handleEvent(event, change, modalTarget, activeCamera, size, gesture.areaScreenOrigin)
 							} else {
-								objectPick.handleIdleEvent(event, change, activeCamera, size)
+								// Box select can never arm over a UV area in Object mode, so the flow runs un-armed.
+								objectPick.handleEvent(event, change, false, activeCamera, size)
 							}
 						}
 					}
