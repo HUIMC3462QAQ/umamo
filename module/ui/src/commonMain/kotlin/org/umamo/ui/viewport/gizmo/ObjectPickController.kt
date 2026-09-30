@@ -20,6 +20,7 @@ import org.umamo.edit.selectableOf
 import org.umamo.render.ViewportCamera
 import org.umamo.render.pick.PickCandidate
 import org.umamo.runtime.model.DrawableId
+import org.umamo.runtime.model.PuppetModel
 
 /**
  * Resolves a primary click against the object selection: a hit with a membership modifier toggles
@@ -69,6 +70,72 @@ internal fun resolveAltOverlapPick(candidates: List<PickCandidate>): AltPickReso
 	}
 
 /**
+ * Resolves a finished box drag against the object selection: additive (Shift) keeps the current targets
+ * and adds the enclosed drawables, the last one becoming active (or the current active surviving when the
+ * box enclosed nothing); plain replaces the selection with the enclosed set.  One rule for every surface
+ * that boxes whole drawables - the viewport by centroid, the UV editor by any island vertex.
+ *
+ * @param Selection current The committed object selection.
+ * @param List<SelectionTarget.Drawable> enclosed The enclosed, selectable drawables in enclosure order.
+ * @param Boolean additive True when Shift extends the selection.
+ * @return Selection The selection the box produces.
+ */
+internal fun resolveObjectBoxSelection(
+	current: Selection,
+	enclosed: List<SelectionTarget.Drawable>,
+	additive: Boolean,
+): Selection =
+	if (additive) {
+		Selection(current.targets + enclosed, enclosed.lastOrNull() ?: current.active)
+	} else {
+		Selection(enclosed.toSet(), enclosed.lastOrNull())
+	}
+
+/**
+ * The selectable drawables among [ids], as selection targets in the same order: a region selection
+ * passes over what cannot be selected, the way a click passes through it.
+ *
+ * @param Iterable<DrawableId> ids The drawables a region enclosed.
+ * @param PuppetModel model The model the selectable flags live in.
+ * @return List<SelectionTarget.Drawable> The selectable ones, in the order given.
+ */
+internal fun selectableDrawableTargets(ids: Iterable<DrawableId>, model: PuppetModel): List<SelectionTarget.Drawable> =
+	ids.map { drawableId -> SelectionTarget.Drawable(drawableId) }.filter { target -> model.selectableOf(target) }
+
+/**
+ * The marquee (box + circle) machinery over whole drawables, for every surface that selects objects: the
+ * stroke is seeded from and committed to the session's object selection, the wheel resizes the session's
+ * brush, and a right-click inside the circle tool leaves it.  What differs per surface passes in: how a
+ * stamp paints, how a finished box applies, and the viewport's snapshot and GPU tint.  The stamp has no
+ * default on purpose - an identity default would quietly turn a new surface's circle tool into a no-op -
+ * and the preview never defaults to the session's tint, which only the viewport publishes.
+ *
+ * @param EditorSession session The session owning the object selection and the armed tool.
+ * @param Function stampStroke Applies one brush stamp (working, erasing, center, radiusPx, camera, size).
+ * @param Function applyBox Applies a finished box drag (start, end, additive, camera, size).
+ * @param Function onStrokeBegin Runs before the first stamp of a stroke; defaults to nothing.
+ * @param Function previewStroke Publishes the live stroke, and null when it ends; defaults to nothing.
+ * @return MarqueeSelectController<Selection> The marquee.
+ */
+internal fun objectMarquee(
+	session: EditorSession,
+	stampStroke: (Selection, Boolean, Offset, Float, ViewportCamera, IntSize) -> Selection,
+	applyBox: (Offset, Offset, Boolean, ViewportCamera, IntSize) -> Unit,
+	onStrokeBegin: () -> Unit = {},
+	previewStroke: (Selection?) -> Unit = {},
+): MarqueeSelectController<Selection> =
+	MarqueeSelectController(
+		seedStroke = { session.selection.value },
+		stampStroke = stampStroke,
+		commitStroke = { stroke -> session.setSelection(stroke) },
+		applyBox = applyBox,
+		setCircleRadius = { radiusPx -> session.setCircleRadius(radiusPx) },
+		clearTool = { session.clearSelectTool() },
+		onStrokeBegin = onStrokeBegin,
+		previewStroke = previewStroke,
+	)
+
+/**
  * The idle object-pick pointer flow shared by the drawable-selecting surfaces: a primary press starts
  * a provisional rubber-band, a drag past the click threshold box-selects on release (Shift adds), a
  * sub-threshold release is the click pick (plain replaces, Shift / Ctrl toggles membership, an Alt
@@ -89,8 +156,8 @@ internal fun resolveAltOverlapPick(candidates: List<PickCandidate>): AltPickReso
  * @param Function pickStack The full candidate stack at an area-local point, front-to-back, unfiltered.
  * @param Function onOverlapRequest Opens the overlap picker for an Alt click with 2+ candidates.
  * @param Function placeCursor Places the space's cursor at a Shift+RightClick, given the unprojected point.
- * @param Function onBoxBegin Runs at the press that starts the rubber-band (the viewport snapshots its
- *   centroid cache here, the [MarqueeSelectController] onStrokeBegin precedent); defaults to nothing.
+ * @param Function onBoxBegin Runs at the press that starts the rubber-band (the viewport refreshes its
+ *   selection anchors here, the [MarqueeSelectController] onStrokeBegin precedent); defaults to nothing.
  */
 internal class ObjectPickController(
 	private val session: EditorSession,
@@ -160,6 +227,52 @@ internal class ObjectPickController(
 						session.setViewportGestureActive(false)
 						change.consume()
 					}
+				}
+			}
+
+			else -> {}
+		}
+	}
+
+	/**
+	 * Handles one pointer event while Blender's B armed-box tool owns the area: a primary press starts the
+	 * rubber-band (after [onBoxBegin]), a drag extends it, and the release applies it (Shift adds) and
+	 * disarms - a sub-threshold click disarms too and never click-picks.  Any right-click disarms, Shift
+	 * included, so it never places the cursor while armed.
+	 *
+	 * Unlike the idle flow it raises no gesture-active flag and keeps no boxing mark: the armed tool's own
+	 * latch already names this area to the navigation gate, and a boxing mark would let the idle-box cancel
+	 * the caller runs on every armed event drop the armed rubber-band.  A right-click leaves an in-flight
+	 * band to the tool-change cancel, which fires as the tool clears.
+	 *
+	 * @param PointerEvent event The full pointer event (buttons and modifiers).
+	 * @param PointerInputChange change The event's first change (position and consumption).
+	 * @param ViewportCamera camera The area camera.
+	 * @param IntSize size The area size in pixels.
+	 */
+	fun handleArmedBoxEvent(event: PointerEvent, change: PointerInputChange, camera: ViewportCamera, size: IntSize) {
+		when (event.type) {
+			PointerEventType.Press ->
+				if (event.buttons.isSecondaryPressed) {
+					session.clearSelectTool()
+					change.consume()
+				} else if (event.buttons.isPrimaryPressed) {
+					onBoxBegin()
+					marquee.beginBox(change.position)
+					change.consume()
+				}
+
+			PointerEventType.Move ->
+				if (marquee.dragBox(change.position)) {
+					change.consume()
+				}
+
+			PointerEventType.Release -> {
+				val boxRelease = marquee.releaseBox(change.position, event.keyboardModifiers.isShiftPressed, camera, size)
+				if (boxRelease != BoxRelease.None) {
+					// Armed Box-select is one-shot: disarm after the drag (or a bare click).
+					session.clearSelectTool()
+					change.consume()
 				}
 			}
 

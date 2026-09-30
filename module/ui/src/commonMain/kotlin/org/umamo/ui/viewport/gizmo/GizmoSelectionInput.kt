@@ -39,7 +39,7 @@ internal fun selectToolKind(ownedSelectTool: ActiveSelectTool?): Int =
  * The idle mesh-element selection pointer branch shared by the Edit overlay and the UV editor: a primary
  * click picks the element under the cursor per the select mode (Shift / Ctrl toggle, plain replaces), an
  * empty primary drag rubber-bands a box, a sub-threshold click on empty canvas clears, and Shift+RightClick
- * places the space's cursor.  Only primary-driven events are consumed, so middle-drag pan and wheel zoom
+ * places the space's cursor - except while Box select is armed, where any right-click disarms it instead.  Only primary-driven events are consumed, so middle-drag pan and wheel zoom
  * fall through to the navigation layer beneath.
  *
  * The one behavioral seam is [placeCursor]: the 2D viewport places its world-space cursor, the UV editor
@@ -70,14 +70,16 @@ internal fun handleIdleMeshSelectionEvent(
 ) {
 	when (event.type) {
 		PointerEventType.Press ->
-			if (event.buttons.isSecondaryPressed && event.keyboardModifiers.isShiftPressed) {
+			if (boxArmed && event.buttons.isSecondaryPressed) {
+				// Any right-click disarms Box select, Shift included, so it never places the cursor while
+				// armed - the Object overlay's armed box behaves the same.
+				session.clearSelectTool()
+				change.consume()
+			} else if (event.buttons.isSecondaryPressed && event.keyboardModifiers.isShiftPressed) {
 				// Shift+RightClick places the space's cursor at the pointer (Blender's gesture); the Cursor
 				// pivot mode and the snap / mirror commands anchor on it.
 				val (worldX, worldZ) = screenToWorld(change.position.x, change.position.y, camera, size)
 				placeCursor(worldX, worldZ)
-				change.consume()
-			} else if (boxArmed && event.buttons.isSecondaryPressed) {
-				session.clearSelectTool()
 				change.consume()
 			} else if (event.buttons.isPrimaryPressed) {
 				val current = session.meshSelection.value

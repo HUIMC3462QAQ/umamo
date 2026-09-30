@@ -117,7 +117,8 @@ internal fun gizmoEditSession(editing: List<DrawableId> = listOf(RIG_QUAD), elem
 }
 
 /**
- * An Object-mode session over the rig with the given drawables selected, the first active.
+ * An Object-mode session over the rig with the given drawables selected, the first active; none for an
+ * empty selection.
  *
  * @param List<DrawableId> selected The drawables to select.
  * @return EditorSession The session.
@@ -125,7 +126,7 @@ internal fun gizmoEditSession(editing: List<DrawableId> = listOf(RIG_QUAD), elem
 internal fun gizmoObjectSession(selected: List<DrawableId> = listOf(RIG_QUAD)): EditorSession {
 	val session = EditorSession(gizmoRigModel())
 	val targets = selected.map { drawableId -> SelectionTarget.Drawable(drawableId) }
-	session.setSelection(Selection(targets.toSet(), targets.first()))
+	session.setSelection(Selection(targets.toSet(), targets.firstOrNull()))
 	return session
 }
 

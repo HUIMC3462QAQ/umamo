@@ -46,7 +46,7 @@ internal enum class BoxRelease {
  * @param Function setCircleRadius Resizes the brush (the session clamps and remembers it).
  * @param Function clearTool Leaves the armed select tool (a right-click inside the circle tool).
  * @param Function onStrokeBegin Runs before the first stamp of a stroke (the Object overlay
- *   snapshots its centroid cache here); defaults to nothing.
+ *   refreshes its selection anchors here); defaults to nothing.
  * @param Function previewStroke Publishes the live stroke after every stamp and null when the stroke
  *   ends (the Object overlay's GPU tint); defaults to nothing.
  */
@@ -204,6 +204,22 @@ internal class MarqueeSelectController<StrokeSelection>(
 		val painted = stampStroke(circleStroke ?: seedStroke(), erasing, center, radiusPx, camera, size)
 		circleStroke = painted
 		previewStroke(painted)
+	}
+
+	/**
+	 * Drops whatever is in flight WITHOUT committing it: the stroke and its erase flag, and the box.  For
+	 * an overlay leaving composition mid-gesture, where nothing should land.  The preview is cleared only
+	 * when this controller had a stroke in flight, so another area's live preview is left alone.
+	 */
+	fun discard() {
+		val hadStroke = circleStroke != null
+		circleStroke = null
+		circleErasing = false
+		boxStart = null
+		boxCurrent = null
+		if (hadStroke) {
+			previewStroke(null)
+		}
 	}
 
 	/**

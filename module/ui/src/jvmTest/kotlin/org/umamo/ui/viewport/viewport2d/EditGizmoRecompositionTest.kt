@@ -1,19 +1,14 @@
 package org.umamo.ui.viewport.viewport2d
 
-import androidx.compose.runtime.Composer
 import androidx.compose.runtime.InternalComposeTracingApi
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.v2.runComposeUiTest
 import org.umamo.edit.MeshElement
 import org.umamo.edit.MeshOperatorKind
 import org.umamo.edit.ProportionalEditState
 import org.umamo.edit.ProportionalFalloff
 import org.umamo.edit.TransformAxisConstraint
-import org.umamo.ui.workspace.spaces.parameters.ComposableRunCounter
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -23,37 +18,10 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalTestApi::class, InternalComposeTracingApi::class)
 class EditGizmoRecompositionTest {
-	/**
-	 * Runs [body] with the viewport2d package's composable runs counted, and takes the counter off again
-	 * whatever happens: the tracer is one per process.
-	 *
-	 * @param Function body The case, handed the counter.
-	 */
-	private fun counting(body: ComposeUiTest.(ComposableRunCounter) -> Unit) {
-		val counter = ComposableRunCounter(VIEWPORT2D_PACKAGE_PREFIX, FIXTURE_FUNCTION)
-		Composer.setTracer(counter)
-		try {
-			runComposeUiTest { body(counter) }
-		} finally {
-			Composer.setTracer(null)
-		}
-	}
-
-	/**
-	 * Asserts nothing of the package ran since the counter was last reset.
-	 *
-	 * @param ComposableRunCounter counter The counter.
-	 * @param String what What the case did, for the message.
-	 */
-	private fun assertNothingRan(counter: ComposableRunCounter, what: String) {
-		assertEquals(emptyMap(), counter.namedRuns(), "$what ran no composable")
-		assertEquals(0, counter.lambdaRuns(), "$what ran no composable lambda")
-	}
-
 	/** The counter has to see the overlays compose at all, or every absence below would pass by seeing nothing. */
 	@Test
 	fun theCounterSeesTheOverlaysCompose() =
-		counting { counter ->
+		countingGizmoRuns { counter ->
 			mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
 
 			assertTrue(counter.runsOf("ViewportEditGizmoOverlay") >= 2, "one per area")
@@ -63,7 +31,7 @@ class EditGizmoRecompositionTest {
 	/** Hovering over an idle overlay moves only what the chrome draws. */
 	@Test
 	fun aHoverRunsNothing() =
-		counting { counter ->
+		countingGizmoRuns { counter ->
 			mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
 			counter.reset()
 
@@ -75,7 +43,7 @@ class EditGizmoRecompositionTest {
 	/** Driving a modal transform previews through the render service and runs no composable. */
 	@Test
 	fun aModalDriveRunsNothing() =
-		counting { counter ->
+		countingGizmoRuns { counter ->
 			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
 			moveIn(LEFT_AREA, listOf(Offset(200f, 150f)))
 			fixture.session.beginMeshOperator(MeshOperatorKind.Grab, LEFT_AREA)
@@ -91,7 +59,7 @@ class EditGizmoRecompositionTest {
 	/** A proportional radius or axis change mid-gesture redraws the HUD and runs no composable. */
 	@Test
 	fun aHudChangeMidGestureRunsNothing() =
-		counting { counter ->
+		countingGizmoRuns { counter ->
 			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
 			val session = fixture.session
 			session.setProportionalEdit(ProportionalEditState(ProportionalFalloff.Linear, 10f))
@@ -107,9 +75,4 @@ class EditGizmoRecompositionTest {
 
 			assertNothingRan(counter, "a radius and an axis change")
 		}
-
-	private companion object {
-		const val VIEWPORT2D_PACKAGE_PREFIX = "org.umamo.ui.viewport.viewport2d."
-		const val FIXTURE_FUNCTION = "mountGizmoOverlays"
-	}
 }

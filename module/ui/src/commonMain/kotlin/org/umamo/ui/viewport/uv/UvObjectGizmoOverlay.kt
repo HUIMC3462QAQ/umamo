@@ -15,7 +15,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.FilterQuality
@@ -37,9 +36,7 @@ import org.umamo.edit.EditorMode
 import org.umamo.edit.EditorSession
 import org.umamo.edit.MeshOperatorKind
 import org.umamo.edit.NoticePlacement
-import org.umamo.edit.Selection
 import org.umamo.edit.SelectionTarget
-import org.umamo.edit.selectableOf
 import org.umamo.edit.setAtlasPlacements
 import org.umamo.format.art.AlphaContour
 import org.umamo.format.art.LayerBounds
@@ -51,12 +48,10 @@ import org.umamo.runtime.model.PuppetAtlas
 import org.umamo.runtime.model.applyUvAffine
 import org.umamo.ui.model.LocalSessionAtlasPages
 import org.umamo.ui.theme.LocalUmamoColors
-import org.umamo.ui.theme.LocalUmamoCursors
 import org.umamo.ui.theme.drawRubberBand
 import org.umamo.ui.theme.hiddenPointerIcon
 import org.umamo.ui.theme.selectionOverlayStyle
 import org.umamo.ui.viewport.gizmo.GizmoMeshGeometry
-import org.umamo.ui.viewport.gizmo.MarqueeSelectController
 import org.umamo.ui.viewport.gizmo.ModalGestureState
 import org.umamo.ui.viewport.gizmo.ModalTransformTarget
 import org.umamo.ui.viewport.gizmo.ObjectPickController
@@ -64,8 +59,11 @@ import org.umamo.ui.viewport.gizmo.TransformGestureFrame
 import org.umamo.ui.viewport.gizmo.buildHighlightSets
 import org.umamo.ui.viewport.gizmo.collectModalConfirmRequests
 import org.umamo.ui.viewport.gizmo.drawMeshWireframe
-import org.umamo.ui.viewport.gizmo.drawModalTransformHud
+import org.umamo.ui.viewport.gizmo.drawOwnedModalTransformHud
+import org.umamo.ui.viewport.gizmo.objectMarquee
+import org.umamo.ui.viewport.gizmo.resolveObjectBoxSelection
 import org.umamo.ui.viewport.gizmo.screenToWorld
+import org.umamo.ui.viewport.gizmo.selectableDrawableTargets
 import org.umamo.ui.viewport.gizmo.worldToScreen
 import org.umamo.ui.viewport.rememberViewportOverlayColors
 
@@ -174,7 +172,8 @@ internal fun UvObjectGizmoOverlay(
 	val meshSelection by session.meshSelection.collectAsState()
 	val objectSelection by session.selection.collectAsState()
 	val activeOperator by session.activeUvOperator.collectAsState()
-	val axisConstraint by session.axisConstraint.collectAsState()
+	// Held as State, not read here: the HUD reads it only while drawing a gesture this area owns.
+	val axisConstraintState = session.axisConstraint.collectAsState()
 	val committedModel by session.model.collectAsState()
 	val tileByDrawableId = remember(committedModel) { committedModel.drawables.mapNotNull { drawable -> drawable.atlasTileId?.let { tileId -> drawable.id to tileId } }.toMap() }
 	val pinnedTileIds = remember(committedModel) { committedModel.atlas.tiles.filter { tile -> tile.pinned }.mapTo(HashSet()) { tile -> tile.id } }
@@ -214,20 +213,13 @@ internal fun UvObjectGizmoOverlay(
 	// so they stay sanely wired only so an unforeseen arming degrades to a no-op stroke.
 	val marquee =
 		remember(areaId) {
-			MarqueeSelectController<Selection>(
-				seedStroke = { session.selection.value },
+			objectMarquee(
+				session = session,
 				stampStroke = { working, _, _, _, _, _ -> working },
-				commitStroke = { stroke -> session.setSelection(stroke) },
 				applyBox = { start, end, additive, boxCamera, boxSize ->
-					val model = session.model.value
-					val enclosed =
-						uvIslandsInBox(liveGeometries.value, start, end, boxCamera, boxSize)
-							.map { drawableId -> SelectionTarget.Drawable(drawableId) }
-							.filter { target -> model.selectableOf(target) }
-					session.setSelection(resolveIslandBoxSelection(session.selection.value, enclosed, additive))
+					val enclosed = selectableDrawableTargets(uvIslandsInBox(liveGeometries.value, start, end, boxCamera, boxSize), session.model.value)
+					session.setSelection(resolveObjectBoxSelection(session.selection.value, enclosed, additive))
 				},
-				setCircleRadius = { radiusPx -> session.setCircleRadius(radiusPx) },
-				clearTool = { session.clearSelectTool() },
 			)
 		}
 
@@ -581,18 +573,15 @@ internal fun UvObjectGizmoOverlay(
 			// Modal transform HUD (axis line, pivot dash, drawn cursor), shared chrome with the other
 			// gizmo overlays.  Only the initiating area draws it - the capture exists solely in the
 			// overlay whose area the operator latch names.
-			val hudPivot = gesture.capture?.transform?.anchor
-			if (ownsGesture && hudPivot != null) {
-				drawModalTransformHud(
-					axisConstraint = axisConstraint,
-					pivotScreen = worldToScreen(hudPivot.first, hudPivot.second, camera, IntSize(widthPx, heightPx)),
-					virtualPointer = gesture.cursorWrap.virtualPointer(gesture.lastPointer),
-					realPointer = gesture.lastPointer,
-					viewport = Size(widthPx.toFloat(), heightPx.toFloat()),
-					lineColor = overlayColors.viewportMarquee,
-					pointerCursor = LocalUmamoCursors.nsewScroll,
-				)
-			}
+			drawOwnedModalTransformHud(
+				owned = ownsGesture,
+				pivotWorld = gesture.capture?.transform?.anchor,
+				gesture = gesture,
+				axisConstraint = axisConstraintState,
+				camera = camera,
+				size = IntSize(widthPx, heightPx),
+				lineColor = overlayColors.viewportMarquee,
+			)
 		}
 	}
 }

@@ -32,6 +32,16 @@ internal class StubPuppetViewportService : PuppetViewportService {
 	/** Every pick-stack request, as the area and the pointer it asked about. */
 	val stackRequests = ArrayList<Pair<String, Pair<Float, Float>>>()
 
+	/** What [drawableWorldCentroids] answers: each drawable's world centroid, set by the case. */
+	val centroids = LinkedHashMap<DrawableId, FloatArray>()
+
+	/** How many times an overlay asked for the centroids (one snapshot per select gesture). */
+	var centroidSnapshots = 0
+		private set
+
+	/** Every Zoom Region request, as the area and its left, top, right, and bottom edges in pixels. */
+	val zoomRegionRequests = ArrayList<Pair<String, List<Float>>>()
+
 	override var zoomStepPercent: Float = 0f
 
 	override var zoomStepCoarsePercent: Float = 0f
@@ -139,7 +149,7 @@ internal class StubPuppetViewportService : PuppetViewportService {
 	override fun zoomCentered(areaId: String, zoomIn: Boolean, coarse: Boolean) {}
 
 	/**
-	 * Does nothing.
+	 * Records the request.
 	 *
 	 * @param String areaId The area.
 	 * @param Float leftPx The left edge.
@@ -147,7 +157,9 @@ internal class StubPuppetViewportService : PuppetViewportService {
 	 * @param Float rightPx The right edge.
 	 * @param Float bottomPx The bottom edge.
 	 */
-	override fun zoomToRegion(areaId: String, leftPx: Float, topPx: Float, rightPx: Float, bottomPx: Float) {}
+	override fun zoomToRegion(areaId: String, leftPx: Float, topPx: Float, rightPx: Float, bottomPx: Float) {
+		zoomRegionRequests.add(areaId to listOf(leftPx, topPx, rightPx, bottomPx))
+	}
 
 	/**
 	 * Does nothing.
@@ -267,11 +279,15 @@ internal class StubPuppetViewportService : PuppetViewportService {
 	}
 
 	/**
-	 * No centroids.
+	 * A copy of [centroids] as it is now, counting the snapshot: a copy, so a case that changes the map after
+	 * a press can show the gesture kept the snapshot it took.
 	 *
-	 * @return Map An empty map.
+	 * @return Map Each drawable's world centroid.
 	 */
-	override fun drawableWorldCentroids(): Map<DrawableId, FloatArray> = emptyMap()
+	override fun drawableWorldCentroids(): Map<DrawableId, FloatArray> {
+		centroidSnapshots++
+		return centroids.toMap()
+	}
 
 	/**
 	 * Renders nothing.

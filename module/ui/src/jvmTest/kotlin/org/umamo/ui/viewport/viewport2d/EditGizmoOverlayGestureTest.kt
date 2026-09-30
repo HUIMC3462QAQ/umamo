@@ -1,6 +1,7 @@
 package org.umamo.ui.viewport.viewport2d
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.v2.runComposeUiTest
@@ -346,5 +347,20 @@ class EditGizmoOverlayGestureTest {
 			waitForIdle()
 
 			assertEquals(0f, rigPositionsOf(session, RIG_QUAD)[0], "vertex 0 did not jump")
+		}
+
+	/** A right-click disarms Box select (B) in Edit mode, Shift+RightClick too: while B is armed it never places the cursor. */
+	@Test
+	fun aShiftRightClickDisarmsTheBox() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession())
+			val session = fixture.session
+			session.beginBoxSelect(LEFT_AREA)
+			waitForIdle()
+
+			withKeyHeld(LEFT_AREA, Key.ShiftLeft) { clickIn(LEFT_AREA, gestureStart, MouseButton.Secondary) }
+
+			assertNull(session.activeSelectTool.value, "the tool disarmed")
+			assertNull(session.cursor2d.value, "and the cursor stayed where it was")
 		}
 }

@@ -58,14 +58,13 @@ import org.umamo.ui.viewport.gizmo.buildHighlightSets
 import org.umamo.ui.viewport.gizmo.circleSelection
 import org.umamo.ui.viewport.gizmo.collectModalConfirmRequests
 import org.umamo.ui.viewport.gizmo.drawMeshWireframe
-import org.umamo.ui.viewport.gizmo.drawModalTransformHud
+import org.umamo.ui.viewport.gizmo.drawOwnedModalTransformHud
 import org.umamo.ui.viewport.gizmo.drawSelectToolAffordances
 import org.umamo.ui.viewport.gizmo.elementsInBox
 import org.umamo.ui.viewport.gizmo.gestureParameters
 import org.umamo.ui.viewport.gizmo.handleIdleMeshSelectionEvent
 import org.umamo.ui.viewport.gizmo.handleSelectLinkedRequest
 import org.umamo.ui.viewport.gizmo.selectToolKind
-import org.umamo.ui.viewport.gizmo.worldToScreen
 import org.umamo.ui.viewport.rememberViewportOverlayColors
 import kotlin.math.pow
 
@@ -142,7 +141,8 @@ internal fun UvEditGizmoOverlay(
 	val meshSelection by session.meshSelection.collectAsState()
 	val activeOperator by session.activeUvOperator.collectAsState()
 	val activeSelectTool by session.activeSelectTool.collectAsState()
-	val axisConstraint by session.axisConstraint.collectAsState()
+	// Held as State, not read here: the HUD reads it only while drawing a gesture this area owns.
+	val axisConstraintState = session.axisConstraint.collectAsState()
 	val proportionalEdit by session.proportionalEdit.collectAsState()
 	val renderSync = LocalPuppetRenderSync.current
 	val viewportOverlayColors = rememberViewportOverlayColors()
@@ -607,26 +607,22 @@ internal fun UvEditGizmoOverlay(
 			// Modal transform HUD (axis line, pivot dash, drawn cursor, proportional ring), shared
 			// chrome with the viewport overlays.  Only the initiating area draws it - the capture
 			// exists solely in the overlay whose area the operator latch names.
-			val hudOperator = activeOperator
-			val hudPivot = gesture.capture?.transform?.anchor
-			if (hudOperator != null && hudPivot != null) {
-				val ringRadiusPx =
+			drawOwnedModalTransformHud(
+				owned = activeOperator != null,
+				pivotWorld = gesture.capture?.transform?.anchor,
+				gesture = gesture,
+				axisConstraint = axisConstraintState,
+				camera = camera,
+				size = IntSize(widthPx, heightPx),
+				lineColor = overlayColors.viewportMarquee,
+				proportionalRadiusPx = {
 					if (proportionalEdit != null) {
 						(proportionalRadiusDisplay ?: 0f).takeIf { radius -> radius > 0f }?.times(camera.zoom)
 					} else {
 						null
 					}
-				drawModalTransformHud(
-					axisConstraint = axisConstraint,
-					pivotScreen = worldToScreen(hudPivot.first, hudPivot.second, camera, IntSize(widthPx, heightPx)),
-					virtualPointer = gesture.cursorWrap.virtualPointer(gesture.lastPointer),
-					realPointer = gesture.lastPointer,
-					viewport = Size(widthPx.toFloat(), heightPx.toFloat()),
-					lineColor = overlayColors.viewportMarquee,
-					pointerCursor = LocalUmamoCursors.nsewScroll,
-					proportionalRadiusPx = ringRadiusPx,
-				)
-			}
+				},
+			)
 		}
 	}
 }
