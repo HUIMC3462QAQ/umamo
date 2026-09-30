@@ -8,6 +8,7 @@ import org.umamo.edit.MeshSelectMode
 import org.umamo.edit.MeshSelection
 import org.umamo.edit.MeshSelectionOps
 import org.umamo.edit.MeshTopology
+import org.umamo.edit.MeshTransforms
 import org.umamo.render.ViewportCamera
 import org.umamo.render.pick.distanceToSegment
 import org.umamo.runtime.model.DrawableId
@@ -41,6 +42,26 @@ internal class GizmoMeshGeometry(
 	val edges: List<MeshElement.Edge>,
 	val positions: FloatArray,
 )
+
+/**
+ * The active element's own covered median: the median of the vertices the active element covers, in the
+ * geometry's space - what the Active Element pivot anchors on and the "to Active" snaps aim at.
+ *
+ * @param MeshSelection selection The mesh selection.
+ * @param List<GizmoMeshGeometry> geometries The shown meshes' gizmo geometry.
+ * @return Pair<Float, Float>? The median, or null when nothing is active, the active mesh is not shown,
+ *   or its element covers no vertex.
+ */
+internal fun activeElementMedian(selection: MeshSelection, geometries: List<GizmoMeshGeometry>): Pair<Float, Float>? {
+	val active = selection.activeElement ?: return null
+	val activeGeometry = geometries.firstOrNull { geometry -> geometry.drawableId == active.drawableId } ?: return null
+	val activeCovered = MeshTopology.coveredVertexIndices(setOf(active.element), activeGeometry.indices)
+	return if (activeCovered.isEmpty()) {
+		null
+	} else {
+		MeshTransforms.medianPivot(activeGeometry.positions, activeCovered)
+	}
+}
 
 /**
  * The nearest element of the given domain under the pointer across every mesh, or null.  Each mesh's

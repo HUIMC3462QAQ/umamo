@@ -1,8 +1,6 @@
 package org.umamo.ui.viewport.uv
 
 import androidx.compose.ui.unit.IntSize
-import org.umamo.edit.Selection
-import org.umamo.edit.SelectionTarget
 import org.umamo.render.DecodedImage
 import org.umamo.render.ViewportCamera
 import org.umamo.runtime.model.BlendMode
@@ -232,37 +230,6 @@ class UvIslandPickControllerTest {
 			uvIslandsInBox(listOf(farIsland, nearIsland), allCornerA, allCornerB, camera, size),
 			"the result preserves geometries order",
 		)
-	}
-
-	/** Plain box replaces; additive extends with the last enclosed island active. */
-	@Test
-	fun boxSelectionReplacesOrExtends() {
-		val islandA = SelectionTarget.Drawable(DrawableId("a"))
-		val islandB = SelectionTarget.Drawable(DrawableId("b"))
-		val replaced = resolveIslandBoxSelection(Selection(setOf(islandA), islandA), listOf(islandB), additive = false)
-		assertEquals(setOf<SelectionTarget>(islandB), replaced.targets, "a plain box replaces the selection")
-		assertEquals(islandB, replaced.active, "the last enclosed island becomes active")
-		val extended = resolveIslandBoxSelection(Selection(setOf(islandA), islandA), listOf(islandB), additive = true)
-		assertEquals(setOf<SelectionTarget>(islandA, islandB), extended.targets, "an additive box keeps the current targets")
-		assertEquals(islandB, extended.active, "the last enclosed island becomes active")
-	}
-
-	/** An additive box that enclosed nothing keeps the selection AND its active target. */
-	@Test
-	fun emptyAdditiveBoxKeepsTheSelection() {
-		val islandA = SelectionTarget.Drawable(DrawableId("a"))
-		val current = Selection(setOf(islandA), islandA)
-		val result = resolveIslandBoxSelection(current, emptyList(), additive = true)
-		assertEquals(current, result, "nothing enclosed changes nothing")
-	}
-
-	/** A plain box that enclosed nothing clears (the viewport's box rule). */
-	@Test
-	fun emptyPlainBoxClears() {
-		val islandA = SelectionTarget.Drawable(DrawableId("a"))
-		val result = resolveIslandBoxSelection(Selection(setOf(islandA), islandA), emptyList(), additive = false)
-		assertTrue(result.isEmpty, "an empty plain box clears the selection")
-		assertNull(result.active, "no active target survives")
 	}
 
 	/**

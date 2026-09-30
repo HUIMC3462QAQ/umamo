@@ -3,8 +3,6 @@ package org.umamo.ui.viewport.uv
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import org.umamo.edit.MeshSelectMode
-import org.umamo.edit.Selection
-import org.umamo.edit.SelectionTarget
 import org.umamo.render.DecodedImage
 import org.umamo.render.ViewportCamera
 import org.umamo.render.eval.paintOrder
@@ -190,26 +188,4 @@ internal fun uvIslandsInBox(
 ): List<DrawableId> =
 	geometries.mapNotNull { geometry ->
 		geometry.drawableId.takeIf { elementsInBox(MeshSelectMode.Vertex, geometry, cornerA, cornerB, camera, size).isNotEmpty() }
-	}
-
-/**
- * Resolves a finished island box drag against the object selection: additive (Shift) keeps the
- * current targets and adds the enclosed islands, the last one becoming active (or the current
- * active surviving when the box enclosed nothing); plain replaces the selection with the enclosed
- * set.  The viewport's object box rule, over islands.
- *
- * @param Selection current The committed object selection.
- * @param List<SelectionTarget.Drawable> enclosed The enclosed, selectable islands in enclosure order.
- * @param Boolean additive True when Shift extends the selection.
- * @return Selection The selection the box produces.
- */
-internal fun resolveIslandBoxSelection(
-	current: Selection,
-	enclosed: List<SelectionTarget.Drawable>,
-	additive: Boolean,
-): Selection =
-	if (additive) {
-		Selection(current.targets + enclosed, enclosed.lastOrNull() ?: current.active)
-	} else {
-		Selection(enclosed.toSet(), enclosed.lastOrNull())
 	}

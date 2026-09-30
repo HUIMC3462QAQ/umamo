@@ -1,0 +1,78 @@
+package org.umamo.ui.viewport.viewport2d
+
+import androidx.compose.runtime.InternalComposeTracingApi
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.ExperimentalTestApi
+import org.umamo.edit.MeshElement
+import org.umamo.edit.MeshOperatorKind
+import org.umamo.edit.ProportionalEditState
+import org.umamo.edit.ProportionalFalloff
+import org.umamo.edit.TransformAxisConstraint
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+/**
+ * Pins what recomposes the viewport gizmo overlays.  The pointer, the live preview, and the modal HUD's
+ * inputs are read where they are drawn, not where the overlay composes, so hovering, driving a gesture,
+ * and changing the proportional radius or the axis mid-gesture redraw the chrome and run no composable.
+ */
+@OptIn(ExperimentalTestApi::class, InternalComposeTracingApi::class)
+class EditGizmoRecompositionTest {
+	/** The counter has to see the overlays compose at all, or every absence below would pass by seeing nothing. */
+	@Test
+	fun theCounterSeesTheOverlaysCompose() =
+		countingGizmoRuns { counter ->
+			mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+
+			assertTrue(counter.runsOf("ViewportEditGizmoOverlay") >= 2, "one per area")
+			assertTrue(counter.runsOf("ViewportObjectGizmoOverlay") >= 2, "one per area")
+		}
+
+	/** Hovering over an idle overlay moves only what the chrome draws. */
+	@Test
+	fun aHoverRunsNothing() =
+		countingGizmoRuns { counter ->
+			mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			counter.reset()
+
+			moveIn(LEFT_AREA, listOf(Offset(200f, 150f), Offset(210f, 150f), Offset(220f, 160f)))
+
+			assertNothingRan(counter, "a hover")
+		}
+
+	/** Driving a modal transform previews through the render service and runs no composable. */
+	@Test
+	fun aModalDriveRunsNothing() =
+		countingGizmoRuns { counter ->
+			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			moveIn(LEFT_AREA, listOf(Offset(200f, 150f)))
+			fixture.session.beginMeshOperator(MeshOperatorKind.Grab, LEFT_AREA)
+			waitForIdle()
+			counter.reset()
+
+			moveIn(LEFT_AREA, listOf(Offset(210f, 150f), Offset(220f, 155f), Offset(240f, 150f)))
+
+			assertTrue(fixture.service.pushedModels.isNotEmpty(), "the moves did drive")
+			assertNothingRan(counter, "a modal drive")
+		}
+
+	/** A proportional radius or axis change mid-gesture redraws the HUD and runs no composable. */
+	@Test
+	fun aHudChangeMidGestureRunsNothing() =
+		countingGizmoRuns { counter ->
+			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			val session = fixture.session
+			session.setProportionalEdit(ProportionalEditState(ProportionalFalloff.Linear, 10f))
+			moveIn(LEFT_AREA, listOf(Offset(200f, 150f)))
+			session.beginMeshOperator(MeshOperatorKind.Grab, LEFT_AREA)
+			waitForIdle()
+			counter.reset()
+
+			session.setProportionalRadius(20f)
+			waitForIdle()
+			session.toggleAxisConstraint(TransformAxisConstraint.AxisX)
+			waitForIdle()
+
+			assertNothingRan(counter, "a radius and an axis change")
+		}
+}

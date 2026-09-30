@@ -261,17 +261,18 @@ class EditorSession(
 	}
 
 	/**
-	 * True while a viewport overlay is driving a non-armed pointer gesture (today: the Object-mode
-	 * un-armed box drag), so the shell can route Escape to a gesture cancel instead of its next Escape
-	 * behavior (clearing the object selection). Transient UI coordination like [previewSelection] - not
-	 * snapshotted, not on the bus; the overlay sets it at press and clears it on release or cancel.
+	 * True while a select drag is held in a viewport or UV area - a box (armed or not) or a circle stroke,
+	 * in either mode - so navigation does not also pan, the shell routes Escape to a gesture cancel instead
+	 * of its next Escape behavior (clearing the object selection), and undo / redo wait for the release.
+	 * Transient UI coordination like [previewSelection] - not snapshotted, not on the bus; the overlay sets
+	 * it at press and clears it on release, cancel, or when it leaves composition.
 	 */
 	val viewportGestureActive: StateFlow<Boolean> = latches.viewportGestureActive
 
 	/**
-	 * Publishes whether a non-armed viewport gesture is in flight (see [viewportGestureActive]).
+	 * Publishes whether a select drag is held (see [viewportGestureActive]).
 	 *
-	 * @param Boolean active True while the overlay's gesture owns the pointer.
+	 * @param Boolean active True while the overlay's select drag owns the pointer.
 	 */
 	fun setViewportGestureActive(active: Boolean) {
 		latches.setViewportGestureActive(active)
@@ -1264,6 +1265,20 @@ class EditorSession(
 		get() = latches.activeMeshOperatorSuppressesProportional
 
 	/**
+	 * Whether a mesh operator of [kind], latched as the active one, weights the unselected vertices near
+	 * the selection by proportional editing: every operator but Vertex Slide (positions-only, one vertex
+	 * along one edge), unless its latch suppressed proportional editing (the duplicate / rip auto-grab).
+	 * The one rule every proportional gate asks - the capture, the wheel, a mid-gesture change, the strip's
+	 * rows, the ring, and the status badge.  It takes the kind rather than reading the latch because each
+	 * gate already holds the kind it is deciding for.
+	 *
+	 * @param MeshOperatorKind kind The latched operator's kind.
+	 * @return Boolean True when the gesture takes proportional weights.
+	 */
+	fun meshOperatorTakesProportional(kind: MeshOperatorKind): Boolean =
+		kind != MeshOperatorKind.VertexSlide && !latches.activeMeshOperatorSuppressesProportional
+
+	/**
 	 * Latches a modal mesh operator so the gizmo overlay begins the gesture. A no-op unless Edit mode is
 	 * active with a drawable and a non-empty selection — so the bound G / S / R commands need no context
 	 * guard of their own and the keymap stays mode-agnostic. For an edge or face selection the gesture
@@ -2098,24 +2113,40 @@ class EditorSession(
 		requestBus.requestMeshGestureCancel()
 	}
 
-	/** Steps back one undo level, republishing the model and selection. No-op when nothing to undo. */
+	/**
+	 * Steps back one undo level, republishing the model and selection. No-op when nothing to undo, and while
+	 * a select drag is held ([viewportGestureActive]): the drag lands or is abandoned first (Blender parity),
+	 * rather than landing on top of the restored state and wiping redo.
+	 */
 	fun undo() {
+		if (latches.viewportGestureActive.value) {
+			return
+		}
 		restore(history.undo() ?: return)
 	}
 
-	/** Steps forward one redo level, republishing the model and selection. No-op when nothing to redo. */
+	/**
+	 * Steps forward one redo level, republishing the model and selection. No-op when nothing to redo, and
+	 * while a select drag is held (see [undo]).
+	 */
 	fun redo() {
+		if (latches.viewportGestureActive.value) {
+			return
+		}
 		restore(history.redo() ?: return)
 	}
 
 	/**
 	 * Jumps the history cursor directly to [index], republishing the model and selection at that step. The
 	 * history panel calls this when a row is clicked, so the user can leap across several undo levels at
-	 * once. No-op when [index] is already the live step.
+	 * once. No-op when [index] is already the live step, and while a select drag is held (see [undo]).
 	 *
 	 * @param Int index The target step index within [historyView].
 	 */
 	fun jumpTo(index: Int) {
+		if (latches.viewportGestureActive.value) {
+			return
+		}
 		restore(history.jumpTo(index) ?: return)
 	}
 

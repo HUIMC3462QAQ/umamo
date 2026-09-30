@@ -19,15 +19,17 @@ import org.umamo.render.pick.PickCandidate
 import org.umamo.runtime.model.DrawableId
 import org.umamo.ui.transform.captureDrawableWorld
 import org.umamo.ui.viewport.PuppetViewportService
+import org.umamo.ui.viewport.gizmo.activeElementMedian
 import org.umamo.ui.viewport.gizmo.worldToScreen
 
 /*
  * The bodies of the session-request handlers the 2D viewport's gizmo overlays collect: keymap commands
  * that carry no pointer (Alt+Q switch-mesh, Rip, the Shift+S snaps) land on the session's request
  * flows, and only the overlay knows the pointer position and the projected geometry to execute them
- * against.  Each overlay keeps a thin, area-gated collector; the work lives here as plain functions,
- * testable without Compose.  Select Linked serves both surfaces and sits with the shared selection
- * input (gizmo/GizmoSelectionInput.kt); the UV editor's snap is in uv/UvSessionRequestHandlers.kt.
+ * against.  Each overlay keeps a thin, area-gated collector (the Edit overlay's is EditGizmoRequests.kt);
+ * the work lives here as plain functions, testable without Compose.  Select Linked serves both surfaces
+ * and sits with the shared selection input (gizmo/GizmoSelectionInput.kt); the UV editor's snap is in
+ * uv/UvSessionRequestHandlers.kt.
  */
 
 /**
@@ -159,15 +161,7 @@ internal fun handleEditSnapRequest(
 	val medianX = coveredSumX / coveredCount
 	val medianY = coveredSumY / coveredCount
 	// The active element's own median (its covered vertices), or null when nothing is active.
-	val active = selection.activeElement
-	val activeGeometry = active?.let { candidate -> geometries.firstOrNull { it.drawableId == candidate.drawableId } }
-	val activeMedian =
-		if (active != null && activeGeometry != null) {
-			val activeCovered = MeshTopology.coveredVertexIndices(setOf(active.element), activeGeometry.mesh.indices)
-			if (activeCovered.isNotEmpty()) MeshTransforms.medianPivot(activeGeometry.worldPosed, activeCovered) else null
-		} else {
-			null
-		}
+	val activeMedian = activeElementMedian(selection, geometries.map { geometry -> geometry.gizmo })
 	val model = session.model.value
 	val cursor = session.cursor2dOrWorldOrigin()
 	when (kind) {
