@@ -173,7 +173,7 @@ See format planning document: docs/plan/uma-format.md
 	* The color-blind-assist first pass — vertex/edge/face gizmo colors plus the selection highlight — already exists in Settings > Colors.
 
 ## Refactor
-* `ViewportEditGizmoOverlay.kt`
+* `ViewportObjectGizmoOverlay.kt` - Now do the same for object like what was done for ViewportEditGizmoOverlay.
 
 ## DRY/Standardization
 * Fields like PropertyFieldRow need to take a key use use that to get the correct resource key automatically instead of passing it.
