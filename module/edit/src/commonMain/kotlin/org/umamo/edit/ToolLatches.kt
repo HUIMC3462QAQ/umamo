@@ -53,7 +53,7 @@ internal class ToolLatches(private val notify: (String, NoticePlacement) -> Unit
 
 	private val mutableViewportGestureActive = MutableStateFlow(false)
 
-	/** True while a non-armed viewport gesture is in flight (see [EditorSession.viewportGestureActive]). */
+	/** True while a select drag is held (see [EditorSession.viewportGestureActive]). */
 	val viewportGestureActive: StateFlow<Boolean> = mutableViewportGestureActive.asStateFlow()
 
 	private val mutablePreviewSelection = MutableStateFlow<Set<DrawableId>?>(null)

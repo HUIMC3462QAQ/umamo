@@ -2,15 +2,11 @@ package org.umamo.ui.viewport.gizmo
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEvent
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
-import androidx.compose.ui.input.pointer.isPrimaryPressed
-import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
-import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.unit.IntSize
 import org.umamo.edit.EditorSession
 import org.umamo.edit.Selection
@@ -133,22 +129,20 @@ internal fun objectMarquee(
 		clearTool = { session.clearSelectTool() },
 		onStrokeBegin = onStrokeBegin,
 		previewStroke = previewStroke,
+		setGestureActive = { active -> session.setViewportGestureActive(active) },
 	)
 
 /**
- * The idle object-pick pointer flow shared by the drawable-selecting surfaces: a primary press starts
- * a provisional rubber-band, a drag past the click threshold box-selects on release (Shift adds), a
- * sub-threshold release is the click pick (plain replaces, Shift / Ctrl toggles membership, an Alt
- * click resolves the overlap stack, an unmodified click on empty canvas clears), and Shift+RightClick
- * places the space's cursor.  Only primary-driven events are consumed, so middle-drag pan and wheel
- * zoom fall through to the navigation layer beneath.
+ * The object-selecting surfaces' pointer flow, shared by the 2D viewport's Object mode and the UV editor's:
+ * the box select (un-armed and armed, one flow - see BoxSelectFlow) with the object domain's click, which
+ * picks on the release of a sub-threshold click (plain replaces, Shift / Ctrl toggles membership, an Alt
+ * click resolves the overlap stack, an unmodified click on empty canvas clears).
  *
  * The domain seams pass in as constructor callbacks, the [MarqueeSelectController] pattern: the 2D
  * viewport binds the render service's raster pickers and the world 2D cursor; a UV object mode binds
  * its own display-space island hit tests and the UV cursor over the SAME session selection.  The
- * shared parts - the selection store, the selectable filter, and the navigation-suppressing
- * gesture-active flag - read the session directly, like [handleIdleMeshSelectionEvent] does for the
- * mesh-element domain.
+ * shared parts - the selection store and the selectable filter - read the session directly, like
+ * [MeshPickController] does for the mesh-element domain.
  *
  * @param EditorSession session The session owning the model, the object selection, and the gesture-active flag.
  * @param MarqueeSelectController<Selection> marquee The box machinery this flow rubber-bands through.
@@ -161,137 +155,51 @@ internal fun objectMarquee(
  */
 internal class ObjectPickController(
 	private val session: EditorSession,
-	private val marquee: MarqueeSelectController<Selection>,
+	marquee: MarqueeSelectController<Selection>,
 	private val pickTopmost: (Offset) -> DrawableId?,
 	private val pickStack: (Offset) -> List<PickCandidate>,
 	private val onOverlapRequest: (Offset, List<PickCandidate>) -> Unit,
-	private val placeCursor: (Float, Float) -> Unit,
-	private val onBoxBegin: () -> Unit = {},
+	placeCursor: (Float, Float) -> Unit,
+	onBoxBegin: () -> Unit = {},
 ) {
-	// Marks a box drag started from a plain primary press (the sub-threshold release of which is the
-	// click pick).  A plain var, not snapshot state: only the pointer loop and the cancel paths read
-	// it, never composition, so there is no observer to notify - the rubber-band the draw pass
-	// observes lives in the marquee controller.
-	private var boxing = false
+	// The box gesture, with the object click as its sub-threshold release.
+	private val boxFlow =
+		BoxSelectFlow(
+			session = session,
+			marquee = marquee,
+			placeCursor = placeCursor,
+			onClick = { event, change ->
+				val modifiers = event.keyboardModifiers
+				applyClickPick(
+					position = change.position,
+					toggleMembership = modifiers.isCtrlPressed || modifiers.isMetaPressed || modifiers.isShiftPressed,
+					alt = modifiers.isAltPressed,
+				)
+			},
+			onBoxBegin = onBoxBegin,
+		)
 
 	/**
-	 * Handles one idle pointer event: the press / move / release flow described on the class.  The
-	 * caller routes events here only while nothing is armed in its area (no modal operator, no armed
-	 * select tool).
+	 * Handles one pointer event while no transform or circle tool owns the area: the box select, armed or
+	 * not, and the click pick.
 	 *
 	 * @param PointerEvent event The full pointer event (buttons and modifiers).
 	 * @param PointerInputChange change The event's first change (position and consumption).
+	 * @param Boolean armed True while Box select is armed in this area.
 	 * @param ViewportCamera camera The area camera.
 	 * @param IntSize size The area size in pixels.
 	 */
-	fun handleIdleEvent(event: PointerEvent, change: PointerInputChange, camera: ViewportCamera, size: IntSize) {
-		when (event.type) {
-			PointerEventType.Press ->
-				if (event.buttons.isSecondaryPressed && event.keyboardModifiers.isShiftPressed && !boxing) {
-					// Shift+RightClick places the space's cursor at the pointer (Blender's gesture); the
-					// cursor overlay draws it and the Cursor pivot mode / snap menu anchor on it.
-					val (unprojectedX, unprojectedY) = screenToWorld(change.position.x, change.position.y, camera, size)
-					placeCursor(unprojectedX, unprojectedY)
-					change.consume()
-				} else if (event.buttons.isSecondaryPressed) {
-					if (boxing) {
-						cancel()
-						change.consume()
-					}
-				} else if (event.buttons.isPrimaryPressed && !event.buttons.isTertiaryPressed) {
-					onBoxBegin()
-					marquee.beginBox(change.position)
-					boxing = true
-					session.setViewportGestureActive(true)
-					change.consume()
-				}
-
-			PointerEventType.Move ->
-				if (boxing && marquee.dragBox(change.position)) {
-					change.consume()
-				}
-
-			PointerEventType.Release -> {
-				if (boxing) {
-					val boxRelease = marquee.releaseBox(change.position, event.keyboardModifiers.isShiftPressed, camera, size)
-					if (boxRelease != BoxRelease.None) {
-						if (boxRelease == BoxRelease.Click) {
-							val modifiers = event.keyboardModifiers
-							applyClickPick(
-								position = change.position,
-								toggleMembership = modifiers.isCtrlPressed || modifiers.isMetaPressed || modifiers.isShiftPressed,
-								alt = modifiers.isAltPressed,
-							)
-						}
-						boxing = false
-						session.setViewportGestureActive(false)
-						change.consume()
-					}
-				}
-			}
-
-			else -> {}
-		}
+	fun handleEvent(event: PointerEvent, change: PointerInputChange, armed: Boolean, camera: ViewportCamera, size: IntSize) {
+		boxFlow.handleEvent(event, change, armed, camera, size)
 	}
 
 	/**
-	 * Handles one pointer event while Blender's B armed-box tool owns the area: a primary press starts the
-	 * rubber-band (after [onBoxBegin]), a drag extends it, and the release applies it (Shift adds) and
-	 * disarms - a sub-threshold click disarms too and never click-picks.  Any right-click disarms, Shift
-	 * included, so it never places the cursor while armed.
-	 *
-	 * Unlike the idle flow it raises no gesture-active flag and keeps no boxing mark: the armed tool's own
-	 * latch already names this area to the navigation gate, and a boxing mark would let the idle-box cancel
-	 * the caller runs on every armed event drop the armed rubber-band.  A right-click leaves an in-flight
-	 * band to the tool-change cancel, which fires as the tool clears.
-	 *
-	 * @param PointerEvent event The full pointer event (buttons and modifiers).
-	 * @param PointerInputChange change The event's first change (position and consumption).
-	 * @param ViewportCamera camera The area camera.
-	 * @param IntSize size The area size in pixels.
-	 */
-	fun handleArmedBoxEvent(event: PointerEvent, change: PointerInputChange, camera: ViewportCamera, size: IntSize) {
-		when (event.type) {
-			PointerEventType.Press ->
-				if (event.buttons.isSecondaryPressed) {
-					session.clearSelectTool()
-					change.consume()
-				} else if (event.buttons.isPrimaryPressed) {
-					onBoxBegin()
-					marquee.beginBox(change.position)
-					change.consume()
-				}
-
-			PointerEventType.Move ->
-				if (marquee.dragBox(change.position)) {
-					change.consume()
-				}
-
-			PointerEventType.Release -> {
-				val boxRelease = marquee.releaseBox(change.position, event.keyboardModifiers.isShiftPressed, camera, size)
-				if (boxRelease != BoxRelease.None) {
-					// Armed Box-select is one-shot: disarm after the drag (or a bare click).
-					session.clearSelectTool()
-					change.consume()
-				}
-			}
-
-			else -> {}
-		}
-	}
-
-	/**
-	 * Abandons an in-flight un-armed box drag, dropping the rubber-band without touching the
-	 * selection; a no-op when none is in flight, so callers invoke it unconditionally (the Escape /
-	 * tool-switch / inert-area paths).
+	 * Abandons an in-flight box, dropping the rubber-band without touching the selection; a no-op when none
+	 * is in flight, so callers invoke it unconditionally (Escape, a tool switch, another area taking over,
+	 * the overlay leaving composition).
 	 */
 	fun cancel() {
-		if (!boxing) {
-			return
-		}
-		marquee.cancel()
-		boxing = false
-		session.setViewportGestureActive(false)
+		boxFlow.cancel()
 	}
 
 	/**

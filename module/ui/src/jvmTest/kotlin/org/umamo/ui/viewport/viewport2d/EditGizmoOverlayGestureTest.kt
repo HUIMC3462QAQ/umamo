@@ -363,4 +363,125 @@ class EditGizmoOverlayGestureTest {
 			assertNull(session.activeSelectTool.value, "the tool disarmed")
 			assertNull(session.cursor2d.value, "and the cursor stayed where it was")
 		}
+
+	/** A box around vertices 0 and 1, started on empty canvas. */
+	private val boxFrom = Offset(140f, 95f)
+	private val boxTo = Offset(250f, 125f)
+
+	/** A right-click mid-box abandons it: nothing lands. */
+	@Test
+	fun aRightClickMidBoxAbandonsIt() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession())
+			val session = fixture.session
+			pressIn(LEFT_AREA, boxFrom)
+			moveIn(LEFT_AREA, listOf(boxTo))
+
+			pressIn(LEFT_AREA, boxTo, MouseButton.Secondary)
+			releaseIn(LEFT_AREA, MouseButton.Secondary)
+			releaseIn(LEFT_AREA)
+
+			assertEquals(emptySet(), session.meshSelection.value.elementsOf(RIG_QUAD))
+			assertEquals(false, session.viewportGestureActive.value)
+		}
+
+	/** Shift+RightClick mid-box abandons it too, and does not place the cursor. */
+	@Test
+	fun aShiftRightClickMidBoxAbandonsItWithoutTheCursor() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession())
+			val session = fixture.session
+			pressIn(LEFT_AREA, boxFrom)
+			moveIn(LEFT_AREA, listOf(boxTo))
+
+			withKeyHeld(LEFT_AREA, Key.ShiftLeft) {
+				pressIn(LEFT_AREA, boxTo, MouseButton.Secondary)
+				releaseIn(LEFT_AREA, MouseButton.Secondary)
+			}
+			releaseIn(LEFT_AREA)
+
+			assertEquals(emptySet(), session.meshSelection.value.elementsOf(RIG_QUAD))
+			assertNull(session.cursor2d.value)
+		}
+
+	/** A box drag and a circle stroke both raise the session's gesture flag while they are held. */
+	@Test
+	fun aSelectDragRaisesTheGestureFlag() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession())
+			val session = fixture.session
+
+			pressIn(LEFT_AREA, boxFrom)
+			moveIn(LEFT_AREA, listOf(boxTo))
+			assertEquals(true, session.viewportGestureActive.value, "a box drag")
+			releaseIn(LEFT_AREA)
+			assertEquals(false, session.viewportGestureActive.value)
+
+			session.beginCircleSelect(LEFT_AREA)
+			waitForIdle()
+			pressIn(LEFT_AREA, rigScreenOf(20f, -20f))
+			assertEquals(true, session.viewportGestureActive.value, "a circle stroke")
+			releaseIn(LEFT_AREA)
+			assertEquals(false, session.viewportGestureActive.value)
+		}
+
+	/** Leaving Edit mode mid-box abandons the box: it never lands on the mesh selection after the switch. */
+	@Test
+	fun leavingEditModeMidBoxAbandonsIt() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession())
+			val session = fixture.session
+			pressIn(LEFT_AREA, boxFrom)
+			moveIn(LEFT_AREA, listOf(boxTo))
+
+			session.setMode(EditorMode.Object)
+			waitForIdle()
+			releaseIn(LEFT_AREA)
+
+			assertEquals(emptyMap(), session.meshSelection.value.elementsByDrawable)
+			assertTrue(session.historyView.value.steps.none { step -> step.labelKey == "change.mesh.select" }, "no selection step after the switch")
+			assertEquals(false, session.viewportGestureActive.value)
+		}
+
+	/** Arming Zoom Region mid-box abandons the box, which does not come back when Zoom Region disarms. */
+	@Test
+	fun armingZoomRegionMidBoxAbandonsIt() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession())
+			val session = fixture.session
+			pressIn(LEFT_AREA, boxFrom)
+			moveIn(LEFT_AREA, listOf(boxTo))
+
+			session.armZoomRegion(LEFT_AREA)
+			waitForIdle()
+			moveIn(LEFT_AREA, listOf(Offset(260f, 130f)))
+			releaseIn(LEFT_AREA)
+			assertEquals(false, session.viewportGestureActive.value, "the box went with the arming")
+			session.disarmZoomRegion()
+			waitForIdle()
+			moveIn(LEFT_AREA, listOf(Offset(300f, 200f)))
+
+			assertEquals(emptySet(), session.meshSelection.value.elementsOf(RIG_QUAD))
+			assertEquals(false, session.viewportGestureActive.value)
+		}
+
+	/** Undo mid-stroke is ignored until the stroke is released; the stroke then commits as its own step. */
+	@Test
+	fun undoMidStrokeWaitsForTheRelease() =
+		runComposeUiTest {
+			val fixture = mountGizmoOverlays(gizmoEditSession(elements = listOf(MeshElement.Vertex(0))))
+			val session = fixture.session
+			session.beginCircleSelect(LEFT_AREA)
+			waitForIdle()
+			val historyBefore = session.historyView.value
+
+			pressIn(LEFT_AREA, rigScreenOf(20f, -20f))
+			session.undo()
+			waitForIdle()
+			assertEquals(historyBefore, session.historyView.value, "the undo was ignored")
+			releaseIn(LEFT_AREA)
+
+			assertEquals(setOf<MeshElement>(MeshElement.Vertex(0), MeshElement.Vertex(2)), session.meshSelection.value.elementsOf(RIG_QUAD))
+			assertEquals(historyBefore.steps.size + 1, session.historyView.value.steps.size, "the stroke is its own step")
+		}
 }

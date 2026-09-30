@@ -49,6 +49,7 @@ import org.umamo.ui.theme.hiddenPointerIcon
 import org.umamo.ui.theme.selectionOverlayStyle
 import org.umamo.ui.viewport.gizmo.GizmoMeshGeometry
 import org.umamo.ui.viewport.gizmo.MarqueeSelectController
+import org.umamo.ui.viewport.gizmo.MeshPickController
 import org.umamo.ui.viewport.gizmo.ModalGestureState
 import org.umamo.ui.viewport.gizmo.ModalTransformTarget
 import org.umamo.ui.viewport.gizmo.TransformGestureFrame
@@ -62,7 +63,6 @@ import org.umamo.ui.viewport.gizmo.drawOwnedModalTransformHud
 import org.umamo.ui.viewport.gizmo.drawSelectToolAffordances
 import org.umamo.ui.viewport.gizmo.elementsInBox
 import org.umamo.ui.viewport.gizmo.gestureParameters
-import org.umamo.ui.viewport.gizmo.handleIdleMeshSelectionEvent
 import org.umamo.ui.viewport.gizmo.handleSelectLinkedRequest
 import org.umamo.ui.viewport.gizmo.selectToolKind
 import org.umamo.ui.viewport.rememberViewportOverlayColors
@@ -179,6 +179,22 @@ internal fun UvEditGizmoOverlay(
 				},
 				setCircleRadius = { radiusPx -> session.setCircleRadius(radiusPx) },
 				clearTool = { session.clearSelectTool() },
+				setGestureActive = { active -> session.setViewportGestureActive(active) },
+			)
+		}
+
+	// The element pick and box select, armed or not - the flow shared with the 2D viewport - placing the UV
+	// cursor on Shift+RightClick (the viewport's 2D-cursor gesture, in texture space).
+	val meshPick =
+		remember(areaId) {
+			MeshPickController(
+				session = session,
+				marquee = marquee,
+				geometries = { liveGeometries.value },
+				placeCursor = { displayX, displayY ->
+					val (cursorU, cursorV) = liveFrame.value.storedUvAt(displayX, displayY)
+					session.setUvCursor(cursorU, cursorV)
+				},
 			)
 		}
 
@@ -328,6 +344,7 @@ internal fun UvEditGizmoOverlay(
 	val ownedSelectTool = activeSelectTool?.takeIf { tool -> tool.areaId == areaId }
 	LaunchedEffect(selectToolKind(ownedSelectTool)) {
 		marquee.cancel()
+		meshPick.cancel()
 	}
 
 	// The race-free box cancel: the shell fires this for every Edit-mode select-gesture cancel, and an
@@ -335,6 +352,7 @@ internal fun UvEditGizmoOverlay(
 	LaunchedEffect(session) {
 		session.meshGestureCancelRequests.collect {
 			marquee.cancel()
+			meshPick.cancel()
 		}
 	}
 
@@ -461,6 +479,10 @@ internal fun UvEditGizmoOverlay(
 			if (gesture.capture != null) {
 				liveRenderSync.value?.resync()
 			}
+			// A select gesture in flight is dropped with the overlay, nothing of it landing, and the gesture
+			// flag it raised comes down.
+			marquee.discard()
+			meshPick.cancel()
 		}
 	}
 
@@ -532,10 +554,15 @@ internal fun UvEditGizmoOverlay(
 									(latchedUvOperator != null && latchedUvOperator.areaId != areaId) ||
 									(latchedTool != null && latchedTool.areaId != areaId)
 								) {
+									meshPick.cancel()
 									continue
 								}
 								val activeCamera = liveCamera.value
 								val size = liveSize.value
+								// A transform or the circle tool armed mid-drag supersedes the box.
+								if (latchedUvOperator != null || latchedTool is ActiveSelectTool.Circle) {
+									meshPick.cancel()
+								}
 								if (latchedUvOperator != null) {
 									// MODAL: the shared controller drives the transform over the captured
 									// mapping and swallows every event.
@@ -546,27 +573,10 @@ internal fun UvEditGizmoOverlay(
 									// do not also pan / zoom).
 									marquee.handleCircleEvent(event, change, latchedTool.radiusPx, activeCamera, size)
 								} else {
-									// IDLE: element selection, shared with the 2D viewport's Edit overlay.  Only
-									// primary-driven events are consumed, so middle-drag pan and wheel zoom fall
-									// through; armed Box-select boxes on any press and disarms.  Shift+RightClick
-									// places the UV cursor (the viewport's 2D-cursor gesture, in texture space).
-									handleIdleMeshSelectionEvent(
-										event = event,
-										change = change,
-										session = session,
-										geometries = liveGeometries.value,
-										marquee = marquee,
-										boxArmed = latchedTool is ActiveSelectTool.BoxArmed,
-										camera = activeCamera,
-										size = size,
-										placeCursor = { displayX, displayY ->
-											val (cursorU, cursorV) = liveFrame.value.storedUvAt(displayX, displayY)
-											session.setUvCursor(
-												cursorU,
-												cursorV,
-											)
-										},
-									)
+									// ELEMENT PICK AND BOX SELECT, armed or not: the flow shared with the 2D viewport.
+									// Only primary-driven events and right-clicks are consumed, so middle-drag pan
+									// and wheel zoom fall through.
+									meshPick.handleEvent(event, change, latchedTool is ActiveSelectTool.BoxArmed, activeCamera, size)
 								}
 							}
 						}
