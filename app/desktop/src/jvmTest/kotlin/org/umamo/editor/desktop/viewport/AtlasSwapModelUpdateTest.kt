@@ -3,6 +3,7 @@ package org.umamo.editor.desktop.viewport
 import androidx.compose.ui.graphics.toPixelMap
 import org.umamo.render.DecodedImage
 import org.umamo.render.PuppetTextures
+import org.umamo.render.gl.GlRenderDevice
 import org.umamo.runtime.model.AtlasPage
 import org.umamo.runtime.model.BlendMode
 import org.umamo.runtime.model.Drawable
@@ -142,7 +143,7 @@ class AtlasSwapModelUpdateTest {
 		val baselineAtlas = PuppetAtlas(pages = listOf(AtlasPage(16, 16)))
 		val baselineModel = modelWith(baselineAtlas, quadUvs(0.5f, 0.5f))
 		val baselineTextures = PuppetTextures(listOf(solidImage(0xFF, 0x00, 0x00)), mapOf(probeId.raw to 0), false)
-		val service = OffscreenPuppetService(baselineModel, baselineTextures, LiveParams(emptyMap()))
+		val service = OffscreenPuppetService(baselineModel, baselineTextures, LiveParams(emptyMap()), GlRenderDevice(), createOffscreenGlContext())
 		service.start()
 		try {
 			val frames = service.register("area")

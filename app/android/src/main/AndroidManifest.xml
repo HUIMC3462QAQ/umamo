@@ -5,6 +5,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
 	<application
+		android:name=".UmamoApplication"
 		android:allowBackup="true"
 		android:icon="@mipmap/ic_launcher"
 		android:label="Umamo"
@@ -52,6 +53,19 @@
 				<data android:pathPattern=".*\\..*\\.uma" />
 				<data android:pathPattern=".*\\..*\\..*\\.uma" />
 				<data android:pathPattern=".*\\..*\\..*\\..*\\.uma" />
+			</intent-filter>
+		</activity>
+
+		<!-- The GLES self-check. A launcher entry of its own on purpose: it must be reachable even when the
+		     editor shell cannot start, because validating the renderer port is a separate problem from
+		     getting the shell up. Labelled distinctly so it is obvious which icon runs what. -->
+		<activity
+			android:name=".ProbeActivity"
+			android:exported="true"
+			android:label="Umamo GL 自检">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
 		</activity>
 	</application>

@@ -41,10 +41,11 @@ internal fun puppetVertexShader(dialect: GlslDialect): String =
  *
  * @param GlslDialect dialect The target flavor.
  * @return String The ready-to-compile source.
- * @warning The [GlslDialect.Es300] output is NOT compilable as-is: `samplerBuffer` is GLES 3.2, and the
- *   Android baseline is 3.0.  Making it portable means repacking the shared position buffer as a regular
- *   2D texture indexed `(i % width, i / width)` - see TODO.md § Android GLES renderer backend option (b).
- *   The parameter is accepted here so the seam exists, not because ES works today.
+ * @warning On [GlslDialect.Es300] the position store is a regular RG32F 2D TEXTURE, not a texture buffer
+ *   (a TBO is GLES 3.2; the Android baseline is 3.0), indexed `(i % positionTexWidth, i / positionTexWidth)`,
+ *   so the Es300 build declares `sampler2D positionBuffer` plus a `positionTexWidth` uniform.
+ *   A caller MUST set that uniform to the store's row length: it cannot be a compile-time constant, because
+ *   the store's width is `min(row texels, vertex capacity)`.  The Core330 build is unchanged.
  */
 internal fun glueVertexShader(dialect: GlslDialect): String =
 	glslHeader(dialect) +
@@ -53,22 +54,51 @@ internal fun glueVertexShader(dialect: GlslDialect): String =
 		"layout(location = 3) in int inGlueIndex;\n" + // which glue (for its per-pose intensity), or -1
 		"layout(location = 4) in float inWeldWeight;\n" + // this vertex's weld weight (0 when not glued)
 		"uniform vec4 worldToNdc;\n" +
-		"uniform samplerBuffer positionBuffer;\n" + // RG = pass-1 deformed world positions, by global index
+		positionStoreUniforms(dialect) + // RG = pass-1 deformed world positions, by global index
 		"uniform int baseOffset;\n" + // this mesh's base index in positionBuffer
 		"uniform float glueIntensity[$MAX_GLUES];\n" +
 		"out vec2 vUv;\n" +
 		"void main() {\n" +
 		"	vUv = inUv;\n" +
-		"	vec2 own = texelFetch(positionBuffer, baseOffset + gl_VertexID).rg;\n" +
+		"	vec2 own = " + positionStoreFetch(dialect, "baseOffset + gl_VertexID") + ".rg;\n" +
 		"	vec2 world = own;\n" +
 		// Skip the partner read when the weld is a no-op: a zero per-pose intensity also flags an unposed
 		// partner (set CPU-side), whose position-buffer region is uninitialised - so it is never read.
 		"	if (inGlueIndex >= 0 && inWeldWeight != 0.0 && glueIntensity[inGlueIndex] != 0.0) {\n" +
-		"		vec2 partner = texelFetch(positionBuffer, inPartnerIndex).rg;\n" +
+		"		vec2 partner = " + positionStoreFetch(dialect, "inPartnerIndex") + ".rg;\n" +
 		"		vec2 welded = own + (partner - own) * (inWeldWeight * glueIntensity[inGlueIndex]); if (welded.x == welded.x && welded.y == welded.y && distance(welded, own) < 100000.0) { world = welded; }\n" +
 		"	}\n" +
 		"	gl_Position = vec4(world.x * worldToNdc.x + worldToNdc.z, world.y * worldToNdc.y + worldToNdc.w, 0.0, 1.0);\n" +
 		"}\n"
+
+/**
+ * The glue shader's position-store declarations, per dialect.
+ *
+ * Core330 reads a texture buffer with a bare integer index. Es300 has no texture buffers, so the store is
+ * a 2D RG32F texture and the shader needs the row length to turn a linear index into a texel coordinate.
+ *
+ * @param GlslDialect dialect The target flavor.
+ * @return String The declaration lines, newline-terminated.
+ */
+private fun positionStoreUniforms(dialect: GlslDialect): String =
+	when (dialect) {
+		GlslDialect.Core330 -> "uniform samplerBuffer positionBuffer;\n"
+		GlslDialect.Es300 -> "uniform sampler2D positionBuffer;\nuniform int positionTexWidth;\n"
+	}
+
+/**
+ * The glue shader's position lookup for a linear vertex [index], per dialect.
+ *
+ * @param GlslDialect dialect The target flavor.
+ * @param String      index   The GLSL expression producing the linear vertex index.
+ * @return String The `texelFetch` expression, without the trailing swizzle.
+ */
+private fun positionStoreFetch(dialect: GlslDialect, index: String): String =
+	when (dialect) {
+		GlslDialect.Core330 -> "texelFetch(positionBuffer, $index)"
+		GlslDialect.Es300 ->
+			"texelFetch(positionBuffer, ivec2(($index) % positionTexWidth, ($index) / positionTexWidth), 0)"
+	}
 
 /**
  * The shared puppet fragment shader: samples the bound art texture through the stored-to-sampled uv

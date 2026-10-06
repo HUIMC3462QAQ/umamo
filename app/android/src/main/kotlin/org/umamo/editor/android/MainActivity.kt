@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.init
+import org.umamo.editor.desktop.viewport.OffscreenPuppetService
+import org.umamo.render.gles.GlesRenderDevice
 import org.umamo.storage.androidAppStorage
 import org.umamo.ui.ProvideSettings
 import org.umamo.ui.app.EditorApp
@@ -28,9 +30,9 @@ import org.umamo.ui.theme.UmamoTheme
  * Android entrypoint.  Mounts the same shared [EditorApp] shell desktop runs - the full File / Edit /
  * Workspace / Help menu bar, document open/save through the SAF picker, the per-document editing
  * session, area tree, command palette, and the Preferences window - over the Android storage/settings
- * foundation.  The 2D GL viewport is the one piece still platform-deferred: viewport areas render
- * placeholders (viewportServiceFactory = null) until the GLES sibling of the desktop render service
- * lands; the platform split stays confined to the viewport, as intended.
+ * foundation.  The 2D viewport is wired to the shared off-screen stack (:viewport) through its GLES
+ * device and an EGL context, exactly as desktop wires the same stack through GL 3.3 and GLFW; the
+ * platform split stays confined to those two seams, as intended.
  */
 class MainActivity : ComponentActivity() {
 	/**
@@ -79,9 +81,12 @@ class MainActivity : ComponentActivity() {
 							onOpen = { document = it },
 							onExit = { finish() },
 							exitGuard = exitGuard,
-							// The GLES puppet render service is the remaining platform work; until it lands the
-							// shared shell runs fully (menus, document, panels, thumbnails) with placeholder viewports.
-							viewportServiceFactory = null,
+							// The GLES puppet render service, over the viewport stack's device + context seams:
+							// GlesRenderDevice draws through android.opengl, EglOffscreenGlContext owns the
+							// off-screen EGL context its render thread makes current.
+							viewportServiceFactory = { puppet, textures, liveParams ->
+								OffscreenPuppetService(puppet, textures, liveParams, GlesRenderDevice(), EglOffscreenGlContext()).also { it.start() }
+							},
 							openRequests = openRequests,
 						)
 					}

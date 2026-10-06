@@ -90,6 +90,8 @@ kotlin {
 				// stringResource(Res.string.*); :ui exposes it as implementation, so declare it here too.
 				implementation(libs.compose.components.resources)
 				implementation(project(":ui"))
+				// The off-screen viewport stack; the desktop host supplies the GL 3.3 device + GLFW context.
+				implementation(project(":viewport"))
 				implementation(project(":runtime"))
 				// Editing core: the per-document EditorSession the desktop host creates and the
 				// Selection / EditorMode model the viewport pick reads (used directly in jvmMain).

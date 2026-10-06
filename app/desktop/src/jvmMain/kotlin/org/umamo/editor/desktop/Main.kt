@@ -18,6 +18,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.umamo.editor.desktop.viewport.OffscreenPuppetService
 import org.umamo.format.FileRole
 import org.umamo.format.FormatRegistry
+import org.umamo.render.gl.GlRenderDevice
 import org.umamo.runtime.model.ParameterId
 import org.umamo.storage.UmamoLog
 import org.umamo.storage.desktopAppStorage
@@ -295,7 +296,7 @@ fun main(args: Array<String>) {
 							onExit = { closeApp() },
 							exitGuard = exitGuard,
 							viewportServiceFactory = { puppet, textures, liveParams ->
-								OffscreenPuppetService(puppet, textures, liveParams).also { it.start() }
+								OffscreenPuppetService(puppet, textures, liveParams, GlRenderDevice(), createOffscreenGlContext()).also { it.start() }
 							},
 							openRequests = openRequests,
 							hostHeap = hostHeap,

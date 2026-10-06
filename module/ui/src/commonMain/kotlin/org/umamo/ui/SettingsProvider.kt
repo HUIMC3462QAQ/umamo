@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
+import org.jetbrains.compose.resources.MissingResourceException
 import org.umamo.settings.Settings
 import org.umamo.storage.AppStorage
 import org.umamo.ui.l10n.LOCALE_SETTINGS_KEY
@@ -46,7 +47,17 @@ fun ProvideSettings(storage: AppStorage, content: @Composable () -> Unit) {
  *
  * @return String The default settings JSON.
  */
-suspend fun defaultSettingsJson(): String = Res.readBytes("files/defaultSettings.json").decodeToString()
+suspend fun defaultSettingsJson(): String =
+	try {
+		Res.readBytes("files/defaultSettings.json").decodeToString()
+	} catch (missing: MissingResourceException) {
+		// The bundled baseline is a Compose resource, and a packaging gap that loses it takes the whole
+		// app down before its first frame - which is exactly what the Android host did (its assets were
+		// empty, so this read threw at startup). Starting from an empty baseline only degrades the
+		// defaults; failing here costs the session.
+		println("Umamo: bundled defaultSettings.json is missing; starting from an empty baseline")
+		"{}"
+	}
 
 /**
  * Loads the app's settings - the bundled defaults under the user's file - and seeds a first run's choices, so

@@ -2,6 +2,7 @@ package org.umamo.editor.desktop.viewport
 
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
+import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import org.umamo.render.gl.GlRenderDevice
@@ -85,6 +86,10 @@ internal class GlfwOffscreenGlContext : OffscreenGlContext {
 	 * current, after the engine's glFinish barrier - or from a failed [createAndMakeCurrent], to release the
 	 * window it made.  Does nothing once no window is held, so a second call is harmless.
 	 */
+	override fun finish() {
+		GL11.glFinish()
+	}
+
 	override fun destroy() {
 		if (window != MemoryUtil.NULL) {
 			GLFW.glfwMakeContextCurrent(MemoryUtil.NULL)

@@ -60,6 +60,17 @@ jobs:
       - name: Set up Gradle (with caching)
         uses: gradle/actions/setup-gradle@v4
 
+      # AGP signs a debug build with ~/.android/debug.keystore, which it CREATES if absent - so every
+      # fresh runner produced a different key and a new build could not be installed over the previous
+      # one (INSTALL_FAILED_UPDATE_INCOMPATIBLE, and uninstalling first throws away the app's data).
+      # Caching the file pins one debug identity across runs. The key is a debug key and lives only in
+      # this repository's own cache, so nothing secret is being shared.
+      - name: Pin the debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: umamo-android-debug-keystore-v1
+
       - name: Assemble APK
         run: ./gradlew :android:${{ github.event.inputs.variant || 'assembleDebug' }} --stacktrace
 

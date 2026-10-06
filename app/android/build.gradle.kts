@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 // :android (app/android) — Android entrypoint (Activity + Compose + GLSurfaceView viewport).
 // A plain Android application module (not KMP): it consumes the shared KMP libraries.
 // :android — Android 起動点（Activity ＋ Compose ＋ GLSurfaceView ビューポート）。
@@ -56,6 +58,8 @@ dependencies {
 	// the same way the desktop does; declared directly for parity with :runtime / :render.
 	implementation(project(":edit"))
 	implementation(project(":render"))
+	// The off-screen viewport stack; this host supplies the GLES device + EGL context.
+	implementation(project(":viewport"))
 	// androidAppStorage + the per-OS config/data dirs the settings live in; also pulls FileKit
 	// (api-exposed by :storage), whose Android pickers MainActivity initialises with FileKit.init.
 	implementation(project(":storage"))
@@ -73,3 +77,60 @@ dependencies {
 	implementation(libs.compose.foundation)
 	implementation(libs.compose.ui)
 }
+
+// The app ships its OWN copy of :ui's compose resources, at
+// src/main/assets/composeResources/<resource package>/. It has to: Compose Multiplatform's resource
+// pipeline never delivered them into this app's assets, and on Android the resource reader resolves them
+// through ASSETS - so without the copy the app died before its first frame with
+// `MissingResourceException: composeResources/org.umamo.ui.resources/files/defaultSettings.json`, and
+// every string, font and icon was missing too.
+//
+// A checked-in copy can drift from its source, so this guard fails the build when it does. It is wired in
+// ahead of preBuild rather than left as an optional task, because a stale copy is exactly the bug it
+// exists to prevent and would otherwise ship silently.
+val composeResourcesSourceDirectory = rootProject.layout.projectDirectory.dir("module/ui/src/commonMain/composeResources")
+val shippedComposeAssetsDirectory = layout.projectDirectory.dir("src/main/assets/composeResources/org.umamo.ui.resources")
+
+val verifyComposeAssets =
+	tasks.register("verifyComposeAssets") {
+		description = "Fails when the app's checked-in compose resources drift from :ui's."
+		val sourceDirectory = composeResourcesSourceDirectory.asFile
+		val shippedDirectory = shippedComposeAssetsDirectory.asFile
+		val creditsFile = rootProject.file("CREDITS.md")
+		doLast {
+			fun digestOf(file: File): String =
+				MessageDigest.getInstance("SHA-256")
+					.digest(file.readBytes())
+					.joinToString("") { byte: Byte -> "%02x".format(byte) }
+
+			val expected = LinkedHashMap<String, String>()
+			sourceDirectory.walkTopDown().filter { it.isFile }.forEach { file ->
+				expected[file.relativeTo(sourceDirectory).invariantSeparatorsPath] = digestOf(file)
+			}
+			// :ui's own build sync folds CREDITS.md in under files/, so the shipped copy carries it too.
+			expected["files/CREDITS.md"] = digestOf(creditsFile)
+
+			val problems = mutableListOf<String>()
+			expected.forEach { (path, digest) ->
+				val shipped = File(shippedDirectory, path)
+				when {
+					!shipped.isFile -> problems += "missing from the app: $path"
+					digestOf(shipped) != digest -> problems += "differs from :ui: $path"
+				}
+			}
+			shippedDirectory.walkTopDown().filter { it.isFile }.forEach { file ->
+				val path = file.relativeTo(shippedDirectory).invariantSeparatorsPath
+				if (path !in expected) problems += "not present in :ui: $path"
+			}
+			if (problems.isNotEmpty()) {
+				throw GradleException(
+					"compose resources have drifted:\n  " + problems.joinToString("\n  ") +
+						"\nRe-copy module/ui/src/commonMain/composeResources (plus CREDITS.md under files/) into " +
+						"app/android/src/main/assets/composeResources/org.umamo.ui.resources/.",
+				)
+			}
+			logger.lifecycle("verifyComposeAssets: ${expected.size} files match :ui")
+		}
+	}
+
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(verifyComposeAssets) }

@@ -1,0 +1,69 @@
+{
+	"localization": {
+		"locale": "en"
+	},
+	"input": {
+		"keybinding": {
+			"preset": "default",
+			"overrides": {}
+		},
+		"pen": {
+			"backend": "auto"
+		}
+	},
+	"interface": {
+		"theme": "dark",
+		"historyLimit": 200,
+		"layout": {
+			"workspaces": []
+		},
+		"viewport": {
+			"showToolbar": true,
+			"showSidebar": false
+		}
+	},
+	"viewport": {
+		"zoomStepPercent": 1.0,
+		"zoomStepCoarsePercent": 5.0,
+		"selectionHighlightColor": "#FF338CFF",
+		"activeSelectionHighlightColor": "#FF7DE400",
+		"warningColor": "#FFFF5A5A",
+		"pinnedPlacementColor": "#FFB266FF",
+		"grid": {
+			"scale": 100.0,
+			"subdivisions": 10
+		},
+		"rendering": {
+			"supersample": true,
+			"supersampleWhileResizing": true
+		},
+		"meshEdit": {
+			"vertexIdle": "#FFFF00EC",
+			"vertexSelected": "#FFFF7A00",
+			"vertexActive": "#FF7DE400",
+			"vertexOffKey": "#66888888",
+			"edgeIdle": "#99000000",
+			"edgeSelected": "#FFFF7A00",
+			"edgeActive": "#FF7DE400",
+			"edgeOffKey": "#44888888",
+			"faceIdle": "#22000000",
+			"faceSelected": "#66FF7A00",
+			"faceActive": "#FF7DE400",
+			"faceOffKey": "#44888888"
+		}
+	},
+	"import": {
+		"parameterTemplate": "humanoid",
+		"alignment": "center",
+		"watchMode": "auto",
+		"deleteArtIgnoresLayer": false,
+		"layerPositionsFromWorldAxes": false
+	},
+	"app": {
+		"launchCount": 0,
+		"showLowMemoryNotice": true,
+		"checkForUpdates": true,
+		"lastUpdateCheck": 0,
+		"skippedUpdateVersion": ""
+	}
+}
