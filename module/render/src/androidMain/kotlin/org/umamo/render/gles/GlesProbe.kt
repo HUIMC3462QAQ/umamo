@@ -154,17 +154,18 @@ public class GlesProbe(
 					majorSpacingY = 64f,
 					subdivisions = 4,
 					lineWidthPx = 1.5f,
-					colors = GridColors(
-						backgroundRed = 0.10f,
-						backgroundGreen = 0.10f,
-						backgroundBlue = 0.13f,
-						majorRed = 0.55f,
-						majorGreen = 0.55f,
-						majorBlue = 0.60f,
-						minorRed = 0.22f,
-						minorGreen = 0.22f,
-						minorBlue = 0.26f,
-					),
+					colors =
+						GridColors(
+							backgroundRed = 0.10f,
+							backgroundGreen = 0.10f,
+							backgroundBlue = 0.13f,
+							majorRed = 0.55f,
+							majorGreen = 0.55f,
+							majorBlue = 0.60f,
+							minorRed = 0.22f,
+							minorGreen = 0.22f,
+							minorBlue = 0.26f,
+						),
 				),
 			)
 			pass.end()

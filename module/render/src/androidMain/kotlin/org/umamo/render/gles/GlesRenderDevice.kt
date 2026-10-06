@@ -458,12 +458,13 @@ class GlesRenderDevice : RenderDevice {
 		val rowBytes = glesTicket.width * 4
 		// ES has no glMapBuffer; the Range form is the one that exists. It returns null on failure, which
 		// the zero-filled fallback below covers.
-		val mapped: ByteBuffer? = GLES30.glMapBufferRange(
-			GLES30.GL_PIXEL_PACK_BUFFER,
-			0,
-			rowBytes * glesTicket.height,
-			GLES30.GL_MAP_READ_BIT,
-		) as? ByteBuffer
+		val mapped: ByteBuffer? =
+			GLES30.glMapBufferRange(
+				GLES30.GL_PIXEL_PACK_BUFFER,
+				0,
+				rowBytes * glesTicket.height,
+				GLES30.GL_MAP_READ_BIT,
+			) as? ByteBuffer
 		val topDown = ByteArray(rowBytes * glesTicket.height)
 		if (mapped != null) {
 			// Flip the GL bottom-up rows straight out of the mapped PBO into the API's top-first contract -

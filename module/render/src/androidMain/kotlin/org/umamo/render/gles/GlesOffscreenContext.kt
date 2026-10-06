@@ -65,7 +65,7 @@ public class GlesOffscreenContext(
 				intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE),
 				0,
 			)
-		if (context == null || context == EGL14.EGL_NO_CONTEXT) {
+		if (context == EGL14.EGL_NO_CONTEXT) {
 			return fail("eglCreateContext(ES3)")
 		}
 		surface =
@@ -75,7 +75,7 @@ public class GlesOffscreenContext(
 				intArrayOf(EGL14.EGL_WIDTH, surfaceWidth, EGL14.EGL_HEIGHT, surfaceHeight, EGL14.EGL_NONE),
 				0,
 			)
-		if (surface == null || surface == EGL14.EGL_NO_SURFACE) {
+		if (surface == EGL14.EGL_NO_SURFACE) {
 			return fail("eglCreatePbufferSurface")
 		}
 		if (!EGL14.eglMakeCurrent(display, surface, surface, context)) {
@@ -131,12 +131,18 @@ public class GlesOffscreenContext(
 	private fun chooseConfig(): EGLConfig? {
 		val attribs =
 			intArrayOf(
-				EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
-				EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
-				EGL14.EGL_RED_SIZE, 8,
-				EGL14.EGL_GREEN_SIZE, 8,
-				EGL14.EGL_BLUE_SIZE, 8,
-				EGL14.EGL_ALPHA_SIZE, 8,
+				EGL14.EGL_RENDERABLE_TYPE,
+				EGL_OPENGL_ES3_BIT_KHR,
+				EGL14.EGL_SURFACE_TYPE,
+				EGL14.EGL_PBUFFER_BIT,
+				EGL14.EGL_RED_SIZE,
+				8,
+				EGL14.EGL_GREEN_SIZE,
+				8,
+				EGL14.EGL_BLUE_SIZE,
+				8,
+				EGL14.EGL_ALPHA_SIZE,
+				8,
 				EGL14.EGL_NONE,
 			)
 		val configs = arrayOfNulls<EGLConfig>(1)

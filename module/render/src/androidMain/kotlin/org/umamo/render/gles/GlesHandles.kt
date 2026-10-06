@@ -109,6 +109,7 @@ internal class GlesUniformLocations(program: Int) {
 	val deltaTex = GLES20.glGetUniformLocation(program, "deltaTex")
 	val cpTex = GLES20.glGetUniformLocation(program, "cpTex")
 	val positionBuffer = GLES20.glGetUniformLocation(program, "positionBuffer")
+
 	// The Es300 glue shader turns a linear vertex index into a texel coordinate with these two: the
 	// store is a 2D texture there, so the row length has to be told to it (see glueVertexShader).
 	val positionTexWidth = GLES20.glGetUniformLocation(program, "positionTexWidth")
