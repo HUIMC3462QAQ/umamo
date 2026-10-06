@@ -94,11 +94,12 @@ public class GlesProbe(
 	private fun probePipelines(device: GlesRenderDevice, log: StringBuilder): Boolean {
 		var ok = true
 		for (purpose in PipelinePurpose.entries) {
-			val blend = when (purpose) {
-				PipelinePurpose.GridBackdrop -> PipelineBlend.Opaque
-				PipelinePurpose.Composite -> PipelineBlend.Opaque
-				else -> PipelineBlend.Normal
-			}
+			val blend =
+				when (purpose) {
+					PipelinePurpose.GridBackdrop -> PipelineBlend.Opaque
+					PipelinePurpose.Composite -> PipelineBlend.Opaque
+					else -> PipelineBlend.Normal
+				}
 			try {
 				device.createRenderPipeline(RenderPipelineSpec(purpose, blend, cullBackFaces = false))
 				log.append("pipeline ").append(purpose.name).append(": OK\n")
@@ -124,19 +125,20 @@ public class GlesProbe(
 		val grid = device.createRenderPipeline(RenderPipelineSpec(PipelinePurpose.GridBackdrop, PipelineBlend.Opaque))
 		try {
 			val frame = device.beginFrame()
-			val pass = frame.beginRenderPass(
-				RenderPassSpec(
-					colorTarget = target,
-					loadAction = LoadAction.Clear,
-					viewportWidth = width,
-					viewportHeight = height,
-					storeAction = StoreAction.Store,
-					clearRed = 0.05f,
-					clearGreen = 0.05f,
-					clearBlue = 0.07f,
-					clearAlpha = 1f,
-				),
-			)
+			val pass =
+				frame.beginRenderPass(
+					RenderPassSpec(
+						colorTarget = target,
+						loadAction = LoadAction.Clear,
+						viewportWidth = width,
+						viewportHeight = height,
+						storeAction = StoreAction.Store,
+						clearRed = 0.05f,
+						clearGreen = 0.05f,
+						clearBlue = 0.07f,
+						clearAlpha = 1f,
+					),
+				)
 			pass.setPipeline(grid)
 			// World -> NDC over a 256-unit square centred on the origin: the grid's own origin and spacing
 			// then land in the middle of the target, so lines are visible in the read-back.

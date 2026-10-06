@@ -57,14 +57,15 @@ internal object CrashLog {
 	private fun record(directory: File, thread: Thread, error: Throwable) {
 		val stack = StringWriter().also { writer -> PrintWriter(writer).use { error.printStackTrace(it) } }.toString()
 		val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-		val text = buildString {
-			append("crash at ").append(timestamp).append('\n')
-			append("thread: ").append(thread.name).append('\n')
-			append("device: ").append(android.os.Build.MANUFACTURER).append(' ')
-				.append(android.os.Build.MODEL).append(", Android ").append(android.os.Build.VERSION.RELEASE)
-				.append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n")
-			append('\n').append(stack)
-		}
+		val text =
+			buildString {
+				append("crash at ").append(timestamp).append('\n')
+				append("thread: ").append(thread.name).append('\n')
+				append("device: ").append(android.os.Build.MANUFACTURER).append(' ')
+					.append(android.os.Build.MODEL).append(", Android ").append(android.os.Build.VERSION.RELEASE)
+					.append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n")
+				append('\n').append(stack)
+			}
 		File(directory, FILE_NAME).writeText(text)
 		Log.e(TAG, "recorded a crash to $FILE_NAME")
 	}

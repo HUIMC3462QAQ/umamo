@@ -57,22 +57,24 @@ public class GlesOffscreenContext(
 		val config = chooseConfig() ?: return fail("eglChooseConfig (no ES3/ES2 pbuffer config)")
 		// EGL_CONTEXT_CLIENT_VERSION 3 is what makes this an ES 3.0 context; the config's
 		// EGL_RENDERABLE_TYPE only has to admit it (see chooseConfig).
-		context = EGL14.eglCreateContext(
-			display,
-			config,
-			EGL14.EGL_NO_CONTEXT,
-			intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE),
-			0,
-		)
+		context =
+			EGL14.eglCreateContext(
+				display,
+				config,
+				EGL14.EGL_NO_CONTEXT,
+				intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE),
+				0,
+			)
 		if (context == null || context == EGL14.EGL_NO_CONTEXT) {
 			return fail("eglCreateContext(ES3)")
 		}
-		surface = EGL14.eglCreatePbufferSurface(
-			display,
-			config,
-			intArrayOf(EGL14.EGL_WIDTH, surfaceWidth, EGL14.EGL_HEIGHT, surfaceHeight, EGL14.EGL_NONE),
-			0,
-		)
+		surface =
+			EGL14.eglCreatePbufferSurface(
+				display,
+				config,
+				intArrayOf(EGL14.EGL_WIDTH, surfaceWidth, EGL14.EGL_HEIGHT, surfaceHeight, EGL14.EGL_NONE),
+				0,
+			)
 		if (surface == null || surface == EGL14.EGL_NO_SURFACE) {
 			return fail("eglCreatePbufferSurface")
 		}
@@ -127,15 +129,16 @@ public class GlesOffscreenContext(
 	 * creation does not simply trust the config's type.
 	 */
 	private fun chooseConfig(): EGLConfig? {
-		val attribs = intArrayOf(
-			EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
-			EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
-			EGL14.EGL_RED_SIZE, 8,
-			EGL14.EGL_GREEN_SIZE, 8,
-			EGL14.EGL_BLUE_SIZE, 8,
-			EGL14.EGL_ALPHA_SIZE, 8,
-			EGL14.EGL_NONE,
-		)
+		val attribs =
+			intArrayOf(
+				EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
+				EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
+				EGL14.EGL_RED_SIZE, 8,
+				EGL14.EGL_GREEN_SIZE, 8,
+				EGL14.EGL_BLUE_SIZE, 8,
+				EGL14.EGL_ALPHA_SIZE, 8,
+				EGL14.EGL_NONE,
+			)
 		val configs = arrayOfNulls<EGLConfig>(1)
 		val count = IntArray(1)
 		if (EGL14.eglChooseConfig(display, attribs, 0, configs, 0, 1, count, 0) && count[0] > 0) {
