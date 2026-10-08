@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.umamo.editor.desktop.viewport.OffscreenPuppetService
+import org.umamo.editor.desktop.viewport.createOffscreenGlContext
 import org.umamo.format.FileRole
 import org.umamo.format.FormatRegistry
 import org.umamo.render.gl.GlRenderDevice
